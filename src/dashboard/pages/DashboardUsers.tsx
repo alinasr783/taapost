@@ -49,6 +49,8 @@ export default function DashboardUsers() {
   const handleUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
+      let userId = editingUser?.id
+
       if (editingUser) {
         const updateData: any = {
           username: formData.username,
@@ -57,14 +59,40 @@ export default function DashboardUsers() {
         if (formData.password) {
           updateData.password = formData.password
         }
-        await supabase.from('users').update(updateData).eq('id', editingUser.id)
+        const { error } = await supabase.from('users').update(updateData).eq('id', editingUser.id)
+        if (error) throw error
       } else {
-        await supabase.from('users').insert([{
+        const { data, error } = await supabase.from('users').insert([{
           username: formData.username,
-          password: formData.password, // Storing plain text as requested
+          password: formData.password,
           is_superadmin: formData.is_superadmin
-        }])
+        }]).select().single()
+        
+        if (error) throw error
+        if (data) userId = data.id
       }
+
+      // Save permissions
+      if (userId && !formData.is_superadmin) {
+        // Delete existing permissions
+        await supabase.from('user_permissions').delete().eq('user_id', userId)
+        
+        // Insert new permissions
+        const toInsert = userPermissions
+          .filter(p => p.can_add || p.can_edit || p.can_delete)
+          .map(p => ({
+            user_id: userId,
+            category_id: p.category_id,
+            can_add: p.can_add,
+            can_edit: p.can_edit,
+            can_delete: p.can_delete
+          }))
+        
+        if (toInsert.length > 0) {
+          await supabase.from('user_permissions').insert(toInsert)
+        }
+      }
+
       setIsFormOpen(false)
       fetchUsers()
     } catch (err) {
@@ -73,7 +101,7 @@ export default function DashboardUsers() {
     }
   }
 
-  const openUserForm = (user?: User) => {
+  const openUserForm = async (user?: User) => {
     if (user) {
       setEditingUser(user)
       setFormData({
@@ -81,6 +109,10 @@ export default function DashboardUsers() {
         password: '', // Don't show password
         is_superadmin: user.is_superadmin
       })
+      
+      // Fetch permissions
+      const { data } = await supabase.from('user_permissions').select('*').eq('user_id', user.id)
+      setUserPermissions(data || [])
     } else {
       setEditingUser(null)
       setFormData({
@@ -88,6 +120,7 @@ export default function DashboardUsers() {
         password: '',
         is_superadmin: false
       })
+      setUserPermissions([])
     }
     setIsFormOpen(true)
   }
@@ -221,7 +254,7 @@ export default function DashboardUsers() {
       {/* User Form Modal */}
       {isFormOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-lg shadow-xl w-full max-w-md border border-border">
+          <div className="bg-card rounded-lg shadow-xl w-full max-w-2xl border border-border max-h-[90vh] overflow-y-auto">
             <div className="p-4 border-b border-border flex justify-between items-center">
               <h2 className="text-xl font-bold text-foreground">{editingUser ? 'تعديل مستخدم' : 'إضافة مستخدم جديد'}</h2>
               <button onClick={() => setIsFormOpen(false)} className="p-2 hover:bg-muted rounded-full text-muted-foreground transition-colors">

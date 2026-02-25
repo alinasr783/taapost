@@ -179,6 +179,7 @@ export default function DashboardArticles() {
 
       {isFormOpen && (
         <DashboardArticleForm
+          key={editingArticle ? editingArticle.id : 'new'}
           article={editingArticle}
           categories={categories}
           user={user}

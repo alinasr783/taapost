@@ -8,11 +8,19 @@ type Props = { children: ReactNode }
 
 export default function SiteLayout({ children }: Props) {
   const [theme, setTheme] = useState(
-    document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+    localStorage.getItem('theme') || 'light'
   )
   const navigate = useNavigate()
   const [q, setQ] = useState('')
   const [categories, setCategories] = useState<Category[]>([])
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [theme])
 
   useEffect(() => {
     async function fetchCategories() {

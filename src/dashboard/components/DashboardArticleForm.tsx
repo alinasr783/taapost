@@ -15,44 +15,47 @@ type Props = {
   onSuccess: () => void
 }
 
+// Helper to decode HTML entities
+const decodeHtml = (html: string) => {
+  const txt = document.createElement('textarea')
+  txt.innerHTML = html
+  return txt.value
+}
+
 export default function DashboardArticleForm({ article, categories, user, permissions, onClose, onSuccess }: Props) {
   const [loading, setLoading] = useState(false)
-  const [formData, setFormData] = useState({
-    title: '',
-    slug: '',
-    excerpt: '',
-    content: '',
-    category_id: 0,
-    image: '',
-    type: 'article',
-    date: new Date().toISOString().split('T')[0]
-  })
-
-  // Helper to decode HTML entities
-  const decodeHtml = (html: string) => {
-    const txt = document.createElement('textarea')
-    txt.innerHTML = html
-    return txt.value
-  }
-
-  useEffect(() => {
+  const [formData, setFormData] = useState(() => {
     if (article) {
-      setFormData({
-        title: article.title,
-        slug: article.slug,
+      return {
+        title: article.title || '',
+        slug: article.slug || '',
         excerpt: article.excerpt || '',
         content: decodeHtml(article.content || ''),
-        category_id: article.category_id,
+        category_id: article.category_id || 0,
         image: article.image || '',
         type: article.type || 'article',
-        date: article.date || new Date().toISOString().split('T')[0]
-      })
-    } else {
+        date: article.date ? article.date.split('T')[0] : new Date().toISOString().split('T')[0]
+      }
+    }
+    return {
+      title: '',
+      slug: '',
+      excerpt: '',
+      content: '',
+      category_id: 0,
+      image: '',
+      type: 'article',
+      date: new Date().toISOString().split('T')[0]
+    }
+  })
+
+  useEffect(() => {
+    if (!article) {
       // Set default category if available
       const availableCategories = categories.filter(c => 
         user?.is_superadmin || permissions.some(p => p.category_id === c.id && p.can_add)
       )
-      if (availableCategories.length > 0) {
+      if (availableCategories.length > 0 && formData.category_id === 0) {
         setFormData(prev => ({ ...prev, category_id: availableCategories[0].id }))
       }
     }
@@ -169,7 +172,7 @@ export default function DashboardArticleForm({ article, categories, user, permis
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">القسم</label>
               <select
@@ -182,6 +185,22 @@ export default function DashboardArticleForm({ article, categories, user, permis
                 {availableCategories.map(c => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1">نوع المحتوى</label>
+              <select
+                required
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                className="w-full p-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring outline-none text-foreground"
+              >
+                <option value="article">مقال</option>
+                <option value="breaking">خبر عاجل</option>
+                <option value="report">تقرير</option>
+                <option value="video">فيديو</option>
+                <option value="podcast">بودكاست</option>
+                <option value="statement">بيان رسمي</option>
               </select>
             </div>
             <div>

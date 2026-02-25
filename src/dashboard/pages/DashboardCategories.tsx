@@ -137,7 +137,9 @@ export default function DashboardCategories() {
         slug: formData.slug,
         description: formData.description,
         image: formData.image,
-        topics: formData.topics.split(',').map(t => t.trim()).filter(Boolean)
+        topics: formData.topics.split(',').map(t => t.trim()).filter(Boolean),
+        order_index: formData.order_index,
+        display_order: formData.display_order
       }
 
       if (editingCategory) {
@@ -361,6 +363,26 @@ export default function DashboardCategories() {
                   className="w-full p-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring outline-none"
                   placeholder="سياسة, اقتصاد, رياضة"
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">ترتيب القائمة</label>
+                  <input
+                    type="number"
+                    value={formData.order_index}
+                    onChange={(e) => setFormData({ ...formData, order_index: parseInt(e.target.value) || 0 })}
+                    className="w-full p-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">ترتيب الرئيسية</label>
+                  <input
+                    type="number"
+                    value={formData.display_order}
+                    onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) || 0 })}
+                    className="w-full p-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring outline-none"
+                  />
+                </div>
               </div>
               <div>
                 <ImageUpload

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowRight, Calendar, Folder } from 'lucide-react'
 import { supabase, type Article } from '../lib/supabase'
 import { useTrackView } from '../hooks/useTrackView'
@@ -8,6 +8,7 @@ export default function ArticlePage() {
   const { slug } = useParams()
   const navigate = useNavigate()
   const [article, setArticle] = useState<Article | null>(null)
+  const [relatedArticles, setRelatedArticles] = useState<Article[]>([])
   const [loading, setLoading] = useState(true)
   const [toc, setToc] = useState<{ id: string, text: string }[]>([])
 
@@ -47,6 +48,19 @@ export default function ArticlePage() {
             contentHtml: doc.body.innerHTML
           } as Article)
           setToc(newToc)
+
+          // Fetch related articles
+          const { data: relatedData } = await supabase
+            .from('articles')
+            .select('slug, title, image, date, category_id, excerpt')
+            .eq('category_id', data.category_id)
+            .neq('id', data.id)
+            .limit(5)
+            .order('date', { ascending: false })
+            
+          if (relatedData) {
+             setRelatedArticles(relatedData as Article[])
+          }
         } else {
           setArticle(null)
         }
@@ -184,6 +198,49 @@ export default function ArticlePage() {
           </div>
         </article>
       </div>
+
+      {/* Related Articles Section */}
+      {relatedArticles.length > 0 && (
+        <section className="mt-16 border-t border-border/40 pt-10">
+          <h2 className="text-2xl font-bold mb-8 flex items-center gap-2">
+            <span className="w-1 h-8 bg-primary rounded-full"/>
+            اقرأ أيضاً
+          </h2>
+          <div className="overflow-x-auto">
+            <div className="flex gap-7 pb-4">
+              {relatedArticles.map((related) => (
+                <Link 
+                  key={related.id} 
+                  to={`/مقال/${encodeURIComponent(related.slug)}`}
+                  className="relative flex min-w-[360px] max-w-[480px] flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md group"
+                >
+                  <div className="relative h-56 w-full">
+                    <img 
+                      src={related.image} 
+                      alt={related.title} 
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
+                    <div className="absolute right-2 top-2 rounded-[5px] border border-white/30 bg-black/40 px-2 py-1 text-[11px] text-white/90 backdrop-blur">
+                      {related.date}
+                    </div>
+                    <div className="absolute inset-x-2 bottom-2">
+                      <div className="space-y-1 rounded-[5px] border border-white/20 bg-black/50 px-3 py-2 text-white backdrop-blur-md">
+                        <div className="line-clamp-2 text-sm font-semibold">
+                          {related.title}
+                        </div>
+                        <div className="line-clamp-2 text-[11px] text-white/85">
+                          {related.excerpt}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   )
 }
