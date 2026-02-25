@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, FileText, FolderTree, Users, LogOut, Settings } from 'lucide-react'
-import type { User } from '../../lib/supabase'
+import { LayoutDashboard, FileText, FolderTree, Users, LogOut } from 'lucide-react'
+import type { User } from '../lib/supabase'
 
 export default function DashboardLayout() {
   const navigate = useNavigate()

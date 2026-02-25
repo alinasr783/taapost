@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = "https://vqhqczgumuganbefodqo.supabase.co"
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxaHFjemd1bXVnYW5iZWZvZHFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4MTg3MTUsImV4cCI6MjA4NzM5NDcxNX0.LHHEW_0_0egk7gEIHRoB8U1vJ9FmNqjJ5lzPpNOXorU"
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase environment variables. Check .env file.')
@@ -39,6 +39,7 @@ export type Article = {
   category?: string
   categoryId?: number
   contentHtml?: string
+  created_at?: string
 }
 
 export type User = {

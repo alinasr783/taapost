@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Save, Image as ImageIcon } from 'lucide-react'
+import { X, Save } from 'lucide-react'
 import { supabase, type Article, type Category, type User, type UserPermission } from '../../lib/supabase'
 import { hasPermission } from '../utils'
 import ImageUpload from './ImageUpload'
@@ -220,7 +220,7 @@ export default function DashboardArticleForm({ article, categories, user, permis
               <ReactQuill
                 theme="snow"
                 value={formData.content}
-                onChange={(value) => setFormData({ ...formData, content: value })}
+                onChange={(value: string) => setFormData({ ...formData, content: value })}
                 className="h-64 mb-12"
                 modules={{
                   toolbar: [

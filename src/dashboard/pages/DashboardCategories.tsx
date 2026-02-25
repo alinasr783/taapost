@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase, type Category } from '../../lib/supabase'
-import { Plus, Edit, Trash2, GripVertical, Save, ArrowRight, X } from 'lucide-react'
+import { Plus, Edit, Trash2, Save, X } from 'lucide-react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, horizontalListSortingStrategy } from '@dnd-kit/sortable'
 import { SortableItem } from '../components/SortableItem'
-import { useNavigate } from 'react-router-dom'
 import ImageUpload from '../components/ImageUpload'
 
 export default function DashboardCategories() {
@@ -13,7 +12,7 @@ export default function DashboardCategories() {
   const [activeTab, setActiveTab] = useState<'list' | 'header_order' | 'home_order'>('list')
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
-  const [savingOrder, setSavingOrder] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   
   // Form State
   const [formData, setFormData] = useState({
@@ -41,7 +40,7 @@ export default function DashboardCategories() {
 
   const fetchCategories = async () => {
     setLoading(true)
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('categories')
       .select('*')
       .order('order_index', { ascending: true }) // Default sort by header order
@@ -87,7 +86,7 @@ export default function DashboardCategories() {
 
   const saveOrder = async (items: Category[], field: 'order_index' | 'display_order') => {
     try {
-      setSavingOrder(true)
+      setIsSaving(true)
       const updates = items.map((item, index) => ({
         id: item.id,
         [field]: index
@@ -102,7 +101,7 @@ export default function DashboardCategories() {
       console.error('Error saving order:', err)
       alert('حدث خطأ أثناء حفظ الترتيب')
     } finally {
-      setSavingOrder(false)
+      setIsSaving(false)
     }
   }
 
@@ -131,6 +130,7 @@ export default function DashboardCategories() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSaving(true)
     try {
       const dataToSave = {
         name: formData.name,
@@ -151,6 +151,8 @@ export default function DashboardCategories() {
     } catch (err) {
       console.error(err)
       alert('حدث خطأ أثناء الحفظ')
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -372,15 +374,17 @@ export default function DashboardCategories() {
                   type="button"
                   onClick={() => setIsFormOpen(false)}
                   className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-md transition-colors"
+                  disabled={isSaving}
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
                   className="px-6 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 flex items-center gap-2 transition-colors"
+                  disabled={isSaving}
                 >
                   <Save size={18} />
-                  <span>حفظ</span>
+                  <span>{isSaving ? 'جاري الحفظ...' : 'حفظ'}</span>
                 </button>
               </div>
             </form>

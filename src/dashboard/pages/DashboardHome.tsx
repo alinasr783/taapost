@@ -10,8 +10,15 @@ import { Loader2 } from 'lucide-react'
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8']
 
 export default function DashboardHome() {
+  interface AnalyticsData {
+    topArticles: { name: string; fullTitle: string; count: number }[]
+    topLocations: { name: string; value: number }[]
+    topTimes: { name: string; views: number }[]
+    topCategories: { name: string; count: number }[]
+  }
+
   const [loading, setLoading] = useState(true)
-  const [data, setData] = useState({
+  const [data, setData] = useState<AnalyticsData>({
     topArticles: [],
     topLocations: [],
     topTimes: [],
@@ -165,12 +172,12 @@ export default function DashboardHome() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  label={({ name, percent }: any) => `${name} ${(percent ? percent * 100 : 0).toFixed(0)}%`}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"
                 >
-                  {data.topLocations.map((entry, index) => (
+                  {data.topLocations.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="hsl(var(--card))" />
                   ))}
                 </Pie>
