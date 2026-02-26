@@ -222,17 +222,17 @@ export default function Home() {
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={handleNext}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
-                  >
-                    ›
-                  </button>
-                  <button
-                    type="button"
                     onClick={handlePrev}
                     className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
                   >
                     ‹
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNext}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
+                  >
+                    ›
                   </button>
                   <div className="flex items-center gap-1">
                     {carouselArticles.map((item, index) => (
@@ -255,8 +255,8 @@ export default function Home() {
             </div>
             
             {/* Mobile Controls */}
-            <div className="flex flex-col items-end gap-3 md:hidden pointer-events-auto">
-              <div className="flex flex-wrap justify-end gap-2">
+            <div className="flex flex-col items-start gap-3 md:hidden pointer-events-auto">
+              <div className="flex flex-wrap justify-start gap-2">
                 <button
                   type="button"
                   onClick={(e) => {
@@ -283,17 +283,17 @@ export default function Home() {
               <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={handleNext}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
-                  >
-                    ›
-                  </button>
-                  <button
-                    type="button"
                     onClick={handlePrev}
                     className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
                   >
                     ‹
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNext}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
+                  >
+                    ›
                   </button>
                   <div className="flex items-center gap-1">
                     {carouselArticles.map((item, index) => (
