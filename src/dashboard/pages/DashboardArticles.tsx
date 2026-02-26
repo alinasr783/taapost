@@ -14,16 +14,6 @@ export default function DashboardArticles() {
   const [user, setUser] = useState<User | null>(null)
   const [permissions, setPermissions] = useState<UserPermission[]>([])
 
-  useEffect(() => {
-    const storedUser = localStorage.getItem('dashboard_user')
-    if (storedUser) {
-      const u = JSON.parse(storedUser)
-      setUser(u)
-      fetchPermissions(u.id)
-    }
-    fetchData()
-  }, [])
-
   const fetchPermissions = async (userId: number) => {
     const { data } = await supabase.from('user_permissions').select('*').eq('user_id', userId)
     if (data) setPermissions(data)
@@ -40,6 +30,16 @@ export default function DashboardArticles() {
     if (categoriesRes.data) setCategories(categoriesRes.data)
     setLoading(false)
   }
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('dashboard_user')
+    if (storedUser) {
+      const u = JSON.parse(storedUser)
+      setUser(u)
+      fetchPermissions(u.id)
+    }
+    fetchData()
+  }, [])
 
   const handleDelete = async (id: number) => {
     if (!window.confirm('هل أنت متأكد من حذف هذا المقال؟')) return

@@ -20,7 +20,9 @@ export default function DashboardCategories() {
     slug: '',
     description: '',
     image: '',
-    topics: ''
+    topics: '',
+    order_index: 0,
+    display_order: 0
   })
 
   const sensors = useSensors(
@@ -166,7 +168,9 @@ export default function DashboardCategories() {
         slug: category.slug,
         description: category.description || '',
         image: category.image || '',
-        topics: category.topics ? category.topics.join(', ') : ''
+        topics: category.topics ? category.topics.join(', ') : '',
+        order_index: category.order_index || 0,
+        display_order: category.display_order || 0
       })
     } else {
       setEditingCategory(null)
@@ -175,7 +179,9 @@ export default function DashboardCategories() {
         slug: '',
         description: '',
         image: '',
-        topics: ''
+        topics: '',
+        order_index: 0,
+        display_order: 0
       })
     }
     setIsFormOpen(true)

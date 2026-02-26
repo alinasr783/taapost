@@ -6,16 +6,16 @@ import type { User } from '../lib/supabase'
 export default function DashboardLayout() {
   const navigate = useNavigate()
   const location = useLocation()
-  const [user, setUser] = useState<User | null>(null)
+  const [user] = useState<User | null>(() => {
+    const storedUser = localStorage.getItem('dashboard_user')
+    return storedUser ? JSON.parse(storedUser) : null
+  })
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('dashboard_user')
-    if (!storedUser) {
+    if (!user) {
       navigate('/dashboard/login')
-      return
     }
-    setUser(JSON.parse(storedUser))
-  }, [navigate])
+  }, [user, navigate])
 
   const handleLogout = () => {
     localStorage.removeItem('dashboard_user')
