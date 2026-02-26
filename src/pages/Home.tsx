@@ -69,21 +69,9 @@ export default function Home() {
       const container = scrollRef.current
       const slideWidth = container.clientWidth
       container.scrollTo({
-        left: -(index * slideWidth), // For RTL, usually negative or positive depending on browser implementation of scrollLeft. Let's try standard scrollTo with behavior.
-        // Actually, let's use scrollIntoView on the child element if possible, or calculate position.
-        // In RTL, scrollLeft 0 is usually the rightmost point. Scrolling left means negative values in some browsers (Chrome) or positive (Firefox/Safari old).
-        // Safest is to use scrollIntoView on the child.
+        left: -(index * slideWidth),
         behavior: 'smooth'
       })
-      // Better approach for RTL compatibility:
-      const child = container.children[index] as HTMLElement
-      if (child) {
-        // child.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' }) 
-        // inline: 'start' in RTL should align to the right.
-        // However, if we want full control, we might need to test.
-        // Let's stick to scrollIntoView.
-        child.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
-      }
       setCarouselIndex(index)
     }
   }
