@@ -21,7 +21,7 @@ export default function ArticlePage() {
       try {
         const { data, error } = await supabase
           .from('articles')
-          .select('*, categories(name)')
+          .select('*, categories(name), authors(name, image, bio, role)')
           .eq('slug', slug)
           .single()
         
@@ -42,9 +42,15 @@ export default function ArticlePage() {
             newToc.push({ id, text: h2.textContent || '' })
           })
 
+          // Handle authors (could be array or object depending on relation)
+          const authorData = Array.isArray(data.authors) 
+            ? (data.authors.length > 0 ? data.authors[0] : null)
+            : data.authors
+
           setArticle({
             ...data,
             category: (Array.isArray(data.categories) ? data.categories[0]?.name : data.categories?.name) || '',
+            authors: authorData,
             contentHtml: doc.body.innerHTML
           } as Article)
           setToc(newToc)
@@ -52,7 +58,7 @@ export default function ArticlePage() {
           // Fetch related articles
           const { data: relatedData } = await supabase
             .from('articles')
-            .select('slug, title, image, date, category_id, excerpt')
+            .select('id, slug, title, image, date, category_id, excerpt, is_exclusive')
             .eq('category_id', data.category_id)
             .neq('id', data.id)
             .limit(5)
@@ -133,14 +139,20 @@ export default function ArticlePage() {
 
         {/* Meta Info (Date, Category, Reading Time) */}
         <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-          <span className="flex items-center gap-1 rounded-[5px] bg-primary/10 px-3 py-1 text-primary">
+          <span className="flex items-center gap-1 rounded-[5px] bg-primary text-primary-foreground px-3 py-1 font-medium shadow-sm">
             <Folder className="h-4 w-4" />
             {article.category}
           </span>
-          <span className="flex items-center gap-1">
-            <Calendar className="h-4 w-4" />
-            {article.date}
-          </span>
+          {article.is_exclusive ? (
+            <span className="flex items-center gap-1 rounded-[5px] bg-red-600/10 px-3 py-1 text-red-600 font-bold border border-red-600/20">
+              حصرياً
+            </span>
+          ) : (
+            <span className="flex items-center gap-1">
+              <Calendar className="h-4 w-4" />
+              {new Date(article.date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}
+            </span>
+          )}
           <span className="flex items-center gap-1">
             <span className="i-lucide-clock h-4 w-4" />
             {calculateReadingTime(article.content || '')}
@@ -188,14 +200,35 @@ export default function ArticlePage() {
         )}
 
         {/* Main Content */}
-        <article className={`space-y-8 ${toc.length > 0 ? 'lg:col-span-9 lg:order-1' : 'lg:col-span-12'}`}>
+        <article className={`space-y-8 min-w-0 ${toc.length > 0 ? 'lg:col-span-9 lg:order-1' : 'lg:col-span-12'}`}>
           {/* Content */}
-          <div className="rounded-[5px] border border-border/40 bg-card/30 p-6 backdrop-blur-sm md:p-10">
+          <div className="w-full overflow-hidden break-words rounded-[5px] border border-border/40 bg-card/30 p-6 backdrop-blur-sm md:p-10">
             <div 
-              className="prose prose-lg max-w-none dark:prose-invert prose-headings:font-bold prose-a:text-primary prose-img:rounded-[5px] prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-li:text-foreground prose-h2:text-xl md:prose-h2:text-3xl"
+              className="prose prose-lg max-w-none dark:prose-invert prose-headings:font-bold prose-headings:text-primary prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-img:rounded-[5px] prose-p:text-foreground/90 prose-strong:text-foreground prose-li:text-foreground/90 prose-blockquote:border-primary prose-blockquote:bg-primary/5 prose-blockquote:py-1 prose-blockquote:pr-4 prose-blockquote:rounded-r-sm prose-h2:text-xl md:prose-h2:text-3xl"
               dangerouslySetInnerHTML={{ __html: article.contentHtml || '' }}
             />
           </div>
+
+          {article.authors && article.authors.name && (
+            <div className="mt-8 rounded-[5px] border border-border/40 bg-card/50 p-6 backdrop-blur-sm flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-right">
+              <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-primary/20 shrink-0">
+                {article.authors.image ? (
+                  <img src={article.authors.image} alt={article.authors.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-primary/10 flex items-center justify-center text-primary text-2xl font-bold">
+                    {article.authors.name.charAt(0)}
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 space-y-2">
+                <div className="flex flex-col md:flex-row items-center md:items-end gap-2 justify-center md:justify-start">
+                  <h3 className="text-xl font-bold text-foreground">{article.authors.name}</h3>
+                  {article.authors.role && <span className="text-sm text-primary bg-primary/10 px-2 py-0.5 rounded-full">{article.authors.role}</span>}
+                </div>
+                <p className="text-muted-foreground">{article.authors.bio}</p>
+              </div>
+            </div>
+          )}
         </article>
       </div>
 
@@ -221,9 +254,11 @@ export default function ArticlePage() {
                       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
-                    <div className="absolute right-2 top-2 rounded-[5px] border border-white/30 bg-black/40 px-2 py-1 text-[11px] text-white/90 backdrop-blur">
-                      {related.date}
-                    </div>
+                    {related.is_exclusive && (
+                      <div className="absolute right-2 top-2 rounded-[5px] border border-white/30 bg-red-600/80 px-2 py-1 text-[11px] text-white/90 backdrop-blur font-bold">
+                        حصرياً
+                      </div>
+                    )}
                     <div className="absolute inset-x-2 bottom-2">
                       <div className="space-y-1 rounded-[5px] border border-white/20 bg-black/50 px-3 py-2 text-white backdrop-blur-md">
                         <div className="line-clamp-2 text-sm font-semibold">

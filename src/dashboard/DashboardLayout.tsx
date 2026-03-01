@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, FileText, FolderTree, Users, LogOut } from 'lucide-react'
+import { LayoutDashboard, FileText, FolderTree, Users, LogOut, Settings, PenTool, LayoutTemplate } from 'lucide-react'
 import type { User } from '../lib/supabase'
 
 export default function DashboardLayout() {
@@ -28,6 +28,9 @@ export default function DashboardLayout() {
     { label: 'الرئيسية', icon: LayoutDashboard, path: '/dashboard' },
     { label: 'المقالات', icon: FileText, path: '/dashboard/articles' },
     { label: 'الأقسام', icon: FolderTree, path: '/dashboard/categories' },
+    { label: 'الكتاب', icon: PenTool, path: '/dashboard/authors' },
+    { label: 'تخصيص الرئيسية', icon: LayoutTemplate, path: '/dashboard/home-customization' },
+    { label: 'الاعدادات', icon: Settings, path: '/dashboard/settings' },
   ]
 
   if (user.is_superadmin) {
@@ -69,7 +72,7 @@ export default function DashboardLayout() {
   }
 
   return (
-    <div className="flex min-h-screen bg-muted/30 rtl text-right font-sans" dir="rtl">
+    <div className="flex h-screen bg-muted/30 rtl text-right font-sans overflow-hidden" dir="rtl">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-64 bg-card border-l border-border flex-col fixed h-full z-10 shadow-sm right-0 top-0">
         <div className="p-6 border-b border-border">

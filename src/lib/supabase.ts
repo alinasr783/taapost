@@ -35,6 +35,9 @@ export type Article = {
   type: string
   date: string
   categories?: Category
+  author_id?: number
+  authors?: Author
+  is_exclusive?: boolean
   // Helper for frontend compatibility
   category?: string
   categoryId?: number
@@ -66,4 +69,32 @@ export type ArticleView = {
   country: string
   city: string
   device_type?: string
+}
+
+export type SocialLink = {
+  id: number
+  platform: string
+  url: string
+  icon: string
+  is_active: boolean
+  sort_order: number
+}
+
+export type Author = {
+  id: number
+  name: string
+  image: string
+  bio: string
+  role?: string
+}
+
+export type HomepageSection = {
+  id: number
+  type: 'carousel' | 'category_grid' | 'category_list' | 'custom' | 'latest_grid' | 'category_section'
+  title: string
+  category_id?: number
+  display_order: number
+  is_active: boolean
+  settings?: Record<string, any>
+  categories?: Category // For joined data
 }

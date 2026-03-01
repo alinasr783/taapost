@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { X, Save } from 'lucide-react'
-import { supabase, type Article, type Category, type User, type UserPermission } from '../../lib/supabase'
+import { supabase, type Article, type Category, type User, type UserPermission, type Author } from '../../lib/supabase'
 import { hasPermission } from '../utils'
 import ImageUpload from './ImageUpload'
 import ReactQuill from 'react-quill-new'
@@ -24,6 +24,7 @@ const decodeHtml = (html: string) => {
 
 export default function DashboardArticleForm({ article, categories, user, permissions, onClose, onSuccess }: Props) {
   const [loading, setLoading] = useState(false)
+  const [authors, setAuthors] = useState<Author[]>([])
   const [formData, setFormData] = useState(() => {
     if (article) {
       return {
@@ -32,8 +33,10 @@ export default function DashboardArticleForm({ article, categories, user, permis
         excerpt: article.excerpt || '',
         content: decodeHtml(article.content || ''),
         category_id: article.category_id || 0,
+        author_id: article.author_id || 0,
         image: article.image || '',
         type: article.type || 'article',
+        is_exclusive: article.is_exclusive || false,
         date: article.date ? article.date.split('T')[0] : new Date().toISOString().split('T')[0]
       }
     }
@@ -43,13 +46,20 @@ export default function DashboardArticleForm({ article, categories, user, permis
       excerpt: '',
       content: '',
       category_id: 0,
+      author_id: 0,
       image: '',
       type: 'article',
+      is_exclusive: false,
       date: new Date().toISOString().split('T')[0]
     }
   })
 
   useEffect(() => {
+    // Fetch authors
+    supabase.from('authors').select('*').order('name').then(({ data }) => {
+      if (data) setAuthors(data)
+    })
+
     if (!article) {
       // Set default category if available
       const availableCategories = categories.filter(c => 
@@ -89,6 +99,7 @@ export default function DashboardArticleForm({ article, categories, user, permis
 
       const dataToSave = {
         ...formData,
+        author_id: formData.author_id === 0 ? null : formData.author_id
       }
 
       let error
@@ -131,8 +142,8 @@ export default function DashboardArticleForm({ article, categories, user, permis
   })
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-card rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col border border-border">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-card rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col border border-border" onClick={(e) => e.stopPropagation()}>
         <div className="p-4 border-b border-border flex justify-between items-center sticky top-0 bg-card z-10">
           <h2 className="text-xl font-bold text-foreground">{article ? 'تعديل مقال' : 'إضافة مقال جديد'}</h2>
           <button onClick={onClose} className="p-2 hover:bg-muted rounded-full text-muted-foreground transition-colors">
@@ -203,6 +214,17 @@ export default function DashboardArticleForm({ article, categories, user, permis
                 <option value="statement">بيان رسمي</option>
               </select>
             </div>
+            <div className="flex items-end mb-1">
+              <label className="flex items-center gap-2 cursor-pointer bg-muted/30 p-2 rounded-md border border-input w-full">
+                <input
+                  type="checkbox"
+                  checked={formData.is_exclusive}
+                  onChange={(e) => setFormData({ ...formData, is_exclusive: e.target.checked })}
+                  className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <span className="text-sm font-medium text-foreground">مقال حصري</span>
+              </label>
+            </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">التاريخ</label>
               <input
@@ -213,6 +235,20 @@ export default function DashboardArticleForm({ article, categories, user, permis
                 className="w-full p-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring outline-none text-foreground"
               />
             </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">الكاتب (اختياري)</label>
+            <select
+              value={formData.author_id}
+              onChange={(e) => setFormData({ ...formData, author_id: Number(e.target.value) })}
+              className="w-full p-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring outline-none text-foreground"
+            >
+              <option value={0}>بدون كاتب</option>
+              {authors.map(author => (
+                <option key={author.id} value={author.id}>{author.name}</option>
+              ))}
+            </select>
           </div>
 
           <div>

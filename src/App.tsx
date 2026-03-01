@@ -11,6 +11,10 @@ import DashboardHome from './dashboard/pages/DashboardHome'
 import DashboardArticles from './dashboard/pages/DashboardArticles'
 import DashboardCategories from './dashboard/pages/DashboardCategories'
 import DashboardUsers from './dashboard/pages/DashboardUsers'
+import DashboardAuthors from './dashboard/pages/DashboardAuthors'
+import DashboardHomeCustomization from './dashboard/pages/DashboardHomeCustomization'
+import DashboardSettings from './dashboard/pages/DashboardSettings'
+import ScrollToTop from './components/ScrollToTop'
 
 function PublicLayout() {
   return (
@@ -23,6 +27,7 @@ function PublicLayout() {
 export default function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Routes>
         {/* Dashboard Routes */}
         <Route path="/dashboard/login" element={<DashboardLogin />} />
@@ -31,6 +36,9 @@ export default function App() {
           <Route path="articles" element={<DashboardArticles />} />
           <Route path="categories" element={<DashboardCategories />} />
           <Route path="users" element={<DashboardUsers />} />
+          <Route path="authors" element={<DashboardAuthors />} />
+          <Route path="home-customization" element={<DashboardHomeCustomization />} />
+          <Route path="settings" element={<DashboardSettings />} />
         </Route>
 
         {/* Public Routes */}

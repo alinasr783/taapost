@@ -116,11 +116,18 @@ export default function CategoryPage() {
                     className="h-full w-full object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
-                  <div className="absolute right-2 top-2 rounded-[5px] border border-white/30 bg-black/40 px-2 py-1 text-[11px] text-white/90 backdrop-blur">
-                    {i.date}
-                  </div>
+                  {i.is_exclusive && (
+                    <div className="absolute right-2 top-2 rounded-[5px] border border-white/30 bg-red-600/80 px-2 py-1 text-[11px] text-white/90 backdrop-blur font-bold">
+                      حصرياً
+                    </div>
+                  )}
                   <div className="absolute inset-x-2 bottom-2">
                     <div className="space-y-1 rounded-[5px] border border-white/20 bg-black/50 px-3 py-2 text-white backdrop-blur-md">
+                      {!i.is_exclusive && (
+                        <div className="text-[10px] text-white/70">
+                          {new Date(i.date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}
+                        </div>
+                      )}
                       <div className="line-clamp-2 text-sm font-semibold">
                         {i.title}
                       </div>

@@ -123,7 +123,14 @@ export default function DashboardArticles() {
 
                 return (
                   <tr key={article.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="p-4 font-medium text-foreground">{article.title}</td>
+                    <td className="p-4 font-medium text-foreground">
+                      {article.title}
+                      {article.is_exclusive && (
+                        <span className="mr-2 inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/10">
+                          حصري
+                        </span>
+                      )}
+                    </td>
                     <td className="p-4">
                       <span className="bg-primary/10 text-primary px-2 py-1 rounded text-sm">
                         {categories.find(c => c.id === article.category_id)?.name || article.category_id}

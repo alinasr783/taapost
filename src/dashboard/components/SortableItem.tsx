@@ -1,14 +1,15 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical } from 'lucide-react';
+import { ReactNode } from 'react';
 
 type Props = {
   id: number;
-  name: string;
+  children: ReactNode;
   className?: string;
 }
 
-export function SortableItem({ id, name, className }: Props) {
+export function SortableItem({ id, children, className }: Props) {
   const {
     attributes,
     listeners,
@@ -26,12 +27,14 @@ export function SortableItem({ id, name, className }: Props) {
     <div 
       ref={setNodeRef} 
       style={style} 
-      {...attributes} 
-      {...listeners} 
-      className={`bg-card p-3 rounded shadow-sm border border-border flex items-center gap-3 cursor-move touch-none select-none text-card-foreground hover:bg-muted/50 transition-colors ${className || ''}`}
+      className={`bg-card rounded shadow-sm border border-border flex items-center gap-3 touch-none select-none text-card-foreground hover:bg-muted/50 transition-colors ${className || ''}`}
     >
-      <GripVertical className="text-muted-foreground flex-shrink-0" />
-      <span className="font-medium truncate">{name}</span>
+      <div {...attributes} {...listeners} className="p-3 cursor-grab hover:text-primary transition-colors text-muted-foreground">
+        <GripVertical size={20} />
+      </div>
+      <div className="flex-1 p-2">
+        {children}
+      </div>
     </div>
   );
 }

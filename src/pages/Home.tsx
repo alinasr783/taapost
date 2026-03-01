@@ -1,15 +1,13 @@
-import { useMemo, useState, useEffect, useRef } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase, type Article } from '../lib/supabase'
+import { supabase, type Article, type HomepageSection } from '../lib/supabase'
+import HomeCarousel from '../components/HomeCarousel'
 
 export default function Home() {
   const navigate = useNavigate()
   const [articles, setArticles] = useState<Article[]>([])
-  const [categories, setCategories] = useState<string[]>([])
+  const [sections, setSections] = useState<HomepageSection[]>([])
   const [loading, setLoading] = useState(true)
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const [carouselIndex, setCarouselIndex] = useState(0)
-  const [isPaused, setIsPaused] = useState(false)
 
   useEffect(() => {
     async function fetchData() {
@@ -17,21 +15,49 @@ export default function Home() {
         // Fetch articles
         const { data: articlesData, error: articlesError } = await supabase
           .from('articles')
-          .select('*, categories(name, slug)')
+          .select('*, categories(id, name, slug)')
           .order('date', { ascending: false })
 
         if (articlesError) {
           console.error('Error fetching articles:', articlesError)
         }
 
-        // Fetch categories
-        const { data: categoriesData, error: categoriesError } = await supabase
-          .from('categories')
-          .select('*')
+        // Fetch homepage sections
+        const { data: sectionsData, error: sectionsError } = await supabase
+          .from('homepage_sections')
+          .select(`
+            *,
+            categories (
+              id,
+              name,
+              slug
+            )
+          `)
+          .eq('is_active', true)
           .order('display_order', { ascending: true })
         
-        if (categoriesError) {
-          console.error('Error fetching categories:', categoriesError)
+        if (sectionsError) {
+          console.error('Error fetching sections:', sectionsError)
+          // Fallback if table doesn't exist or is empty
+          const defaultSections: HomepageSection[] = [
+            { id: 1, type: 'carousel', title: 'Featured', display_order: 1, is_active: true },
+            { id: 2, type: 'latest_grid', title: 'Latest Articles', display_order: 2, is_active: true }
+          ]
+          setSections(defaultSections)
+        } else if (sectionsData && sectionsData.length > 0) {
+          // transform the data to match the type if needed, specifically the joined category
+          const typedSections = sectionsData.map((s: any) => ({
+            ...s,
+            categories: Array.isArray(s.categories) ? s.categories[0] : s.categories
+          }))
+          setSections(typedSections)
+        } else {
+             // Fallback if empty
+            const defaultSections: HomepageSection[] = [
+                { id: 1, type: 'carousel', title: 'Featured', display_order: 1, is_active: true },
+                { id: 2, type: 'latest_grid', title: 'Latest Articles', display_order: 2, is_active: true }
+            ]
+            setSections(defaultSections)
         }
         
         if (articlesData) {
@@ -39,13 +65,10 @@ export default function Home() {
             ...a,
             categoryId: a.category_id,
             category: (Array.isArray(a.categories) ? a.categories[0]?.name : a.categories?.name) || '',
+            categorySlug: (Array.isArray(a.categories) ? a.categories[0]?.slug : a.categories?.slug) || '',
             contentHtml: a.content
           }))
           setArticles(mappedArticles)
-        }
-
-        if (categoriesData) {
-          setCategories(categoriesData.map((c: any) => c.name))
         }
       } catch (error) {
         console.error('Error:', error)
@@ -64,269 +87,116 @@ export default function Home() {
 
   const carouselArticles = useMemo(() => sortedArticles.slice(0, 5), [sortedArticles])
 
-  const scrollToSlide = (index: number) => {
-    if (scrollRef.current) {
-      const container = scrollRef.current
-      const slideWidth = container.clientWidth
-      container.scrollTo({
-        left: -(index * slideWidth),
-        behavior: 'smooth'
-      })
-      setCarouselIndex(index)
-    }
-  }
-
-  const handleNext = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    const nextIndex = (carouselIndex + 1) % carouselArticles.length
-    scrollToSlide(nextIndex)
-  }
-
-  const handlePrev = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    const prevIndex = carouselIndex === 0 ? carouselArticles.length - 1 : carouselIndex - 1
-    scrollToSlide(prevIndex)
-  }
-  
-  const handleScroll = () => {
-    if (scrollRef.current) {
-      const container = scrollRef.current
-      const slideWidth = container.clientWidth
-      // Calculate index based on scroll position. 
-      // In RTL, scrollLeft might be negative or positive. using Math.abs helps.
-      const scrollLeft = Math.abs(container.scrollLeft)
-      const newIndex = Math.round(scrollLeft / slideWidth)
-      if (newIndex !== carouselIndex && newIndex >= 0 && newIndex < carouselArticles.length) {
-         setCarouselIndex(newIndex)
-      }
-    }
-  }
-
-  // Auto-play effect
-  useEffect(() => {
-    if (isPaused || carouselArticles.length === 0) return
-    
-    const timer = setTimeout(() => {
-      const next = (carouselIndex + 1) % carouselArticles.length
-      scrollToSlide(next)
-    }, 3000)
-
-    return () => clearTimeout(timer)
-  }, [carouselIndex, isPaused, carouselArticles.length])
-
   if (loading) {
     return <div className="flex items-center justify-center py-20 min-h-[50vh]">
       <div className="text-lg text-muted-foreground">جاري التحميل...</div>
     </div>
   }
 
-  if (carouselArticles.length === 0) {
-    return null
-  }
-
   return (
     <div className="space-y-8 pb-10 md:space-y-10">
-      <section 
-        className="w-full relative group"
-        onMouseEnter={() => setIsPaused(true)}
-        onMouseLeave={() => setIsPaused(false)}
-      >
-        <div 
-          ref={scrollRef}
-          className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-          onScroll={handleScroll}
-        >
-          {carouselArticles.map((activeSlide) => (
-            <div 
-              key={activeSlide.id} 
-              className="relative w-full flex-shrink-0 snap-center h-64 sm:h-80 md:h-[380px] lg:h-[430px] cursor-pointer"
-              onClick={() => navigate(`/مقال/${encodeURIComponent(activeSlide.slug)}`)}
-            >
-              <img
-                src={activeSlide.image}
-                alt={activeSlide.title}
-                className="h-full w-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-l from-black/85 via-black/50 to-transparent" />
-              <div className="absolute inset-0">
-                <div className="container flex h-full flex-col justify-between py-4 md:py-8">
-                  <div className="space-y-3 text-right text-white md:ml-auto md:mr-0 md:max-w-4xl">
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          navigate(`/قسم/${encodeURIComponent(activeSlide.category || '')}`)
-                        }}
-                        className="inline-flex rounded-[5px] border border-white/30 bg-black/30 px-3 py-1 backdrop-blur hover:bg-black/50"
-                      >
-                        {activeSlide.category}
-                      </button>
-                      <span className="text-white/80">{activeSlide.date}</span>
+      {sections.map((section) => {
+        if (section.type === 'carousel') {
+           const count = section.settings?.count || 5;
+           let slides = sortedArticles;
+
+           // Filter based on source type
+           if (section.settings?.source_type === 'category' && section.category_id) {
+             slides = slides.filter(a => a.categoryId === section.category_id);
+           } else if (section.settings?.source_type === 'categories' && Array.isArray(section.settings?.source_ids)) {
+             slides = slides.filter(a => section.settings.source_ids.includes(a.categoryId));
+           }
+           
+           slides = slides.slice(0, count);
+           
+           if (slides.length === 0) return null;
+           return <HomeCarousel key={section.id} articles={slides} />
+        }
+
+        if (section.type === 'latest_grid') {
+             const count = section.settings?.count || 6;
+             // Exclude carousel articles if desired, or just show latest
+             // Let's show latest excluding the first 5 if carousel is present, 
+             // but simpler is just latest sorted.
+             // If we want to avoid duplicates with carousel, we might need more logic.
+             // For now, let's just show sorted articles.
+             const list = sortedArticles.slice(0, count);
+             if (list.length === 0) return null;
+             
+             return (
+                <section key={section.id} className="container space-y-6">
+                    <div className="flex items-center justify-between border-b border-primary/10 pb-4">
+                        <h2 className="text-2xl font-bold border-r-4 border-primary pr-3">{section.title || 'أحدث المقالات'}</h2>
+                         <button
+                          type="button"
+                          onClick={() => navigate('/المقالات')} 
+                          className="text-xs font-medium bg-primary/10 text-primary px-4 py-1.5 rounded-full hover:bg-primary hover:text-primary-foreground transition-all"
+                        >
+                          المزيد
+                        </button>
                     </div>
-                    <h2 className="text-xs font-semibold text-white/80 sm:text-sm md:text-lg">
-                      أحدث المقالات المختارة
-                    </h2>
-                    <h3 className="text-xl font-bold leading-relaxed sm:text-2xl md:text-4xl">
-                      {activeSlide.title}
-                    </h3>
-                    <p className="hidden text-sm leading-7 text-white/90 sm:block md:text-lg">
-                      {activeSlide.excerpt}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                        {list.map((article) => (
+                           <div key={article.id} 
+                                onClick={() => navigate(`/مقال/${encodeURIComponent(article.slug)}`)}
+                                className="group cursor-pointer space-y-3"
+                           >
+                                <div className="relative aspect-video overflow-hidden rounded-lg shadow-sm group-hover:shadow-md transition-all border border-border/50 group-hover:border-primary/50">
+                                     <img 
+                                        src={article.image} 
+                                        alt={article.title}
+                                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                     />
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-[10px] font-medium">{article.category}</span>
+                                        <span>•</span>
+                                        {article.is_exclusive ? (
+                                            <span className="text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded text-[10px]">حصرياً</span>
+                                        ) : (
+                                            <span>{new Date(article.date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                        )}
+                                    </div>
+                                    <h3 className="line-clamp-2 text-lg font-bold group-hover:text-primary transition-colors leading-normal">
+                                        {article.title}
+                                    </h3>
+                                </div>
+                           </div>
+                        ))}
+                     </div>
+                </section>
+             )
+        }
 
-        {/* Navigation Controls (Overlay) */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="container h-full flex flex-col justify-end pb-4 md:pb-8">
-            <div className="hidden md:flex flex-col items-end gap-3 md:ml-auto pointer-events-auto">
-                <div className="flex flex-wrap justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      navigate(`/مقال/${encodeURIComponent(carouselArticles[carouselIndex].slug)}`)
-                    }}
-                    className="rounded-[5px] border border-white/40 bg-black/40 px-5 py-2.5 text-xs font-semibold text-white shadow-sm backdrop-blur md:text-sm"
-                  >
-                    اقرأ المزيد
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      navigate(`/قسم/${encodeURIComponent(carouselArticles[carouselIndex].category || '')}`)
-                    }}
-                    className="rounded-[5px] border border-white/40 bg-black/40 px-5 py-2.5 text-xs font-semibold text-white shadow-sm backdrop-blur md:text-sm"
-                  >
-                    اقرأ في هذا القسم
-                  </button>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handlePrev}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
-                  >
-                    ‹
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleNext}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
-                  >
-                    ›
-                  </button>
-                  <div className="flex items-center gap-1">
-                    {carouselArticles.map((item, index) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          scrollToSlide(index)
-                        }}
-                        className={`h-1.5 rounded-full transition-all ${
-                          index === carouselIndex
-                            ? 'w-6 bg-white'
-                            : 'w-2 bg-white/40 hover:bg-white/70'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </div>
-            </div>
+        if (section.type === 'category_section' || section.type === 'category_grid') {
+            if (!section.category_id && !section.categories) return null;
             
-            {/* Mobile Controls */}
-            <div className="flex flex-col items-start gap-3 md:hidden pointer-events-auto">
-              <div className="flex flex-wrap justify-start gap-2">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    navigate(`/مقال/${encodeURIComponent(carouselArticles[carouselIndex].slug)}`)
-                  }}
-                  className="rounded-[5px] border border-white/40 bg-black/40 px-4 py-2 text-xs font-semibold text-white shadow-sm backdrop-blur"
-                >
-                  اقرأ المزيد
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    navigate(`/قسم/${encodeURIComponent(carouselArticles[carouselIndex].category || '')}`)
-                  }}
-                  className="rounded-[5px] border border-white/40 bg-black/40 px-4 py-2 text-xs font-semibold text-white shadow-sm backdrop-blur"
-                >
-                  اقرأ في هذا القسم
-                </button>
-              </div>
-              
-              {/* Mobile Navigation Arrows */}
-              <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handlePrev}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
-                  >
-                    ‹
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleNext}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
-                  >
-                    ›
-                  </button>
-                  <div className="flex items-center gap-1">
-                    {carouselArticles.map((item, index) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          scrollToSlide(index)
-                        }}
-                        className={`h-1.5 rounded-full transition-all ${
-                          index === carouselIndex
-                            ? 'w-6 bg-white'
-                            : 'w-2 bg-white/40 hover:bg-white/70'
-                        }`}
-                      />
-                    ))}
-                  </div>
-              </div>
-            </div>
-          </div>
-        </div>
+            // Get category info from joined data or section settings
+            const catName = section.categories?.name || section.title;
+            const catSlug = section.categories?.slug || section.categories?.name; // Fallback
+            const catId = section.category_id || section.categories?.id;
 
-      </section>
+            const list = sortedArticles.filter((a) => a.categoryId === catId).slice(0, section.settings?.count || 4);
+            
+            if (!list.length) return null;
 
-      <section className="container space-y-6">
-        {categories.map((cat) => {
-          const list = sortedArticles.filter((a) => a.category === cat).slice(0, 15)
-          if (!list.length) return null
-          return (
-            <div key={cat} className="space-y-3">
-              <div className="flex items-center justify-between">
+             return (
+            <div key={section.id} className="container space-y-4">
+              <div className="flex items-center justify-between border-b border-primary/10 pb-4">
                 <button
                   type="button"
-                  onClick={() => navigate(`/قسم/${encodeURIComponent(cat)}`)}
-                  className="text-base font-semibold hover:text-primary"
+                  onClick={() => navigate(`/قسم/${encodeURIComponent(catName)}`)}
+                  className="text-2xl font-bold border-r-4 border-primary pr-3 hover:text-primary transition-colors"
                 >
-                  {cat}
+                  {catName}
                 </button>
                 <button
                   type="button"
-                  onClick={() => navigate(`/قسم/${encodeURIComponent(cat)}`)}
-                  className="text-xs font-medium text-primary hover:underline"
+                  onClick={() => navigate(`/قسم/${encodeURIComponent(catName)}`)}
+                  className="text-xs font-medium bg-primary/10 text-primary px-4 py-1.5 rounded-full hover:bg-primary hover:text-primary-foreground transition-all"
                 >
-                  اكتشف المزيد
+                  المزيد
                 </button>
               </div>
               <div className="overflow-x-auto">
@@ -347,14 +217,21 @@ export default function Home() {
                           className="h-full w-full object-cover"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
-                        <div className="absolute right-2 top-2 rounded-[5px] border border-white/30 bg-black/40 px-2 py-1 text-[11px] text-white/90 backdrop-blur">
-                          {article.date}
-                        </div>
+                        {article.is_exclusive && (
+                          <div className="absolute right-2 top-2 rounded-[5px] border border-white/30 px-2 py-1 text-[11px] text-white/90 backdrop-blur bg-red-600/80 font-bold">
+                            حصرياً
+                          </div>
+                        )}
                         <div className="absolute inset-x-2 bottom-2">
-                          <div className="space-y-1 rounded-[5px] border border-white/20 bg-black/50 px-3 py-2 text-white backdrop-blur-md">
-                            <div className="line-clamp-2 text-sm font-semibold">
-                              {article.title}
-                            </div>
+                            <div className="space-y-1 rounded-[5px] border border-white/20 bg-black/50 px-3 py-2 text-white backdrop-blur-md">
+                              {!article.is_exclusive && (
+                                <div className="text-[10px] text-white/70">
+                                  {new Date(article.date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                </div>
+                              )}
+                              <div className="line-clamp-2 text-sm font-semibold">
+                                {article.title}
+                              </div>
                             <div className="line-clamp-2 text-[11px] text-white/85">
                               {article.excerpt}
                             </div>
@@ -367,8 +244,10 @@ export default function Home() {
               </div>
             </div>
           )
-        })}
-      </section>
+        }
+
+        return null;
+      })}
     </div>
   )
 }
