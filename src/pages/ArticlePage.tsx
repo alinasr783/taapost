@@ -202,9 +202,9 @@ export default function ArticlePage() {
         {/* Main Content */}
         <article className={`space-y-8 min-w-0 ${toc.length > 0 ? 'lg:col-span-9 lg:order-1' : 'lg:col-span-12'}`}>
           {/* Content */}
-          <div className="w-full overflow-hidden break-words rounded-[5px] border border-border/40 bg-card/30 p-6 backdrop-blur-sm md:p-10">
+          <div className="w-full overflow-hidden break-normal rounded-[5px] border border-border/40 bg-card/30 p-6 backdrop-blur-sm md:p-10">
             <div 
-              className="prose prose-lg max-w-none dark:prose-invert prose-headings:font-bold prose-headings:text-primary prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-img:rounded-[5px] prose-p:text-foreground/90 prose-strong:text-foreground prose-li:text-foreground/90 prose-blockquote:border-primary prose-blockquote:bg-primary/5 prose-blockquote:py-1 prose-blockquote:pr-4 prose-blockquote:rounded-r-sm prose-h2:text-xl md:prose-h2:text-3xl"
+              className="prose prose-lg max-w-none dark:prose-invert prose-headings:font-bold prose-headings:text-primary prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-img:rounded-[5px] prose-p:text-foreground/90 prose-strong:text-foreground prose-li:text-foreground/90 prose-blockquote:border-primary prose-blockquote:bg-primary/5 prose-blockquote:py-1 prose-blockquote:pr-4 prose-blockquote:rounded-r-sm prose-h2:text-xl md:prose-h2:text-3xl [&_a]:break-all"
               dangerouslySetInnerHTML={{ __html: article.contentHtml || '' }}
             />
           </div>
