@@ -3,7 +3,7 @@ import { supabase, type HomepageSection, type Category } from '../../lib/supabas
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { SortableItem } from '../components/SortableItem'
-import { Plus, Save, Trash2, Eye, EyeOff, Settings } from 'lucide-react'
+import { Plus, Trash2, Eye, EyeOff } from 'lucide-react'
 
 export default function DashboardHomeCustomization() {
   const [sections, setSections] = useState<HomepageSection[]>([])
@@ -302,7 +302,7 @@ export default function DashboardHomeCustomization() {
                         name="source_type"
                         value="latest"
                         checked={formData.source_type === 'latest'}
-                        onChange={(e) => setFormData({ ...formData, source_type: 'latest' as any })}
+                        onChange={() => setFormData({ ...formData, source_type: 'latest' as any })}
                       />
                       <span>آخر المقالات (Latest)</span>
                     </label>
@@ -312,7 +312,7 @@ export default function DashboardHomeCustomization() {
                         name="source_type"
                         value="category"
                         checked={formData.source_type === 'category'}
-                        onChange={(e) => setFormData({ ...formData, source_type: 'category' as any })}
+                        onChange={() => setFormData({ ...formData, source_type: 'category' as any })}
                       />
                       <span>قسم محدد (Single Category)</span>
                     </label>
@@ -322,7 +322,7 @@ export default function DashboardHomeCustomization() {
                         name="source_type"
                         value="categories"
                         checked={formData.source_type === 'categories'}
-                        onChange={(e) => setFormData({ ...formData, source_type: 'categories' as any })}
+                        onChange={() => setFormData({ ...formData, source_type: 'categories' as any })}
                       />
                       <span>أقسام متعددة (Multiple Categories)</span>
                     </label>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Edit, Trash2, Search, Save, X, User } from 'lucide-react'
+import { Plus, Edit, Trash2, Search, X, User } from 'lucide-react'
 import { supabase, type Author } from '../../lib/supabase'
 import ImageUpload from '../components/ImageUpload'
 

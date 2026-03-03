@@ -280,7 +280,9 @@ export default function DashboardCategories() {
               >
                 <div className="flex flex-wrap gap-3 p-4 bg-muted/30 rounded border border-border">
                   {categories.map((category) => (
-                    <SortableItem key={category.id} id={category.id} name={category.name} className="bg-card shadow-sm border border-border" />
+                    <SortableItem key={category.id} id={category.id} className="bg-card shadow-sm border border-border">
+                      {category.name}
+                    </SortableItem>
                   ))}
                 </div>
               </SortableContext>
@@ -304,7 +306,9 @@ export default function DashboardCategories() {
               >
                 <div className="flex flex-col gap-2 max-w-md mx-auto">
                   {categories.map((category) => (
-                    <SortableItem key={category.id} id={category.id} name={category.name} className="w-full bg-card shadow-sm border border-border" />
+                    <SortableItem key={category.id} id={category.id} className="w-full bg-card shadow-sm border border-border">
+                      {category.name}
+                    </SortableItem>
                   ))}
                 </div>
               </SortableContext>

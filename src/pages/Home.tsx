@@ -85,8 +85,6 @@ export default function Home() {
     [articles]
   )
 
-  const carouselArticles = useMemo(() => sortedArticles.slice(0, 5), [sortedArticles])
-
   if (loading) {
     return <div className="flex items-center justify-center py-20 min-h-[50vh]">
       <div className="text-lg text-muted-foreground">جاري التحميل...</div>
@@ -104,7 +102,8 @@ export default function Home() {
            if (section.settings?.source_type === 'category' && section.category_id) {
              slides = slides.filter(a => a.categoryId === section.category_id);
            } else if (section.settings?.source_type === 'categories' && Array.isArray(section.settings?.source_ids)) {
-             slides = slides.filter(a => section.settings.source_ids.includes(a.categoryId));
+             const sourceIds = section.settings.source_ids
+             slides = slides.filter(a => sourceIds.includes(a.categoryId));
            }
            
            slides = slides.slice(0, count);
@@ -174,7 +173,6 @@ export default function Home() {
             
             // Get category info from joined data or section settings
             const catName = section.categories?.name || section.title;
-            const catSlug = section.categories?.slug || section.categories?.name; // Fallback
             const catId = section.category_id || section.categories?.id;
 
             const list = sortedArticles.filter((a) => a.categoryId === catId).slice(0, section.settings?.count || 4);

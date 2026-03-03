@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Save, Plus, Trash2, GripVertical, Check, X, Facebook, Twitter, Instagram, Linkedin, Youtube, MessageCircle, Send, Mail, Globe, Link as LinkIcon, Loader2 } from 'lucide-react'
+import { Save, Plus, Trash2, GripVertical, X, Facebook, Twitter, Instagram, Linkedin, Youtube, MessageCircle, Send, Mail, Globe, Link as LinkIcon, Loader2 } from 'lucide-react'
 import { supabase, type SocialLink } from '../../lib/supabase'
 import ImageUpload from '../components/ImageUpload'
 
@@ -87,7 +87,6 @@ export default function DashboardSettings() {
       const { error } = await supabase
         .from('site_settings')
         .upsert({
-          id: 1,
           ...siteSettings,
           updated_at: new Date().toISOString()
         })
@@ -331,7 +330,6 @@ export default function DashboardSettings() {
               <ImageUpload
                 value={siteSettings.logo_url || ''}
                 onChange={(url) => setSiteSettings({ ...siteSettings, logo_url: url })}
-                bucket="media"
               />
               <p className="text-xs text-muted-foreground mt-2 text-center">
                 يفضل استخدام صورة بخلفية شفافة (PNG) بحجم لا يقل عن 200x200 بكسل
