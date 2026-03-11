@@ -138,6 +138,22 @@ function sanitizeAiHtml(input: string) {
   return html
 }
 
+function enforceNoApologyOrRejection(html: string) {
+  const raw = html.trim()
+  if (!raw) return raw
+
+  let out = raw
+  out = out.replace(/(^|[\s>])(عذرًا|عذرا|أعتذر|اعتذر)(?=[:،\s<]|$)/gi, '$1')
+  out = out.replace(/غير\s+متماش(?:ٍ|ي)[^<\n]{0,60}/gi, '')
+  out = out.replace(/سياق\s+المقال/gi, 'المقال')
+
+  const cleaned = out.trim()
+  if (!cleaned) {
+    return '<p>لنشدّ السؤال إلى خيطٍ من خيوط المقال: ما يثيره النص من معنى يفتح بابًا للإجابة العملية.</p>'
+  }
+  return cleaned
+}
+
 function getGroqApiKey() {
   try {
     const override = localStorage.getItem('taapost_groq_api_key')
@@ -881,9 +897,10 @@ export default function ArticlePage() {
         role: 'system' as const,
         content:
           [
-            'أنت محرّر مساعد يجيب عن أسئلة القارئ ضمن نطاق هذا المقال فقط.',
-            'ممنوع إدخال معلومات من خارج نص المقال، وممنوع التخمين.',
-            'إذا كان السؤال خارج سياق المقال أو لا يملك النص ما يكفي للإجابة: قُل بعبارة فصيحة مختصرة إنه غير متماشٍ مع سياق المقال.',
+            'أنت محرّر مساعد يجيب عن أسئلة القارئ مستندًا إلى نص هذا المقال، مع ذكاء في وصل المعاني وربط الخيوط.',
+            'اجعل نص المقال مرجعك الأول: استخرج منه ما يسند جوابك حرفيًا قدر الإمكان.',
+            'إن كان السؤال بعيدًا عن موضوع المقال: لا ترفض ولا تعتذر ولا تقل إن السؤال غير متماشٍ مع السياق؛ بل اصنع جسرًا بلاغيًا نحو ما ورد في المقال ثم قدّم جوابًا عامًا منضبطًا.',
+            'إذا احتجت لمعلومة لا يذكرها المقال صراحة: صِغ ذلك بلباقة (مثل: "لا يورد المقال تفصيلًا مباشرًا عن...") ثم قدّم إطارًا معرفيًا عامًا بدون اختلاق حقائق أو أرقام أو أسماء.',
             'اكتب بالعربية الفصحى الواضحة، بإيجاز، وبأسلوب صحفي رصين.',
             'يجوز سجع خفيف أو خاتمة موزونة في جملة واحدة إن لاقَ المقام بلا تكلّف.',
             'ممنوع ذكر أنك نموذج ذكاء اصطناعي.',
@@ -893,7 +910,7 @@ export default function ArticlePage() {
         role: 'user' as const,
         content: [
           'ستتلقى نص المقال ثم سؤال القارئ.',
-          'أجب بإيجاز واضح ودقيق. إذا كان السؤال خارج السياق فاجعل answer جملة اعتذار فصيحة قصيرة.',
+          'أجب بإيجاز واضح ودقيق. حتى لو كان السؤال بعيدًا: ابدأ بجملة تربط السؤال بالمقال، ثم قدّم جوابًا مفيدًا ومتسقًا مع زاوية المقال.',
           'اكتب الإجابة داخل answer كـ HTML منسّق (بدون Markdown). استخدم فقط: <p> <strong> <em> <ul> <ol> <li> <blockquote> <br> <a>.',
           'في كل الأحوال أخرج JSON صالح 100% بدون Markdown وبدون أي نص إضافي بالشكل:',
           '{',
@@ -902,8 +919,8 @@ export default function ArticlePage() {
           '}',
           '',
           'قواعد الاستشهاد:',
-          '- إذا كان السؤال خارج السياق: اجعل citations = []',
-          '- خلاف ذلك: اجعل citations من داخل نص المقال حرفيًا وباختصار.',
+          '- اجعل citations من داخل نص المقال حرفيًا وباختصار متى أمكن، حتى لو كانت الاستشهادات لخدمة الربط لا لإعطاء معلومة خارج النص.',
+          '- إن تعذّر استخراج أي اقتباس مناسب حرفيًا: اجعل citations = [].',
           '',
           `عنوان المقال: ${article?.title ?? ''}`,
           '',
@@ -953,7 +970,7 @@ export default function ArticlePage() {
         }
       }
 
-      const answer = typeof parsed.answer === 'string' ? parsed.answer : ''
+      const answer = typeof parsed.answer === 'string' ? enforceNoApologyOrRejection(parsed.answer) : ''
       const citations = Array.isArray(parsed.citations)
         ? parsed.citations
             .filter(isRecord)
@@ -1224,13 +1241,13 @@ export default function ArticlePage() {
               <div className="mt-6 rounded-[5px] border border-border/50 bg-card/40 p-4 md:p-5">
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-sm font-bold text-foreground">ناقش المقال</div>
-                  <div className="text-xs text-muted-foreground">محادثة ضمن سياق المقال فقط</div>
+                  <div className="text-xs text-muted-foreground">محادثة على ضوء المقال وما يتصل به</div>
                 </div>
 
                 <div className="mt-4 space-y-3">
                   {chatMessages.length === 0 && (
                     <div className="rounded-[5px] border border-border/50 bg-card/50 px-4 py-4 text-sm text-muted-foreground">
-                      اكتب سؤالك عن هذا المقال، وسأجيبك بالاعتماد على محتواه.
+                      اكتب سؤالك، وسأجيبك على ضوء المقال وما يفتحه من أبواب المعنى.
                     </div>
                   )}
 
