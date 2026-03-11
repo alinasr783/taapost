@@ -11,7 +11,22 @@ export default function DashboardArticles() {
   const [search, setSearch] = useState('')
   const [editingArticle, setEditingArticle] = useState<Article | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
-  const [user, setUser] = useState<User | null>(null)
+  const [user] = useState<User | null>(() => {
+    const storedUser = localStorage.getItem('dashboard_user')
+    if (!storedUser) return null
+    try {
+      const parsed: unknown = JSON.parse(storedUser)
+      if (typeof parsed !== 'object' || parsed === null) return null
+      const u = parsed as Partial<User>
+      if (typeof u.id !== 'number') return null
+      if (typeof u.username !== 'string') return null
+      if (typeof u.is_superadmin !== 'boolean') return null
+      if (typeof u.created_at !== 'string') return null
+      return u as User
+    } catch {
+      return null
+    }
+  })
   const [permissions, setPermissions] = useState<UserPermission[]>([])
 
   const fetchPermissions = async (userId: number) => {
@@ -32,14 +47,13 @@ export default function DashboardArticles() {
   }
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('dashboard_user')
-    if (storedUser) {
-      const u = JSON.parse(storedUser)
-      setUser(u)
-      fetchPermissions(u.id)
-    }
-    fetchData()
-  }, [])
+    queueMicrotask(() => {
+      if (user) {
+        void fetchPermissions(user.id)
+      }
+      void fetchData()
+    })
+  }, [user])
 
   const handleDelete = async (id: number) => {
     if (!window.confirm('هل أنت متأكد من حذف هذا المقال؟')) return

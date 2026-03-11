@@ -6,6 +6,9 @@ import { SortableItem } from '../components/SortableItem'
 import { Plus, Trash2, Eye, EyeOff } from 'lucide-react'
 
 export default function DashboardHomeCustomization() {
+  type SectionType = 'carousel' | 'category_grid' | 'category_list' | 'custom' | 'latest_grid'
+  type SourceType = 'latest' | 'category' | 'categories'
+
   const [sections, setSections] = useState<HomepageSection[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -14,11 +17,11 @@ export default function DashboardHomeCustomization() {
   
   // Form State
   const [formData, setFormData] = useState<{
-    type: 'carousel' | 'category_grid' | 'category_list' | 'custom' | 'latest_grid';
+    type: SectionType;
     title: string;
     category_id: number | '';
     count: number;
-    source_type: 'latest' | 'category' | 'categories';
+    source_type: SourceType;
     source_ids: number[];
   }>({
     type: 'category_grid',
@@ -133,7 +136,7 @@ export default function DashboardHomeCustomization() {
     setIsSaving(true)
     
     try {
-      let settings: any = { count: formData.count }
+      const settings: Record<string, unknown> = { count: formData.count }
       let categoryId = formData.category_id || null
 
       if (formData.type === 'carousel') {
@@ -282,7 +285,18 @@ export default function DashboardHomeCustomization() {
                 <label className="block text-sm font-medium mb-1">نوع القسم</label>
                 <select
                   value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
+                  onChange={(e) => {
+                    const next = e.target.value
+                    if (
+                      next === 'carousel' ||
+                      next === 'category_grid' ||
+                      next === 'category_list' ||
+                      next === 'custom' ||
+                      next === 'latest_grid'
+                    ) {
+                      setFormData({ ...formData, type: next })
+                    }
+                  }}
                   className="w-full p-2 bg-background border border-input rounded-md"
                 >
                   <option value="category_grid">شبكة مقالات من قسم (Grid)</option>
@@ -302,7 +316,7 @@ export default function DashboardHomeCustomization() {
                         name="source_type"
                         value="latest"
                         checked={formData.source_type === 'latest'}
-                        onChange={() => setFormData({ ...formData, source_type: 'latest' as any })}
+                        onChange={() => setFormData({ ...formData, source_type: 'latest' })}
                       />
                       <span>آخر المقالات (Latest)</span>
                     </label>
@@ -312,7 +326,7 @@ export default function DashboardHomeCustomization() {
                         name="source_type"
                         value="category"
                         checked={formData.source_type === 'category'}
-                        onChange={() => setFormData({ ...formData, source_type: 'category' as any })}
+                        onChange={() => setFormData({ ...formData, source_type: 'category' })}
                       />
                       <span>قسم محدد (Single Category)</span>
                     </label>
@@ -322,7 +336,7 @@ export default function DashboardHomeCustomization() {
                         name="source_type"
                         value="categories"
                         checked={formData.source_type === 'categories'}
-                        onChange={() => setFormData({ ...formData, source_type: 'categories' as any })}
+                        onChange={() => setFormData({ ...formData, source_type: 'categories' })}
                       />
                       <span>أقسام متعددة (Multiple Categories)</span>
                     </label>

@@ -19,7 +19,7 @@ function hexToHsl(hex: string) {
     b = parseInt("0x" + hex[5] + hex[6]);
   }
   r /= 255; g /= 255; b /= 255;
-  let cmin = Math.min(r,g,b), cmax = Math.max(r,g,b), delta = cmax - cmin;
+  const cmin = Math.min(r,g,b), cmax = Math.max(r,g,b), delta = cmax - cmin;
   let h = 0, s = 0, l = 0;
   if (delta === 0) h = 0;
   else if (cmax === r) h = ((g - b) / delta) % 6;

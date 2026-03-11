@@ -4,6 +4,30 @@ import { ArrowRight, Calendar, Folder } from 'lucide-react'
 import { supabase, type Article } from '../lib/supabase'
 import { useTrackView } from '../hooks/useTrackView'
 
+type ArticleSummary = {
+  lead: string
+  key_points: string[]
+  background: string[]
+  implications: string[]
+  suggested_questions: string[]
+}
+
+type ChatMessage = {
+  role: 'user' | 'assistant'
+  content: string
+  citations?: string[]
+  suggested_questions?: string[]
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function toStringArray(value: unknown) {
+  if (!Array.isArray(value)) return []
+  return value.filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+}
+
 export default function ArticlePage() {
   const { slug } = useParams()
   const navigate = useNavigate()
@@ -11,6 +35,14 @@ export default function ArticlePage() {
   const [relatedArticles, setRelatedArticles] = useState<Article[]>([])
   const [loading, setLoading] = useState(true)
   const [toc, setToc] = useState<{ id: string, text: string }[]>([])
+  const [summary, setSummary] = useState<ArticleSummary | null>(null)
+  const [summaryLoading, setSummaryLoading] = useState(false)
+  const [summaryError, setSummaryError] = useState<string | null>(null)
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const [chatError, setChatError] = useState<string | null>(null)
+  const articleId = article?.id ?? null
 
   useTrackView(article?.id || 0)
 
@@ -54,6 +86,11 @@ export default function ArticlePage() {
             contentHtml: doc.body.innerHTML
           } as Article)
           setToc(newToc)
+          setSummary(null)
+          setSummaryError(null)
+          setChatMessages([])
+          setChatInput('')
+          setChatError(null)
 
           // Fetch related articles
           const { data: relatedData } = await supabase
@@ -80,6 +117,39 @@ export default function ArticlePage() {
     fetchArticle()
   }, [slug])
 
+  useEffect(() => {
+    async function fetchSummary() {
+      if (!articleId) return
+      setSummaryLoading(true)
+      setSummaryError(null)
+      try {
+        const { data, error } = await supabase.functions.invoke('article-ai', {
+          body: { task: 'summarize', articleId }
+        })
+        if (error) {
+          throw error
+        }
+        if (!isRecord(data) || !isRecord(data.summary)) {
+          throw new Error('Missing summary')
+        }
+        const s = data.summary
+        setSummary({
+          lead: typeof s.lead === 'string' ? s.lead : '',
+          key_points: toStringArray(s.key_points),
+          background: toStringArray(s.background),
+          implications: toStringArray(s.implications),
+          suggested_questions: toStringArray(s.suggested_questions),
+        })
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'تعذر تحميل ملخص المقال'
+        setSummaryError(message)
+      } finally {
+        setSummaryLoading(false)
+      }
+    }
+    fetchSummary()
+  }, [articleId])
+
   const handleScrollTo = (id: string) => {
     const element = document.getElementById(id)
     if (element) {
@@ -101,6 +171,54 @@ export default function ArticlePage() {
     const words = text.trim().split(/\s+/).length
     const minutes = Math.ceil(words / wordsPerMinute)
     return `${minutes} دقيقة قراءة`
+  }
+
+  const sendChat = async (text?: string) => {
+    if (!articleId) return
+    const content = (text ?? chatInput).trim()
+    if (!content) return
+
+    setChatError(null)
+    setChatLoading(true)
+
+    setChatMessages((prev) => [...prev, { role: 'user', content }])
+    if (!text) setChatInput('')
+
+    try {
+      const payloadMessages = [...chatMessages, { role: 'user' as const, content }].slice(-10)
+      const { data, error } = await supabase.functions.invoke('article-ai', {
+        body: {
+          task: 'chat',
+          articleId,
+          messages: payloadMessages.map((m) => ({ role: m.role, content: m.content })),
+        }
+      })
+      if (error) throw error
+
+      if (!isRecord(data)) {
+        throw new Error('Invalid response')
+      }
+
+      const answer = typeof data.answer === 'string' ? data.answer : ''
+      const citations = Array.isArray(data.citations)
+        ? data.citations
+            .filter(isRecord)
+            .map((c) => (typeof c.quote === 'string' ? c.quote : ''))
+            .filter((q) => q.trim().length > 0)
+            .slice(0, 4)
+        : []
+      const suggested = toStringArray(data.suggested_questions).slice(0, 4)
+
+      setChatMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: answer || 'تعذر توليد إجابة مفهومة حاليًا.', citations, suggested_questions: suggested }
+      ])
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'تعذر إرسال سؤالك'
+      setChatError(message)
+    } finally {
+      setChatLoading(false)
+    }
   }
 
   if (loading) {
@@ -183,6 +301,24 @@ export default function ArticlePage() {
             <div className="lg:sticky lg:top-24 space-y-4 rounded-[5px] border border-border/40 bg-card/30 p-4 backdrop-blur-sm mb-8 lg:mb-0">
               <h3 className="font-bold text-lg text-foreground border-b border-border pb-2">محتويات المقال</h3>
               <ul className="space-y-2">
+                <li>
+                  <button
+                    onClick={() => handleScrollTo('article-summary')}
+                    className="text-sm text-muted-foreground hover:text-primary transition-colors text-right w-full block truncate"
+                    title="ملخص المقال"
+                  >
+                    <span className="font-bold ml-1">★</span> ملخص المقال
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={() => handleScrollTo('article-chat')}
+                    className="text-sm text-muted-foreground hover:text-primary transition-colors text-right w-full block truncate"
+                    title="اسأل عن المقال"
+                  >
+                    <span className="font-bold ml-1">؟</span> اسأل عن المقال
+                  </button>
+                </li>
                 {toc.map((item, index) => (
                   <li key={item.id}>
                     <button 
@@ -201,6 +337,124 @@ export default function ArticlePage() {
 
         {/* Main Content */}
         <article className={`space-y-8 min-w-0 ${toc.length > 0 ? 'lg:col-span-9 lg:order-1' : 'lg:col-span-12'}`}>
+          {/* Summary */}
+          <section id="article-summary" className="rounded-[5px] border border-border/40 bg-card/30 p-6 backdrop-blur-sm md:p-8">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-xl md:text-2xl font-bold text-foreground">ملخص المقال</h2>
+                <p className="text-sm text-muted-foreground">تلخيص ذكي ومنظم يعتمد على نص المقال نفسه</p>
+              </div>
+              <button
+                onClick={() => {
+                  if (!summaryLoading) {
+                    setSummary(null)
+                    setSummaryError(null)
+                    if (articleId) {
+                      void (async () => {
+                        setSummaryLoading(true)
+                        try {
+                          const { data, error } = await supabase.functions.invoke('article-ai', {
+                            body: { task: 'summarize', articleId }
+                          })
+                          if (error) throw error
+                          if (!isRecord(data) || !isRecord(data.summary)) throw new Error('Missing summary')
+                          const s = data.summary
+                          setSummary({
+                            lead: typeof s.lead === 'string' ? s.lead : '',
+                            key_points: toStringArray(s.key_points),
+                            background: toStringArray(s.background),
+                            implications: toStringArray(s.implications),
+                            suggested_questions: toStringArray(s.suggested_questions),
+                          })
+                        } catch (e) {
+                          const message = e instanceof Error ? e.message : 'تعذر تحميل ملخص المقال'
+                          setSummaryError(message)
+                        } finally {
+                          setSummaryLoading(false)
+                        }
+                      })()
+                    }
+                  }
+                }}
+                className="rounded-[5px] bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                disabled={summaryLoading}
+              >
+                {summaryLoading ? 'جاري التلخيص…' : 'تحديث الملخص'}
+              </button>
+            </div>
+
+            {summaryError && (
+              <div className="mt-4 rounded-[5px] border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                تعذر إظهار الملخص حاليًا: {summaryError}
+              </div>
+            )}
+
+            {!summaryError && !summary && summaryLoading && (
+              <div className="mt-5 text-sm text-muted-foreground">جاري إعداد ملخص المقال…</div>
+            )}
+
+            {summary && (
+              <div className="mt-6 space-y-6">
+                {summary.lead && (
+                  <p className="text-foreground/90 leading-relaxed">{summary.lead}</p>
+                )}
+
+                {summary.key_points?.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="font-bold text-foreground">أهم النقاط</h3>
+                    <ul className="list-disc pr-6 space-y-1 text-foreground/90">
+                      {summary.key_points.slice(0, 8).map((p, i) => (
+                        <li key={i}>{p}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {(summary.background?.length > 0 || summary.implications?.length > 0) && (
+                  <div className="grid gap-6 md:grid-cols-2">
+                    {summary.background?.length > 0 && (
+                      <div className="space-y-2">
+                        <h3 className="font-bold text-foreground">الخلفية والسياق</h3>
+                        <ul className="list-disc pr-6 space-y-1 text-foreground/90">
+                          {summary.background.slice(0, 8).map((p, i) => (
+                            <li key={i}>{p}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {summary.implications?.length > 0 && (
+                      <div className="space-y-2">
+                        <h3 className="font-bold text-foreground">لماذا يهم؟</h3>
+                        <ul className="list-disc pr-6 space-y-1 text-foreground/90">
+                          {summary.implications.slice(0, 8).map((p, i) => (
+                            <li key={i}>{p}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {summary.suggested_questions?.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="font-bold text-foreground">أسئلة ذكية عن المقال</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {summary.suggested_questions.slice(0, 6).map((q, i) => (
+                        <button
+                          key={i}
+                          onClick={() => void sendChat(q)}
+                          className="rounded-[5px] border border-border/60 bg-card/60 px-3 py-2 text-sm text-foreground hover:border-primary/50 hover:bg-primary/5 transition-colors"
+                        >
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+
           {/* Content */}
           <div className="w-full overflow-hidden break-normal rounded-[5px] border border-border/40 bg-card/30 p-6 backdrop-blur-sm md:p-10">
             <div 
@@ -208,6 +462,97 @@ export default function ArticlePage() {
               dangerouslySetInnerHTML={{ __html: article.contentHtml || '' }}
             />
           </div>
+
+          {/* Live Chat */}
+          <section id="article-chat" className="rounded-[5px] border border-border/40 bg-card/30 p-6 backdrop-blur-sm md:p-8">
+            <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-xl md:text-2xl font-bold text-foreground">اسأل عن المقال</h2>
+                <p className="text-sm text-muted-foreground">سؤال وجواب ضمن نطاق المقال فقط</p>
+              </div>
+              {chatMessages.length > 0 && (
+                <button
+                  onClick={() => {
+                    setChatMessages([])
+                    setChatError(null)
+                  }}
+                  className="rounded-[5px] border border-border/60 bg-card/60 px-3 py-2 text-sm text-foreground hover:border-primary/50 hover:bg-primary/5 transition-colors"
+                >
+                  مسح المحادثة
+                </button>
+              )}
+            </div>
+
+            {chatError && (
+              <div className="mt-4 rounded-[5px] border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                تعذر إكمال المحادثة: {chatError}
+              </div>
+            )}
+
+            <div className="mt-6 space-y-3">
+              {chatMessages.length === 0 && (
+                <div className="rounded-[5px] border border-border/50 bg-card/50 px-4 py-4 text-sm text-muted-foreground">
+                  اكتب سؤالك عن هذا المقال، وسأجيبك بالاعتماد على محتواه.
+                </div>
+              )}
+
+              {chatMessages.map((m, idx) => (
+                <div key={idx} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div
+                    className={`max-w-[92%] rounded-[5px] px-4 py-3 text-sm leading-relaxed border ${
+                      m.role === 'user'
+                        ? 'bg-primary text-primary-foreground border-primary/20'
+                        : 'bg-card/70 text-foreground border-border/50'
+                    }`}
+                  >
+                    <div className="whitespace-pre-wrap">{m.content}</div>
+                    {m.role === 'assistant' && m.citations && m.citations.length > 0 && (
+                      <div className="mt-3 border-t border-border/40 pt-3">
+                        <div className="text-xs text-muted-foreground mb-2">استشهادات من المقال</div>
+                        <ul className="space-y-1">
+                          {m.citations.map((q, i) => (
+                            <li key={i} className="text-xs text-foreground/90">
+                              “{q}”
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {m.role === 'assistant' && m.suggested_questions && m.suggested_questions.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {m.suggested_questions.map((q, i) => (
+                          <button
+                            key={i}
+                            onClick={() => void sendChat(q)}
+                            className="rounded-[5px] border border-border/60 bg-card/60 px-3 py-1.5 text-xs text-foreground hover:border-primary/50 hover:bg-primary/5 transition-colors"
+                          >
+                            {q}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              <div className="flex flex-col gap-2 md:flex-row md:items-end">
+                <textarea
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="اكتب سؤالك هنا…"
+                  className="min-h-[90px] w-full resize-none rounded-[5px] border border-border/60 bg-background/60 px-4 py-3 text-sm text-foreground outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
+                  disabled={chatLoading}
+                />
+                <button
+                  onClick={() => void sendChat()}
+                  className="rounded-[5px] bg-primary px-5 py-3 text-primary-foreground hover:bg-primary/90 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                  disabled={chatLoading || !chatInput.trim()}
+                >
+                  {chatLoading ? 'جاري الإرسال…' : 'إرسال'}
+                </button>
+              </div>
+            </div>
+          </section>
 
           {article.authors && article.authors.name && (
             <div className="mt-8 rounded-[5px] border border-border/40 bg-card/50 p-6 backdrop-blur-sm flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-right">

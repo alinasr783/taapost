@@ -52,7 +52,7 @@ export default function DashboardUsers() {
       let userId = editingUser?.id
 
       if (editingUser) {
-        const updateData: any = {
+        const updateData: { username: string; is_superadmin: boolean; password?: string } = {
           username: formData.username,
           is_superadmin: formData.is_superadmin
         }

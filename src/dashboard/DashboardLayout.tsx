@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, FileText, FolderTree, Users, LogOut, Settings, PenTool, LayoutTemplate } from 'lucide-react'
+import { LayoutDashboard, FileText, FolderTree, Users, LogOut, Settings, PenTool, LayoutTemplate, type LucideIcon } from 'lucide-react'
 import type { User } from '../lib/supabase'
 
 export default function DashboardLayout() {
@@ -8,7 +8,19 @@ export default function DashboardLayout() {
   const location = useLocation()
   const [user] = useState<User | null>(() => {
     const storedUser = localStorage.getItem('dashboard_user')
-    return storedUser ? JSON.parse(storedUser) : null
+    if (!storedUser) return null
+    try {
+      const parsed: unknown = JSON.parse(storedUser)
+      if (typeof parsed !== 'object' || parsed === null) return null
+      const u = parsed as Partial<User>
+      if (typeof u.id !== 'number') return null
+      if (typeof u.username !== 'string') return null
+      if (typeof u.is_superadmin !== 'boolean') return null
+      if (typeof u.created_at !== 'string') return null
+      return u as User
+    } catch {
+      return null
+    }
   })
 
   useEffect(() => {
@@ -37,7 +49,13 @@ export default function DashboardLayout() {
     navItems.push({ label: 'المستخدمين', icon: Users, path: '/dashboard/users' })
   }
 
-  const NavLink = ({ item, isMobile = false }: { item: { label: string; icon: any; path: string }; isMobile?: boolean }) => {
+  const NavLink = ({
+    item,
+    isMobile = false,
+  }: {
+    item: { label: string; icon: LucideIcon; path: string }
+    isMobile?: boolean
+  }) => {
     const isActive = location.pathname === item.path
     
     if (isMobile) {

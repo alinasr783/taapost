@@ -119,9 +119,10 @@ export default function DashboardArticleForm({ article, categories, user, permis
       if (error) throw error
 
       onSuccess()
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error saving article:', err)
-      alert('حدث خطأ أثناء حفظ المقال: ' + err.message)
+      const message = err instanceof Error ? err.message : 'حدث خطأ أثناء حفظ المقال'
+      alert(message)
     } finally {
       setLoading(false)
     }

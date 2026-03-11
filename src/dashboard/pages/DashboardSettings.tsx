@@ -42,19 +42,17 @@ export default function DashboardSettings() {
   const [savingSettings, setSavingSettings] = useState(false)
 
   useEffect(() => {
-    fetchData()
+    void (async () => {
+      try {
+        setLoading(true)
+        await Promise.all([fetchLinks(), fetchSiteSettings()])
+      } catch (error) {
+        console.error('Error fetching data:', error)
+      } finally {
+        setLoading(false)
+      }
+    })()
   }, [])
-
-  async function fetchData() {
-    try {
-      setLoading(true)
-      await Promise.all([fetchLinks(), fetchSiteSettings()])
-    } catch (error) {
-      console.error('Error fetching data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   async function fetchSiteSettings() {
     const { data, error } = await supabase

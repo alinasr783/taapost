@@ -3,6 +3,35 @@ import { useNavigate } from 'react-router-dom'
 import { supabase, type Article, type HomepageSection } from '../lib/supabase'
 import HomeCarousel from '../components/HomeCarousel'
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function getNumber(value: unknown, fallback: number) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function getString(value: unknown, fallback = '') {
+  return typeof value === 'string' ? value : fallback
+}
+
+function getSettingsCount(settings: unknown, fallback: number) {
+  if (!isRecord(settings)) return fallback
+  return getNumber(settings.count, fallback)
+}
+
+function getSettingsSourceType(settings: unknown) {
+  if (!isRecord(settings)) return null
+  const v = settings.source_type
+  if (v === 'latest' || v === 'category' || v === 'categories') return v
+  return null
+}
+
+function getSettingsSourceIds(settings: unknown) {
+  if (!isRecord(settings) || !Array.isArray(settings.source_ids)) return []
+  return settings.source_ids.filter((x): x is number => typeof x === 'number' && Number.isFinite(x))
+}
+
 export default function Home() {
   const navigate = useNavigate()
   const [articles, setArticles] = useState<Article[]>([])
@@ -46,11 +75,14 @@ export default function Home() {
           setSections(defaultSections)
         } else if (sectionsData && sectionsData.length > 0) {
           // transform the data to match the type if needed, specifically the joined category
-          const typedSections = sectionsData.map((s: any) => ({
-            ...s,
-            categories: Array.isArray(s.categories) ? s.categories[0] : s.categories
-          }))
-          setSections(typedSections)
+          const typedSections = sectionsData
+            .filter(isRecord)
+            .map((s) => {
+              const joined = s.categories
+              const categories = Array.isArray(joined) ? (joined[0] as unknown) : joined
+              return { ...s, categories } as HomepageSection
+            })
+          setSections(typedSections as HomepageSection[])
         } else {
              // Fallback if empty
             const defaultSections: HomepageSection[] = [
@@ -61,14 +93,20 @@ export default function Home() {
         }
         
         if (articlesData) {
-          const mappedArticles = articlesData.map((a: any) => ({
-            ...a,
-            categoryId: a.category_id,
-            category: (Array.isArray(a.categories) ? a.categories[0]?.name : a.categories?.name) || '',
-            categorySlug: (Array.isArray(a.categories) ? a.categories[0]?.slug : a.categories?.slug) || '',
-            contentHtml: a.content
-          }))
-          setArticles(mappedArticles)
+          const mappedArticles = articlesData
+            .filter(isRecord)
+            .map((a) => {
+              const joined = a.categories
+              const categoryRow = Array.isArray(joined) ? (joined[0] as unknown) : joined
+              const categoryName = isRecord(categoryRow) ? getString(categoryRow.name, '') : ''
+              return {
+                ...(a as unknown as Article),
+                categoryId: typeof a.category_id === 'number' ? a.category_id : undefined,
+                category: categoryName,
+                contentHtml: typeof a.content === 'string' ? a.content : undefined,
+              } as Article
+            })
+          setArticles(mappedArticles as Article[])
         }
       } catch (error) {
         console.error('Error:', error)
@@ -95,14 +133,15 @@ export default function Home() {
     <div className="space-y-8 pb-10 md:space-y-10">
       {sections.map((section) => {
         if (section.type === 'carousel') {
-           const count = section.settings?.count || 5;
+           const count = getSettingsCount(section.settings, 5)
            let slides = sortedArticles;
 
            // Filter based on source type
-           if (section.settings?.source_type === 'category' && section.category_id) {
+           const sourceType = getSettingsSourceType(section.settings)
+           if (sourceType === 'category' && section.category_id) {
              slides = slides.filter(a => a.categoryId === section.category_id);
-           } else if (section.settings?.source_type === 'categories' && Array.isArray(section.settings?.source_ids)) {
-             const sourceIds = section.settings.source_ids
+           } else if (sourceType === 'categories') {
+             const sourceIds = getSettingsSourceIds(section.settings)
              slides = slides.filter(a => sourceIds.includes(a.categoryId));
            }
            
@@ -113,7 +152,7 @@ export default function Home() {
         }
 
         if (section.type === 'latest_grid') {
-             const count = section.settings?.count || 6;
+             const count = getSettingsCount(section.settings, 6)
              // Exclude carousel articles if desired, or just show latest
              // Let's show latest excluding the first 5 if carousel is present, 
              // but simpler is just latest sorted.
@@ -175,7 +214,9 @@ export default function Home() {
             const catName = section.categories?.name || section.title;
             const catId = section.category_id || section.categories?.id;
 
-            const list = sortedArticles.filter((a) => a.categoryId === catId).slice(0, section.settings?.count || 4);
+            const list = sortedArticles
+              .filter((a) => a.categoryId === catId)
+              .slice(0, getSettingsCount(section.settings, 4))
             
             if (!list.length) return null;
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Facebook, Twitter, Instagram, Linkedin, Youtube, MessageCircle, Send, Mail, Globe, Link as LinkIcon, FileText } from 'lucide-react'
+import { Facebook, Twitter, Instagram, Linkedin, Youtube, MessageCircle, Send, Mail, Globe, Link as LinkIcon, FileText, type LucideIcon } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 type SocialLink = {
@@ -12,7 +12,7 @@ type SocialLink = {
   sort_order: number
 }
 
-const iconMap: Record<string, any> = {
+const iconMap: Record<string, LucideIcon> = {
   facebook: Facebook,
   twitter: Twitter,
   x: Twitter,

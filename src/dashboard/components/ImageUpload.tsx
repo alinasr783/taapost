@@ -43,9 +43,10 @@ export default function ImageUpload({ value, onChange, label = 'صورة', class
         .getPublicUrl(filePath)
 
       onChange(data.publicUrl)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error uploading image:', error)
-      setError(error.message || 'حدث خطأ أثناء رفع الصورة')
+      const message = error instanceof Error ? error.message : 'حدث خطأ أثناء رفع الصورة'
+      setError(message)
     } finally {
       setUploading(false)
     }

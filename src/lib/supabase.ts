@@ -95,6 +95,6 @@ export type HomepageSection = {
   category_id?: number
   display_order: number
   is_active: boolean
-  settings?: Record<string, any>
+  settings?: Record<string, unknown>
   categories?: Category // For joined data
 }

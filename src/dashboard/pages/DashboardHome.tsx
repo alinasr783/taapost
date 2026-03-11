@@ -17,6 +17,16 @@ export default function DashboardHome() {
     topCategories: { name: string; count: number }[]
   }
 
+  type ViewRow = {
+    article_id: number
+    viewed_at: string
+    country: string | null
+    article: {
+      title: string
+      categories: { name: string } | null
+    } | null
+  }
+
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<AnalyticsData>({
     topArticles: [],
@@ -55,9 +65,9 @@ export default function DashboardHome() {
       const articleCounts: Record<string, number> = {}
       const articleTitles: Record<string, string> = {}
       
-      views.forEach((view: any) => {
+      ;(views as ViewRow[]).forEach((view) => {
         if (!view.article) return
-        const id = view.article_id
+        const id = String(view.article_id)
         articleCounts[id] = (articleCounts[id] || 0) + 1
         articleTitles[id] = view.article.title
       })
@@ -73,7 +83,7 @@ export default function DashboardHome() {
 
       // 2. Top 5 Locations (Country)
       const locationCounts: Record<string, number> = {}
-      views.forEach((view: any) => {
+      ;(views as ViewRow[]).forEach((view) => {
         const loc = view.country || 'Unknown'
         locationCounts[loc] = (locationCounts[loc] || 0) + 1
       })
@@ -85,7 +95,7 @@ export default function DashboardHome() {
 
       // 3. Top 5 Times (Hour of day)
       const timeCounts: Record<string, number> = {}
-      views.forEach((view: any) => {
+      ;(views as ViewRow[]).forEach((view) => {
         const hour = new Date(view.viewed_at).getHours()
         const timeLabel = `${hour}:00`
         timeCounts[timeLabel] = (timeCounts[timeLabel] || 0) + 1
@@ -108,7 +118,7 @@ export default function DashboardHome() {
 
       // 4. Top 5 Categories
       const categoryCounts: Record<string, number> = {}
-      views.forEach((view: any) => {
+      ;(views as ViewRow[]).forEach((view) => {
         if (!view.article?.categories) return
         const catName = view.article.categories.name
         categoryCounts[catName] = (categoryCounts[catName] || 0) + 1
@@ -172,7 +182,9 @@ export default function DashboardHome() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }: any) => `${name} ${(percent ? percent * 100 : 0).toFixed(0)}%`}
+                  label={({ name, percent }: { name?: string; percent?: number }) =>
+                    `${name ?? ''} ${((percent ?? 0) * 100).toFixed(0)}%`
+                  }
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"
