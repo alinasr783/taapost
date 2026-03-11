@@ -57,10 +57,14 @@ CREATE TABLE IF NOT EXISTS public.site_settings (
     logo_url TEXT,
     primary_color TEXT DEFAULT '#8B4513', -- Brown/Earth tone
     secondary_color TEXT DEFAULT '#000000',
+    show_article_summary BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
     CONSTRAINT single_row CHECK (id = 1)
 );
+
+ALTER TABLE public.site_settings
+ADD COLUMN IF NOT EXISTS show_article_summary BOOLEAN DEFAULT TRUE;
 
 -- Insert default row if not exists
 INSERT INTO public.site_settings (id, site_name, site_description)

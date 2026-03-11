@@ -8,6 +8,13 @@ type ChatMessage = {
   content: string
 }
 
+type VisitorChatMessage = {
+  role: 'user' | 'assistant'
+  content: string
+  citations?: string[]
+  suggested_questions?: string[]
+}
+
 type SummaryJson = {
   lead: string
   key_points: string[]
@@ -174,7 +181,79 @@ async function upsertSummary(args: {
     },
     { onConflict: 'article_id,model' },
   )
-  if (error) throw new Error('Failed to save summary')
+  if (error) return
+}
+
+function normalizeVisitorId(input: unknown) {
+  if (typeof input !== 'string') return null
+  const v = input.trim()
+  if (!v) return null
+  if (v.length > 128) return null
+  return v
+}
+
+async function loadChatHistory(args: {
+  admin: ReturnType<typeof createClient>
+  articleId: number
+  visitorId: string
+}) {
+  const { data, error } = await args.admin
+    .from('article_ai_chat_logs')
+    .select('role, content, response_json, created_at')
+    .eq('article_id', args.articleId)
+    .eq('visitor_id', args.visitorId)
+    .order('created_at', { ascending: true })
+    .limit(60)
+
+  if (error || !data) return []
+
+  const out: VisitorChatMessage[] = []
+  for (const row of data as unknown[]) {
+    const r = getRecord(row)
+    if (!r) continue
+    const role = r.role === 'user' ? 'user' : r.role === 'assistant' ? 'assistant' : null
+    const content = typeof r.content === 'string' ? r.content : ''
+    if (!role || !content.trim()) continue
+
+    const m: VisitorChatMessage = { role, content }
+    if (role === 'assistant' && isRecord(r.response_json)) {
+      const resp = r.response_json
+      const citations = Array.isArray(resp.citations)
+        ? resp.citations
+            .map(getRecord)
+            .filter((c): c is Record<string, unknown> => !!c)
+            .map((c) => (typeof c.quote === 'string' ? c.quote : ''))
+            .filter((q) => q.trim().length > 0)
+            .slice(0, 4)
+        : []
+      if (citations.length > 0) m.citations = citations
+      const suggested = toStringArray(resp.suggested_questions).slice(0, 4)
+      if (suggested.length > 0) m.suggested_questions = suggested
+    }
+    out.push(m)
+  }
+
+  return out.slice(-30)
+}
+
+async function insertChatLog(args: {
+  admin: ReturnType<typeof createClient>
+  articleId: number
+  visitorId: string
+  role: 'user' | 'assistant'
+  content: string
+  responseJson?: unknown
+  model: string
+}) {
+  const payload: Record<string, unknown> = {
+    article_id: args.articleId,
+    visitor_id: args.visitorId,
+    role: args.role,
+    content: args.content,
+    model: args.model,
+  }
+  if (args.responseJson !== undefined) payload.response_json = args.responseJson
+  await args.admin.from('article_ai_chat_logs').insert(payload)
 }
 
 async function handleSummarize(
@@ -185,6 +264,7 @@ async function handleSummarize(
 ) {
   const body = getRecord(reqBody)
   const articleId = Number(body?.articleId)
+  const force = body?.force === true
   if (!Number.isFinite(articleId) || articleId <= 0) {
     return jsonResponse({ error: 'Invalid articleId' }, { status: 400 })
   }
@@ -194,9 +274,11 @@ async function handleSummarize(
   const source = clampText(plain, 14_000)
   const contentHash = await sha256Hex(`${article.title}\n${source}`)
 
-  const cached = await getCachedSummary({ admin, articleId: article.id, model, contentHash })
-  if (cached) {
-    return jsonResponse({ summary: cached, cached: true, model })
+  if (!force) {
+    const cached = await getCachedSummary({ admin, articleId: article.id, model, contentHash })
+    if (cached) {
+      return jsonResponse({ summary: cached, cached: true, model })
+    }
   }
 
   const system: ChatMessage = {
@@ -273,13 +355,33 @@ async function handleSummarize(
   return jsonResponse({ summary: summaryJson, cached: false, model })
 }
 
+async function handleChatHistory(reqBody: unknown, admin: ReturnType<typeof createClient>) {
+  const body = getRecord(reqBody)
+  const articleId = Number(body?.articleId)
+  const visitorId = normalizeVisitorId(body?.visitorId)
+
+  if (!Number.isFinite(articleId) || articleId <= 0) {
+    return jsonResponse({ error: 'Invalid articleId' }, { status: 400 })
+  }
+  if (!visitorId) {
+    return jsonResponse({ error: 'Invalid visitorId' }, { status: 400 })
+  }
+
+  const messages = await loadChatHistory({ admin, articleId, visitorId })
+  return jsonResponse({ messages })
+}
+
 async function handleChat(reqBody: unknown, admin: ReturnType<typeof createClient>, model: string, apiKey: string) {
   const body = getRecord(reqBody)
   const articleId = Number(body?.articleId)
+  const visitorId = normalizeVisitorId(body?.visitorId)
   const messages = Array.isArray(body?.messages) ? body?.messages : []
 
   if (!Number.isFinite(articleId) || articleId <= 0) {
     return jsonResponse({ error: 'Invalid articleId' }, { status: 400 })
+  }
+  if (!visitorId) {
+    return jsonResponse({ error: 'Invalid visitorId' }, { status: 400 })
   }
 
   const normalized: ChatMessage[] = messages
@@ -379,6 +481,34 @@ async function handleChat(reqBody: unknown, admin: ReturnType<typeof createClien
     : []
   const suggestedQuestions = toStringArray(p.suggested_questions).slice(0, 4)
 
+  const responseJson = {
+    answer,
+    citations,
+    suggested_questions: suggestedQuestions,
+  }
+
+  try {
+    await insertChatLog({
+      admin,
+      articleId: article.id,
+      visitorId,
+      role: 'user',
+      content: lastUser,
+      model,
+    })
+    await insertChatLog({
+      admin,
+      articleId: article.id,
+      visitorId,
+      role: 'assistant',
+      content: answer,
+      responseJson,
+      model,
+    })
+  } catch {
+    void 0
+  }
+
   return jsonResponse({ answer, citations, suggested_questions: suggestedQuestions, model })
 }
 
@@ -422,6 +552,9 @@ serve(async (req) => {
     }
     if (task === 'chat') {
       return await handleChat(body, admin, model, groqApiKey)
+    }
+    if (task === 'chat_history') {
+      return await handleChatHistory(body, admin)
     }
     return jsonResponse({ error: 'Unknown task' }, { status: 400 })
   } catch (e) {

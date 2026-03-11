@@ -77,7 +77,7 @@ export default function HomeCarousel({ articles }: Props) {
           <div 
             key={activeSlide.id} 
             className="relative w-full flex-shrink-0 snap-center h-64 sm:h-80 md:h-[380px] lg:h-[430px] cursor-pointer"
-            onClick={() => navigate(`/مقال/${encodeURIComponent(activeSlide.slug)}`)}
+            onClick={() => navigate(`/post/${activeSlide.id}`)}
           >
             <img
               src={activeSlide.image}
@@ -93,7 +93,8 @@ export default function HomeCarousel({ articles }: Props) {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation()
-                        navigate(`/قسم/${encodeURIComponent(activeSlide.category || '')}`)
+                        const categoryId = activeSlide.categoryId ?? activeSlide.category_id
+                        navigate(`/category/${categoryId}`)
                       }}
                       className="inline-flex rounded-[5px] border border-white/30 bg-black/30 px-3 py-1 backdrop-blur hover:bg-black/50"
                     >
@@ -128,7 +129,7 @@ export default function HomeCarousel({ articles }: Props) {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation()
-                    navigate(`/مقال/${encodeURIComponent(articles[carouselIndex].slug)}`)
+                    navigate(`/post/${articles[carouselIndex].id}`)
                   }}
                   className="rounded-[5px] border border-white/40 bg-black/40 px-5 py-2.5 text-xs font-semibold text-white shadow-sm backdrop-blur md:text-sm"
                 >
@@ -138,7 +139,8 @@ export default function HomeCarousel({ articles }: Props) {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation()
-                    navigate(`/قسم/${encodeURIComponent(articles[carouselIndex].category || '')}`)
+                    const categoryId = articles[carouselIndex].categoryId ?? articles[carouselIndex].category_id
+                    navigate(`/category/${categoryId}`)
                   }}
                   className="rounded-[5px] border border-white/40 bg-black/40 px-5 py-2.5 text-xs font-semibold text-white shadow-sm backdrop-blur md:text-sm"
                 >
@@ -187,7 +189,7 @@ export default function HomeCarousel({ articles }: Props) {
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  navigate(`/مقال/${encodeURIComponent(articles[carouselIndex].slug)}`)
+                  navigate(`/post/${articles[carouselIndex].id}`)
                 }}
                 className="rounded-[5px] border border-white/40 bg-black/40 px-4 py-2 text-xs font-semibold text-white shadow-sm backdrop-blur"
               >
@@ -197,7 +199,8 @@ export default function HomeCarousel({ articles }: Props) {
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  navigate(`/قسم/${encodeURIComponent(articles[carouselIndex].category || '')}`)
+                  const categoryId = articles[carouselIndex].categoryId ?? articles[carouselIndex].category_id
+                  navigate(`/category/${categoryId}`)
                 }}
                 className="rounded-[5px] border border-white/40 bg-black/40 px-4 py-2 text-xs font-semibold text-white shadow-sm backdrop-blur"
               >

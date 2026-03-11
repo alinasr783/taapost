@@ -23,6 +23,7 @@ type SiteSettings = {
   logo_url: string | null
   primary_color: string
   secondary_color: string
+  show_article_summary: boolean
 }
 
 export default function DashboardSettings() {
@@ -37,7 +38,8 @@ export default function DashboardSettings() {
     site_description: '',
     logo_url: null,
     primary_color: '#8B4513',
-    secondary_color: '#000000'
+    secondary_color: '#000000',
+    show_article_summary: true,
   })
   const [savingSettings, setSavingSettings] = useState(false)
 
@@ -65,7 +67,10 @@ export default function DashboardSettings() {
         console.error('Error fetching site settings:', error)
       }
     } else if (data) {
-      setSiteSettings(data)
+      setSiteSettings({
+        ...data,
+        show_article_summary: (data as Record<string, unknown>).show_article_summary !== false,
+      })
     }
   }
 
@@ -82,14 +87,25 @@ export default function DashboardSettings() {
   async function handleSaveSettings() {
     try {
       setSavingSettings(true)
-      const { error } = await supabase
-        .from('site_settings')
-        .upsert({
-          ...siteSettings,
-          updated_at: new Date().toISOString()
-        })
-      
-      if (error) throw error
+      const payload = {
+        ...siteSettings,
+        updated_at: new Date().toISOString(),
+      }
+
+      const { error } = await supabase.from('site_settings').upsert(payload)
+
+      if (error) {
+        if (typeof error.message === 'string' && error.message.includes('show_article_summary')) {
+          const rest = { ...(payload as unknown as Record<string, unknown>) }
+          delete rest.show_article_summary
+          const retry = await supabase.from('site_settings').upsert(rest)
+          if (retry.error) throw retry.error
+          alert('تم حفظ إعدادات الموقع (يلزم تحديث قاعدة البيانات لحفظ إعداد ملخص المقال)')
+          return
+        }
+        throw error
+      }
+
       alert('تم حفظ إعدادات الموقع بنجاح')
     } catch (error) {
       console.error('Error saving settings:', error)
@@ -291,6 +307,18 @@ export default function DashboardSettings() {
                 className="w-full p-2 bg-background border border-input rounded-md min-h-[80px]"
                 placeholder="وصف مختصر يظهر في محركات البحث وتذييل الصفحة"
               />
+            </div>
+
+            <div className="flex items-center gap-2 rounded-md border border-border bg-muted/20 px-3 py-3">
+              <input
+                id="show-article-summary"
+                type="checkbox"
+                checked={siteSettings.show_article_summary !== false}
+                onChange={(e) => setSiteSettings({ ...siteSettings, show_article_summary: e.target.checked })}
+              />
+              <label htmlFor="show-article-summary" className="text-sm font-medium">
+                إظهار ملخص المقال أسفل صفحة المقال
+              </label>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

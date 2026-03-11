@@ -1,64 +1,94 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowRight, Loader2 } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase, type Category, type Article } from '../lib/supabase'
 
 export default function CategoryPage() {
-  const { slug } = useParams()
+  const { id, slug } = useParams()
   const navigate = useNavigate()
+  const categoryId = id && /^\d+$/.test(id) ? Number(id) : null
   const categorySlug = slug ? decodeURIComponent(slug) : ''
-  
-  const [category, setCategory] = useState<Category | null>(null)
-  const [articles, setArticles] = useState<Article[]>([])
-  const [loading, setLoading] = useState(true)
+  const categoryQuery = useQuery({
+    queryKey: ['category_page', { categoryId, categorySlug }],
+    queryFn: async () => {
+      if (!categoryId && !categorySlug) return { category: null, articles: [], redirectToId: null as number | null }
+
+      let catData: Category | null = null
+      if (categoryId) {
+        const { data, error } = await supabase.from('categories').select('*').eq('id', categoryId).maybeSingle()
+        if (error) throw error
+        catData = (data as Category | null) ?? null
+      } else if (categorySlug) {
+        const { data, error } = await supabase.from('categories').select('*').eq('slug', categorySlug).maybeSingle()
+        if (error) throw error
+        catData = (data as Category | null) ?? null
+        if (catData) {
+          return { category: null, articles: [], redirectToId: catData.id }
+        }
+      }
+
+      if (!catData) {
+        return { category: null, articles: [], redirectToId: null as number | null }
+      }
+
+      type CategoryArticle = Pick<Article, 'id' | 'title' | 'excerpt' | 'image' | 'date' | 'is_exclusive'>
+      const { data: artData, error: artError } = await supabase
+        .from('articles')
+        .select('id,title,excerpt,image,date,is_exclusive')
+        .eq('category_id', catData.id)
+        .order('date', { ascending: false })
+        .limit(60)
+
+      if (artError) throw artError
+
+      return { category: catData, articles: (artData ?? []) as CategoryArticle[], redirectToId: null as number | null }
+    },
+    enabled: Boolean(categoryId || categorySlug),
+    staleTime: 60_000,
+    gcTime: 30 * 60_000,
+    retry: 1,
+  })
 
   useEffect(() => {
-    async function fetchData() {
-      if (!categorySlug) return
-      setLoading(true)
-      try {
-        // Fetch category by slug
-        const { data: catData, error: catError } = await supabase
-          .from('categories')
-          .select('*')
-          .eq('slug', categorySlug)
-          .maybeSingle()
-        
-        if (catError) {
-          console.error('Error fetching category:', catError)
-        } 
-        
-        if (catData) {
-          setCategory(catData)
-          
-          // Fetch articles for this category
-          const { data: artData, error: artError } = await supabase
-            .from('articles')
-            .select('*')
-            .eq('category_id', catData.id)
-            .order('date', { ascending: false })
-            
-          if (artError) {
-             console.error('Error fetching articles:', artError)
-          } else if (artData) {
-            setArticles(artData)
-          }
-        } else {
-           setCategory(null)
-        }
-      } catch (err) {
-        console.error('Unexpected error:', err)
-      } finally {
-        setLoading(false)
-      }
+    const redirectToId = categoryQuery.data?.redirectToId
+    if (redirectToId) {
+      navigate(`/category/${redirectToId}`, { replace: true })
     }
-    fetchData()
-  }, [categorySlug])
+  }, [categoryQuery.data?.redirectToId, navigate])
+
+  const loading = categoryQuery.isLoading
+  const category = categoryQuery.data?.category ?? null
+  const articles = categoryQuery.data?.articles ?? []
 
   if (loading) {
     return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="container py-8 space-y-8">
+        <div className="space-y-4">
+          <div className="h-6 w-32 rounded bg-muted/40 animate-pulse" />
+          <div className="rounded-[5px] border border-border/40 bg-card/30 p-6 backdrop-blur-[2px] md:p-8">
+            <div className="h-8 w-48 rounded bg-muted/40 animate-pulse" />
+            <div className="mt-3 h-4 w-5/6 rounded bg-muted/30 animate-pulse" />
+          </div>
+        </div>
+        <div>
+          <div className="h-6 w-40 rounded bg-muted/40 animate-pulse mb-6" />
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, idx) => (
+              <div
+                key={idx}
+                className="relative overflow-hidden rounded-[5px] border border-border/40 bg-muted/20 shadow-sm"
+              >
+                <div className="h-56 w-full bg-muted/40 animate-pulse" />
+                <div className="absolute inset-x-2 bottom-2 space-y-2 rounded-[5px] border border-border/30 bg-background/60 px-3 py-2 backdrop-blur-[2px]">
+                  <div className="h-3 w-24 rounded bg-muted/50 animate-pulse" />
+                  <div className="h-4 w-5/6 rounded bg-muted/50 animate-pulse" />
+                  <div className="h-3 w-4/6 rounded bg-muted/40 animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     )
   }
@@ -106,7 +136,7 @@ export default function CategoryPage() {
             {articles.map((i) => (
               <button
                 key={i.id}
-                onClick={() => navigate(`/مقال/${encodeURIComponent(i.slug)}`)}
+                onClick={() => navigate(`/post/${i.id}`)}
                 className="relative flex flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md hover:border-white/20 transition-colors w-full"
               >
                 <div className="relative h-56 w-full">
@@ -114,6 +144,7 @@ export default function CategoryPage() {
                     src={i.image}
                     alt={i.title}
                     className="h-full w-full object-cover"
+                    loading="lazy"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
                   {i.is_exclusive && (
@@ -149,4 +180,3 @@ export default function CategoryPage() {
     </div>
   )
 }
-

@@ -1,73 +1,154 @@
-# React + TypeScript + Vite
+# تاء بوست (TaaPost) — ملف تعريفي بالمنصّة
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+منصّة إعلامية عربية (RTL) مبنية بـ React + Vite + TypeScript، مع لوحة تحكم لإدارة المحتوى، وربط Supabase للبيانات، وإحصائيات مشاهدة، وتجربة قراءة بتصميم زجاجي (Glassmorphism) وألوان ترابية.
 
-Currently, two official plugins are available:
+## الهوية البصرية (الألوان + الثيم الزجاجي)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+**الخط واتجاه القراءة**
+- الخط الافتراضي: Amiri.
+- اتجاه القراءة: RTL على مستوى الصفحة.
 
-## React Compiler
+**نظام الألوان (CSS Variables)**
+- ألوان بطابع ترابي/بني مع محايدات داكنة.
+- اللون الأساسي قابل للتخصيص من لوحة التحكم (يتم تطبيقه على الثيم). القيم الافتراضية: بني `#8B4513` + أسود `#000000`.
+- نصف القطر الافتراضي: 6px.
+- وضع ليلي/نهاري: تبديل عبر زر في الهيدر، مع حفظ الاختيار في `localStorage`.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+**الثيم الزجاجي (Glassmorphism)**
+- طبقات شفافة + `backdrop-blur` في: الهيدر، شريط الأقسام، بطاقات المقالات/الأقسام.
+- تدرّجات فوق الصور لتحسين قراءة النص داخل البطاقات.
 
-## Expanding the ESLint configuration
+## صفحات الموقع (الواجهة العامة)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+**التخطيط العام**
+- هيدر زجاجي: شعار/أيقونة + اسم ووصف الموقع (ديناميكياً من قاعدة البيانات) + بحث سريع.
+- قائمة أقسام ديناميكية مرتّبة.
+- تنقّل سفلي للموبايل: الرئيسية / الأقسام / المقالات.
+- Footer يعرض وصف الموقع وروابط السوشيال (ديناميكية).
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+**المسارات (Routes)**
+- `/` الرئيسية: أقسام ديناميكية حسب إعدادات “تخصيص الرئيسية”.
+- `/الأقسام` صفحة الأقسام: شبكة أقسام ببطاقات زجاجية وصور.
+- `/قسم/:slug` صفحة قسم: عنوان ووصف القسم + شبكة مقالات القسم.
+- `/المقالات` صفحة المقالات: قائمة أحدث المقالات + بحث عبر `?q=`.
+- `/مقال/:slug` صفحة مقال: قراءة المقال + مقالات ذات صلة + مزايا AI + تتبّع مشاهدة.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## أنواع المحتوى (Content Types)
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+المقال داخل لوحة التحكم يدعم نوع محتوى (Type):
+- مقال (article)
+- خبر عاجل (breaking)
+- تقرير (report)
+- فيديو (video)
+- بودكاست (podcast)
+- بيان رسمي (statement)
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+ويدعم أيضاً:
+- مقتطف (Excerpt)
+- صورة رئيسية
+- تحديد “حصري” (Exclusive)
+- اختيار كاتب (اختياري)
+- تاريخ نشر
+- رابط (Slug) مع تحقق من عدم التكرار
+- محرّر نص غني (Rich Text) عبر ReactQuill
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## مزايا تجربة القراءة
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- شارة “حصرياً” للمواد الحصرية.
+- فهرس محتوى داخل المقال عبر استخراج عناوين H2.
+- مقالات ذات صلة من نفس القسم.
+
+**ملخص ومحادثة بالذكاء الاصطناعي (AI)**
+- صفحة المقال تدعم:
+  - توليد ملخص منظم (Lead + Key Points + Background + Implications + أسئلة مقترحة).
+  - محادثة أسئلة وأجوبة حول المقال.
+- مفتاح Groq API يُقرأ من:
+  - `VITE_GROQ_API_KEY` (بيئة التطوير) أو
+  - `localStorage` للاستخدام المحلي.
+- يتم عمل Cache محلي للملخص والمحادثة لكل زائر لتقليل الطلبات.
+- توجد جداول داعمة لحفظ مخرجات AI على قاعدة البيانات (اختياري حسب التفعيل): `article_ai_summaries` و `article_ai_chat_logs`.
+
+## الإحصائيات والتحليلات (Analytics)
+
+**تتبّع المشاهدة**
+- عند فتح مقال: يتم تسجيل مشاهدة في جدول `article_views` مع وقت المشاهدة والدولة/المدينة.
+
+**لوحة الإحصائيات**
+- أعلى 5 مقالات مشاهدة.
+- أعلى 5 دول مشاهدة.
+- أوقات الذروة (بالساعة).
+- أكثر الأقسام نشاطاً.
+
+## لوحة التحكم (Dashboard) — الصفحات والإمكانات
+
+**المسارات**
+- `/dashboard/login` تسجيل الدخول.
+- `/dashboard` لوحة معلومات وإحصائيات.
+- `/dashboard/articles` إدارة المقالات.
+- `/dashboard/categories` إدارة الأقسام.
+- `/dashboard/authors` إدارة الكُتّاب.
+- `/dashboard/home-customization` تخصيص الصفحة الرئيسية.
+- `/dashboard/settings` إعدادات الموقع وروابط التواصل.
+- `/dashboard/users` إدارة المستخدمين (للمدير العام فقط).
+
+**إدارة المقالات**
+- إضافة/تعديل/حذف مقال حسب الصلاحيات.
+- معاينة المقال على الموقع.
+- ربط كاتب + صورة + مقتطف + نوع المحتوى + شارة حصري.
+- صلاحيات على مستوى القسم (Category-based permissions): إضافة/تعديل/حذف.
+
+**إدارة الأقسام**
+- CRUD للأقسام + صورة + وصف + مواضيع.
+- ترتيب الأقسام بطريقتين:
+  - ترتيب شريط الأقسام عبر `order_index`.
+  - ترتيب ظهور الأقسام في الرئيسية عبر `display_order`.
+
+**إدارة الكُتّاب**
+- CRUD للكتّاب + صورة + نبذة + مسمى وظيفي + بحث.
+
+**تخصيص الصفحة الرئيسية**
+- إضافة أقسام مثل:
+  - Carousel بمصدر: أحدث المقالات / قسم محدد / أقسام متعددة.
+  - Latest Grid.
+  - Category Grid/List.
+- ترتيب بالسحب والإفلات + إظهار/إخفاء + حذف.
+
+**إعدادات الموقع**
+- اسم ووصف الموقع + لوجو.
+- اللون الأساسي والثانوي.
+- روابط التواصل الاجتماعي: إضافة/تعديل/حذف + تفعيل/تعطيل + ترتيب.
+
+**إدارة المستخدمين (Superadmin)**
+- إنشاء/تعديل/حذف مستخدمين.
+- صلاحيات كاملة للمدير العام.
+- تحديد صلاحيات لكل قسم: إضافة/تعديل/حذف مقالات.
+
+## قاعدة البيانات (Supabase) — الجداول المستخدمة
+
+- `articles` المقالات
+- `categories` الأقسام
+- `authors` الكُتّاب
+- `homepage_sections` أقسام الصفحة الرئيسية الديناميكية
+- `site_settings` إعدادات الموقع العامة
+- `social_links` روابط التواصل
+- `users` مستخدمو لوحة التحكم
+- `user_permissions` صلاحيات المستخدمين حسب الأقسام
+- `article_views` مشاهدات المقالات
+- `article_ai_summaries` ملخصات AI المحفوظة
+- `article_ai_chat_logs` سجلات محادثات AI
+
+## التقنية والتشغيل
+
+**التقنيات**
+- React + Vite + TypeScript
+- Tailwind CSS (وضع ليلي/نهاري + متغيرات ألوان)
+- Supabase (Database)
+
+**متغيرات البيئة المطلوبة**
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- (اختياري محلياً) `VITE_GROQ_API_KEY`
+
+**تشغيل محلي**
+- `npm install`
+- `npm run dev`

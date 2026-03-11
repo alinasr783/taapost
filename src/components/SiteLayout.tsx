@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { BrainCircuit, Home, LayoutGrid, Moon, Sun, FileText } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase, type Category } from '../lib/supabase'
 import Footer from './Footer'
 
@@ -40,14 +41,14 @@ export default function SiteLayout({ children }: Props) {
   )
   const navigate = useNavigate()
   const [q, setQ] = useState('')
-  const [categories, setCategories] = useState<Category[]>([])
-  const [siteSettings, setSiteSettings] = useState({
+  const defaultSiteSettings = {
     site_name: 'تاء بوست',
     site_description: 'منصة إعلامية رقمية',
     logo_url: null as string | null,
     primary_color: '#8B4513',
-    secondary_color: '#000000'
-  })
+    secondary_color: '#000000',
+    show_article_summary: true,
+  }
   const location = useLocation()
 
   useEffect(() => {
@@ -58,38 +59,43 @@ export default function SiteLayout({ children }: Props) {
     }
   }, [theme])
 
+  const categoriesQuery = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('order_index', { ascending: true })
+
+      if (error) throw error
+      return (data ?? []) as Category[]
+    },
+    staleTime: 5 * 60_000,
+  })
+
+  const siteSettingsQuery = useQuery({
+    queryKey: ['site_settings'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('site_settings').select('*').single()
+      if (error) throw error
+      return data as typeof defaultSiteSettings
+    },
+    staleTime: 5 * 60_000,
+  })
+
+  const categories = categoriesQuery.data ?? []
+  const siteSettings = siteSettingsQuery.data ?? defaultSiteSettings
+
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const [categoriesRes, settingsRes] = await Promise.all([
-          supabase.from('categories').select('*').order('order_index', { ascending: true }),
-          supabase.from('site_settings').select('*').single()
-        ])
-
-        if (categoriesRes.data) {
-          setCategories(categoriesRes.data)
-        }
-
-        if (settingsRes.data) {
-          setSiteSettings(settingsRes.data)
-          // Update title
-          if (settingsRes.data.site_name) {
-            document.title = settingsRes.data.site_name
-          }
-          // Apply colors
-          if (settingsRes.data.primary_color) {
-            const primaryHsl = hexToHsl(settingsRes.data.primary_color)
-            document.documentElement.style.setProperty('--primary', primaryHsl)
-            // Also update the ring color for focus states
-            document.documentElement.style.setProperty('--ring', primaryHsl)
-          }
-        }
-      } catch (err) {
-        console.error('Unexpected error:', err)
-      }
+    if (siteSettings.site_name) {
+      document.title = siteSettings.site_name
     }
-    fetchData()
-  }, [])
+    if (siteSettings.primary_color) {
+      const primaryHsl = hexToHsl(siteSettings.primary_color)
+      document.documentElement.style.setProperty('--primary', primaryHsl)
+      document.documentElement.style.setProperty('--ring', primaryHsl)
+    }
+  }, [siteSettings.site_name, siteSettings.primary_color])
 
   const toggle = () => {
     const t = theme === 'dark' ? 'light' : 'dark'
@@ -100,7 +106,7 @@ export default function SiteLayout({ children }: Props) {
   }
 
   return (
-    <div className="min-h-dvh bg-background text-foreground flex flex-col">
+    <div className="min-h-dvh bg-background text-foreground flex flex-col pb-24 md:pb-0">
       <header className="border-b border-border/60 bg-background/80 backdrop-blur">
         <div className="container flex flex-wrap items-center justify-between gap-3 py-4">
           <Link to="/" className="flex items-center gap-3">
@@ -121,7 +127,7 @@ export default function SiteLayout({ children }: Props) {
               e.preventDefault()
               const qp = new URLSearchParams()
               if (q) qp.set('q', q)
-              navigate(`/المقالات?${qp.toString()}`)
+              navigate(`/posts?${qp.toString()}`)
             }}
             className="flex flex-1 items-center justify-end gap-2 min-w-[180px] max-w-[380px]"
           >
@@ -150,7 +156,7 @@ export default function SiteLayout({ children }: Props) {
                 <button
                   key={cat.id}
                   type="button"
-                  onClick={() => navigate(`/قسم/${encodeURIComponent(cat.slug)}`)}
+                  onClick={() => navigate(`/category/${cat.id}`)}
                   className="whitespace-nowrap rounded-[5px] px-2 py-1 hover:bg-muted/40 hover:text-primary"
                 >
                   {cat.name}
@@ -161,9 +167,9 @@ export default function SiteLayout({ children }: Props) {
         </div>
       </header>
       <main className="flex-1">{children}</main>
-      <nav className="sticky bottom-0 z-40 pb-3 pt-1">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 pb-[env(safe-area-inset-bottom)] pt-1">
         <div className="container flex justify-center">
-          <div className="flex w-full max-w-xs items-center justify-between rounded-[50px] border border-border/60 bg-background/70 px-4 py-2 text-[10px] text-muted-foreground shadow-lg backdrop-blur-sm md:text-xs">
+          <div className="flex w-full max-w-xs items-center justify-between rounded-[50px] border border-border/60 bg-background/70 px-4 py-2 text-[10px] text-muted-foreground shadow-lg backdrop-blur-[2px] md:text-xs">
             <button
               type="button"
               onClick={() => navigate('/')}
@@ -174,18 +180,18 @@ export default function SiteLayout({ children }: Props) {
             </button>
             <button
               type="button"
-              onClick={() => navigate('/الأقسام')}
-              className={`flex flex-1 flex-col items-center gap-1 rounded-[5px] px-2 py-1 transition-colors ${location.pathname.includes('/الأقسام') || location.pathname.includes('/قسم') ? 'text-primary font-bold' : 'hover:bg-white/5 hover:text-primary'}`}
+              onClick={() => navigate('/categories')}
+              className={`flex flex-1 flex-col items-center gap-1 rounded-[5px] px-2 py-1 transition-colors ${location.pathname.includes('/categories') || location.pathname.includes('/category') ? 'text-primary font-bold' : 'hover:bg-white/5 hover:text-primary'}`}
             >
-              <LayoutGrid className={`h-4 w-4 ${location.pathname.includes('/الأقسام') || location.pathname.includes('/قسم') ? 'fill-primary/20' : ''}`} />
+              <LayoutGrid className={`h-4 w-4 ${location.pathname.includes('/categories') || location.pathname.includes('/category') ? 'fill-primary/20' : ''}`} />
               <span>أقسام</span>
             </button>
             <button
               type="button"
-              onClick={() => navigate('/المقالات')}
-              className={`flex flex-1 flex-col items-center gap-1 rounded-[5px] px-2 py-1 transition-colors ${location.pathname.includes('/المقالات') || location.pathname.includes('/مقال') ? 'text-primary font-bold' : 'hover:bg-white/5 hover:text-primary'}`}
+              onClick={() => navigate('/posts')}
+              className={`flex flex-1 flex-col items-center gap-1 rounded-[5px] px-2 py-1 transition-colors ${location.pathname.includes('/posts') || location.pathname.includes('/post') ? 'text-primary font-bold' : 'hover:bg-white/5 hover:text-primary'}`}
             >
-              <FileText className={`h-4 w-4 ${location.pathname.includes('/المقالات') || location.pathname.includes('/مقال') ? 'fill-primary/20' : ''}`} />
+              <FileText className={`h-4 w-4 ${location.pathname.includes('/posts') || location.pathname.includes('/post') ? 'fill-primary/20' : ''}`} />
               <span>مقالات</span>
             </button>
           </div>

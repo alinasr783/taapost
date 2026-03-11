@@ -1,5 +1,6 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { supabase, type Article, type HomepageSection } from '../lib/supabase'
 import HomeCarousel from '../components/HomeCarousel'
 
@@ -32,101 +33,101 @@ function getSettingsSourceIds(settings: unknown) {
   return settings.source_ids.filter((x): x is number => typeof x === 'number' && Number.isFinite(x))
 }
 
+const emptyArticles: Article[] = []
+const emptySections: HomepageSection[] = []
+
 export default function Home() {
   const navigate = useNavigate()
-  const [articles, setArticles] = useState<Article[]>([])
-  const [sections, setSections] = useState<HomepageSection[]>([])
-  const [loading, setLoading] = useState(true)
+  const limit = 60
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        // Fetch articles
-        const { data: articlesData, error: articlesError } = await supabase
+  const homeQuery = useQuery({
+    queryKey: ['home_data', { limit }],
+    queryFn: async () => {
+      const [articlesRes, sectionsRes] = await Promise.all([
+        supabase
           .from('articles')
-          .select('*, categories(id, name, slug)')
+          .select('id,title,excerpt,content,image,category_id,type,date,is_exclusive,categories(id,name,slug)')
           .order('date', { ascending: false })
-
-        if (articlesError) {
-          console.error('Error fetching articles:', articlesError)
-        }
-
-        // Fetch homepage sections
-        const { data: sectionsData, error: sectionsError } = await supabase
+          .limit(limit),
+        supabase
           .from('homepage_sections')
-          .select(`
+          .select(
+            `
             *,
             categories (
               id,
               name,
               slug
             )
-          `)
+          `
+          )
           .eq('is_active', true)
-          .order('display_order', { ascending: true })
-        
-        if (sectionsError) {
-          console.error('Error fetching sections:', sectionsError)
-          // Fallback if table doesn't exist or is empty
-          const defaultSections: HomepageSection[] = [
-            { id: 1, type: 'carousel', title: 'Featured', display_order: 1, is_active: true },
-            { id: 2, type: 'latest_grid', title: 'Latest Articles', display_order: 2, is_active: true }
-          ]
-          setSections(defaultSections)
-        } else if (sectionsData && sectionsData.length > 0) {
-          // transform the data to match the type if needed, specifically the joined category
-          const typedSections = sectionsData
-            .filter(isRecord)
-            .map((s) => {
-              const joined = s.categories
-              const categories = Array.isArray(joined) ? (joined[0] as unknown) : joined
-              return { ...s, categories } as HomepageSection
-            })
-          setSections(typedSections as HomepageSection[])
-        } else {
-             // Fallback if empty
-            const defaultSections: HomepageSection[] = [
-                { id: 1, type: 'carousel', title: 'Featured', display_order: 1, is_active: true },
-                { id: 2, type: 'latest_grid', title: 'Latest Articles', display_order: 2, is_active: true }
-            ]
-            setSections(defaultSections)
-        }
-        
-        if (articlesData) {
-          const mappedArticles = articlesData
-            .filter(isRecord)
-            .map((a) => {
-              const joined = a.categories
-              const categoryRow = Array.isArray(joined) ? (joined[0] as unknown) : joined
-              const categoryName = isRecord(categoryRow) ? getString(categoryRow.name, '') : ''
-              return {
-                ...(a as unknown as Article),
-                categoryId: typeof a.category_id === 'number' ? a.category_id : undefined,
-                category: categoryName,
-                contentHtml: typeof a.content === 'string' ? a.content : undefined,
-              } as Article
-            })
-          setArticles(mappedArticles as Article[])
-        }
-      } catch (error) {
-        console.error('Error:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
+          .order('display_order', { ascending: true }),
+      ])
 
-    fetchData()
-  }, [])
+      let sections: HomepageSection[] = []
+
+      if (sectionsRes.error || !sectionsRes.data || sectionsRes.data.length === 0) {
+        sections = [
+          { id: 1, type: 'carousel', title: 'Featured', display_order: 1, is_active: true },
+          { id: 2, type: 'latest_grid', title: 'Latest Articles', display_order: 2, is_active: true },
+        ]
+      } else {
+        sections = sectionsRes.data
+          .filter(isRecord)
+          .map((s) => {
+            const joined = s.categories
+            const categories = Array.isArray(joined) ? (joined[0] as unknown) : joined
+            return { ...s, categories } as HomepageSection
+          }) as HomepageSection[]
+      }
+
+      const rawArticles = articlesRes.data ?? []
+      const articles = rawArticles
+        .filter(isRecord)
+        .map((a) => {
+          const joined = a.categories
+          const categoryRow = Array.isArray(joined) ? (joined[0] as unknown) : joined
+          const categoryName = isRecord(categoryRow) ? getString(categoryRow.name, '') : ''
+          return {
+            ...(a as unknown as Article),
+            categoryId: typeof a.category_id === 'number' ? a.category_id : undefined,
+            category: categoryName,
+            contentHtml: typeof a.content === 'string' ? a.content : undefined,
+          } as Article
+        })
+
+      return { articles, sections }
+    },
+    staleTime: 60_000,
+    gcTime: 30 * 60_000,
+  })
+
+  const articlesData = homeQuery.data?.articles
+  const sections = homeQuery.data?.sections ?? emptySections
 
   const sortedArticles = useMemo(
-    () => [...articles].sort((a, b) => (a.date < b.date ? 1 : -1)),
-    [articles]
+    () => [...(articlesData ?? emptyArticles)].sort((a, b) => (a.date < b.date ? 1 : -1)),
+    [articlesData]
   )
 
-  if (loading) {
-    return <div className="flex items-center justify-center py-20 min-h-[50vh]">
-      <div className="text-lg text-muted-foreground">جاري التحميل...</div>
-    </div>
+  if (homeQuery.isLoading) {
+    return (
+      <div className="container py-8 space-y-6">
+        <div className="h-10 w-48 rounded bg-muted/40 animate-pulse" />
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, idx) => (
+            <div key={idx} className="space-y-3">
+              <div className="aspect-video rounded-lg bg-muted/40 animate-pulse" />
+              <div className="space-y-2">
+                <div className="h-3 w-24 rounded bg-muted/40 animate-pulse" />
+                <div className="h-4 w-5/6 rounded bg-muted/50 animate-pulse" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -142,7 +143,7 @@ export default function Home() {
              slides = slides.filter(a => a.categoryId === section.category_id);
            } else if (sourceType === 'categories') {
              const sourceIds = getSettingsSourceIds(section.settings)
-             slides = slides.filter(a => sourceIds.includes(a.categoryId));
+             slides = slides.filter(a => a.categoryId != null && sourceIds.includes(a.categoryId));
            }
            
            slides = slides.slice(0, count);
@@ -167,7 +168,7 @@ export default function Home() {
                         <h2 className="text-2xl font-bold border-r-4 border-primary pr-3">{section.title || 'أحدث المقالات'}</h2>
                          <button
                           type="button"
-                          onClick={() => navigate('/المقالات')} 
+                          onClick={() => navigate('/posts')} 
                           className="text-xs font-medium bg-primary/10 text-primary px-4 py-1.5 rounded-full hover:bg-primary hover:text-primary-foreground transition-all"
                         >
                           المزيد
@@ -176,7 +177,7 @@ export default function Home() {
                      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                         {list.map((article) => (
                            <div key={article.id} 
-                                onClick={() => navigate(`/مقال/${encodeURIComponent(article.slug)}`)}
+                                onClick={() => navigate(`/post/${article.id}`)}
                                 className="group cursor-pointer space-y-3"
                            >
                                 <div className="relative aspect-video overflow-hidden rounded-lg shadow-sm group-hover:shadow-md transition-all border border-border/50 group-hover:border-primary/50">
@@ -184,6 +185,7 @@ export default function Home() {
                                         src={article.image} 
                                         alt={article.title}
                                         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                        loading="lazy"
                                      />
                                 </div>
                                 <div className="space-y-2">
@@ -225,14 +227,18 @@ export default function Home() {
               <div className="flex items-center justify-between border-b border-primary/10 pb-4">
                 <button
                   type="button"
-                  onClick={() => navigate(`/قسم/${encodeURIComponent(catName)}`)}
+                  onClick={() => {
+                    if (catId) navigate(`/category/${catId}`)
+                  }}
                   className="text-2xl font-bold border-r-4 border-primary pr-3 hover:text-primary transition-colors"
                 >
                   {catName}
                 </button>
                 <button
                   type="button"
-                  onClick={() => navigate(`/قسم/${encodeURIComponent(catName)}`)}
+                  onClick={() => {
+                    if (catId) navigate(`/category/${catId}`)
+                  }}
                   className="text-xs font-medium bg-primary/10 text-primary px-4 py-1.5 rounded-full hover:bg-primary hover:text-primary-foreground transition-all"
                 >
                   المزيد
@@ -245,7 +251,7 @@ export default function Home() {
                       key={article.id}
                       type="button"
                       onClick={() =>
-                        navigate(`/مقال/${encodeURIComponent(article.slug)}`)
+                        navigate(`/post/${article.id}`)
                       }
                       className="relative flex min-w-[360px] max-w-[480px] flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md"
                     >
@@ -254,6 +260,7 @@ export default function Home() {
                           src={article.image}
                           alt={article.title}
                           className="h-full w-full object-cover"
+                          loading="lazy"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
                         {article.is_exclusive && (

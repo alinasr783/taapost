@@ -1,51 +1,62 @@
-import { useMemo, useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useMemo } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { supabase, type Article } from '../lib/supabase'
 
 export default function Articles() {
   const [params] = useSearchParams()
   const q = params.get('q')?.trim() || ''
-  const [articles, setArticles] = useState<Article[]>([])
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const { data, error } = await supabase
-          .from('articles')
-          .select('*')
-          .order('date', { ascending: false })
+  type ArticleCard = Pick<
+    Article,
+    'id' | 'title' | 'excerpt' | 'image' | 'date' | 'is_exclusive'
+  >
 
-        if (error) {
-          console.error('Error fetching articles:', error)
-        }
-        
-        if (data) {
-          setArticles(data as Article[])
-        }
-      } catch (error) {
-        console.error('Error:', error)
-      } finally {
-        setLoading(false)
+  const normalizedQ = useMemo(() => q.replaceAll(',', ' ').trim(), [q])
+  const limit = 40
+
+  const articlesQuery = useQuery({
+    queryKey: ['articles_list', { q: normalizedQ, limit }],
+    queryFn: async () => {
+      let query = supabase
+        .from('articles')
+        .select('id,title,excerpt,image,date,is_exclusive')
+        .order('date', { ascending: false })
+        .limit(limit)
+
+      if (normalizedQ) {
+        const pattern = `%${normalizedQ}%`
+        query = query.or(`title.ilike.${pattern},excerpt.ilike.${pattern}`)
       }
-    }
-    fetchData()
-  }, [])
 
-  const list = useMemo(() => {
-    const sorted = [...articles].sort((a, b) => (a.date < b.date ? 1 : -1))
-    if (!q) return sorted
-    const t = q.toLowerCase()
-    return sorted.filter(
-      (i) => i.title.toLowerCase().includes(t) || (i.excerpt && i.excerpt.toLowerCase().includes(t))
-    )
-  }, [q, articles])
+      const { data, error } = await query
+      if (error) throw error
+      return (data ?? []) as ArticleCard[]
+    },
+    staleTime: 60_000,
+    gcTime: 30 * 60_000,
+  })
 
-  if (loading) {
+  const list = articlesQuery.data ?? []
+
+  if (articlesQuery.isLoading) {
     return (
       <div className="container py-8 space-y-4">
         <h1 className="mb-4 text-2xl font-bold">المقالات</h1>
-        <div className="text-center py-10">جاري التحميل...</div>
+        <div className="grid gap-6 md:grid-cols-2">
+          {Array.from({ length: 6 }).map((_, idx) => (
+            <div
+              key={idx}
+              className="relative overflow-hidden rounded-[5px] border border-border/40 bg-muted/20 shadow-sm"
+            >
+              <div className="h-52 w-full animate-pulse bg-muted/40" />
+              <div className="absolute inset-x-2 bottom-2 space-y-2 rounded-[5px] border border-border/30 bg-background/60 px-3 py-2 backdrop-blur-[2px]">
+                <div className="h-4 w-5/6 animate-pulse rounded bg-muted/50" />
+                <div className="h-3 w-4/6 animate-pulse rounded bg-muted/40" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
@@ -55,9 +66,9 @@ export default function Articles() {
       <h1 className="mb-4 text-2xl font-bold">المقالات</h1>
       <div className="grid gap-6 md:grid-cols-2">
         {list.map((i) => (
-          <a
-            key={i.slug}
-            href={`/مقال/${encodeURIComponent(i.slug)}`}
+          <Link
+            key={i.id}
+            to={`/post/${i.id}`}
             className="relative flex flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md"
           >
             <div className="relative h-52 w-full">
@@ -65,6 +76,7 @@ export default function Articles() {
                 src={i.image}
                 alt={i.title}
                 className="h-full w-full object-cover"
+                loading="lazy"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
               {i.is_exclusive && (
@@ -83,7 +95,7 @@ export default function Articles() {
                 </div>
               </div>
             </div>
-          </a>
+          </Link>
         ))}
       </div>
       {list.length === 0 && <div className="text-muted-foreground mt-6">لا توجد نتائج</div>}

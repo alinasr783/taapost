@@ -35,7 +35,7 @@ export default function DashboardLogin() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4 rtl" dir="rtl">
+    <div className="flex min-h-dvh items-center justify-center bg-background p-4 rtl" dir="rtl">
       <div className="w-full max-w-md rounded-lg bg-card p-8 shadow-md border border-border">
         <h1 className="mb-6 text-center text-2xl font-bold text-foreground">تسجيل الدخول للوحة التحكم</h1>
         {error && <div className="mb-4 rounded bg-destructive/10 p-3 text-destructive border border-destructive/20">{error}</div>}

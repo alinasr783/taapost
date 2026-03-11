@@ -93,10 +93,10 @@ export default function Footer({ siteSettings }: Props) {
                 <Link to="/" className="hover:text-primary transition-colors hover:translate-x-1 inline-block">الرئيسية</Link>
               </li>
               <li>
-                <Link to="/الأقسام" className="hover:text-primary transition-colors hover:translate-x-1 inline-block">الأقسام</Link>
+                <Link to="/categories" className="hover:text-primary transition-colors hover:translate-x-1 inline-block">الأقسام</Link>
               </li>
               <li>
-                <Link to="/المقالات" className="hover:text-primary transition-colors hover:translate-x-1 inline-block">أحدث المقالات</Link>
+                <Link to="/posts" className="hover:text-primary transition-colors hover:translate-x-1 inline-block">أحدث المقالات</Link>
               </li>
             </ul>
           </div>
