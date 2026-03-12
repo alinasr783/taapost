@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Save, Plus, Trash2, GripVertical, X, Facebook, Twitter, Instagram, Linkedin, Youtube, MessageCircle, Send, Mail, Globe, Link as LinkIcon, Loader2 } from 'lucide-react'
 import { supabase, type SocialLink } from '../../lib/supabase'
 import ImageUpload from '../components/ImageUpload'
+import Switch from '../components/Switch'
 
 const AVAILABLE_ICONS = [
   { name: 'Facebook', icon: Facebook },
@@ -230,13 +231,14 @@ export default function DashboardSettings() {
           />
         </div>
          <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={link.is_active !== false}
-            onChange={(e) => updateLink({ is_active: e.target.checked })}
+          <label htmlFor={`active-${isNew ? 'new' : link.id}`} className="text-sm font-medium">
+            نشط
+          </label>
+          <Switch
             id={`active-${isNew ? 'new' : link.id}`}
+            checked={link.is_active !== false}
+            onCheckedChange={(checked) => updateLink({ is_active: checked })}
           />
-          <label htmlFor={`active-${isNew ? 'new' : link.id}`}>نشط</label>
         </div>
         
         <div className="md:col-span-2 flex justify-end gap-2 mt-2">
@@ -264,13 +266,6 @@ export default function DashboardSettings() {
     <div className="max-w-4xl mx-auto">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">إعدادات الموقع</h1>
-        <button
-          onClick={() => setNewLink({ platform: '', url: '', icon: 'Link', is_active: true, sort_order: links.length + 1 })}
-          className="bg-primary text-primary-foreground px-4 py-2 rounded-md flex items-center gap-2 hover:bg-primary/90 transition-colors"
-        >
-          <Plus size={20} />
-          <span>إضافة رابط</span>
-        </button>
       </div>
 
       <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-8">
@@ -310,15 +305,16 @@ export default function DashboardSettings() {
             </div>
 
             <div className="flex items-center gap-2 rounded-md border border-border bg-muted/20 px-3 py-3">
-              <input
-                id="show-article-summary"
-                type="checkbox"
-                checked={siteSettings.show_article_summary !== false}
-                onChange={(e) => setSiteSettings({ ...siteSettings, show_article_summary: e.target.checked })}
-              />
               <label htmlFor="show-article-summary" className="text-sm font-medium">
                 إظهار ملخص المقال أسفل صفحة المقال
               </label>
+              <div className="mr-auto">
+                <Switch
+                  id="show-article-summary"
+                  checked={siteSettings.show_article_summary !== false}
+                  onCheckedChange={(checked) => setSiteSettings({ ...siteSettings, show_article_summary: checked })}
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -366,7 +362,16 @@ export default function DashboardSettings() {
       </div>
 
       <div className="bg-card rounded-lg shadow-sm border border-border p-6">
-        <h2 className="text-xl font-semibold mb-4">حسابات التواصل الاجتماعي</h2>
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <h2 className="text-xl font-semibold">حسابات التواصل الاجتماعي</h2>
+          <button
+            onClick={() => setNewLink({ platform: '', url: '', icon: 'Link', is_active: true, sort_order: links.length + 1 })}
+            className="bg-primary text-primary-foreground px-4 py-2 rounded-md flex items-center gap-2 hover:bg-primary/90 transition-colors"
+          >
+            <Plus size={20} />
+            <span>إضافة رابط</span>
+          </button>
+        </div>
         
         <div className="space-y-4">
           {links.map((link) => (
@@ -385,12 +390,12 @@ export default function DashboardSettings() {
                       return <Icon size={20} />
                     })()}
                   </div>
-                  <div className="flex-1">
+                  <div className="min-w-0 flex-1">
                     <div className="font-bold flex items-center gap-2">
                       {link.platform}
                       {!link.is_active && <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">غير نشط</span>}
                     </div>
-                    <div className="text-sm text-muted-foreground truncate max-w-xs">{link.url}</div>
+                    <div className="text-sm text-muted-foreground truncate w-[220px] sm:w-[260px] md:w-[340px]">{link.url}</div>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setEditingId(link.id)} className="p-2 hover:bg-muted rounded text-blue-600">تعديل</button>

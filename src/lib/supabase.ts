@@ -15,7 +15,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 export type Category = {
   id: number
-  slug: string
+  slug?: string
   name: string
   description: string
   topics: string[]
@@ -26,7 +26,7 @@ export type Category = {
 
 export type Article = {
   id: number
-  slug: string
+  slug?: string
   title: string
   excerpt: string
   content: string

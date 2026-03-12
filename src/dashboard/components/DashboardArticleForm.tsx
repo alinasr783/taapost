@@ -3,6 +3,7 @@ import { X, Save } from 'lucide-react'
 import { supabase, type Article, type Category, type User, type UserPermission, type Author } from '../../lib/supabase'
 import { hasPermission } from '../utils'
 import ImageUpload from './ImageUpload'
+import Switch from './Switch'
 import ReactQuill from 'react-quill-new'
 import 'react-quill-new/dist/quill.snow.css'
 
@@ -29,7 +30,6 @@ export default function DashboardArticleForm({ article, categories, user, permis
     if (article) {
       return {
         title: article.title || '',
-        slug: article.slug || '',
         excerpt: article.excerpt || '',
         content: decodeHtml(article.content || ''),
         category_id: article.category_id || 0,
@@ -42,7 +42,6 @@ export default function DashboardArticleForm({ article, categories, user, permis
     }
     return {
       title: '',
-      slug: '',
       excerpt: '',
       content: '',
       category_id: 0,
@@ -84,22 +83,9 @@ export default function DashboardArticleForm({ article, categories, user, permis
 
     setLoading(true)
     try {
-      // Check for unique slug
-      const { data: existingSlug } = await supabase
-        .from('articles')
-        .select('id')
-        .eq('slug', formData.slug)
-        .single()
-      
-      if (existingSlug && (!article || existingSlug.id !== article.id)) {
-        alert('هذا الرابط (Slug) مستخدم بالفعل، يرجى تغييره')
-        setLoading(false)
-        return
-      }
-
       const dataToSave = {
         ...formData,
-        author_id: formData.author_id === 0 ? null : formData.author_id
+        author_id: formData.author_id === 0 ? null : formData.author_id,
       }
 
       let error
@@ -112,7 +98,12 @@ export default function DashboardArticleForm({ article, categories, user, permis
       } else {
         const { error: insertError } = await supabase
           .from('articles')
-          .insert([dataToSave])
+          .insert([
+            {
+              ...dataToSave,
+              slug: `p_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
+            },
+          ])
         error = insertError
       }
 
@@ -160,28 +151,11 @@ export default function DashboardArticleForm({ article, categories, user, permis
                 type="text"
                 required
                 value={formData.title}
-                onChange={(e) => {
-                    const title = e.target.value;
-                    setFormData(prev => ({
-                        ...prev,
-                        title,
-                        slug: article ? prev.slug : title.trim().replace(/\s+/g, '-')
-                    }))
-                }}
+                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
                 className="w-full p-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring outline-none text-foreground"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">الرابط (Slug)</label>
-              <input
-                type="text"
-                required
-                value={formData.slug}
-                onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                className="w-full p-2 bg-muted/50 border border-input rounded-md focus:ring-2 focus:ring-ring outline-none text-foreground"
-                dir="ltr"
-              />
-            </div>
+            <div />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -216,15 +190,10 @@ export default function DashboardArticleForm({ article, categories, user, permis
               </select>
             </div>
             <div className="flex items-end mb-1">
-              <label className="flex items-center gap-2 cursor-pointer bg-muted/30 p-2 rounded-md border border-input w-full">
-                <input
-                  type="checkbox"
-                  checked={formData.is_exclusive}
-                  onChange={(e) => setFormData({ ...formData, is_exclusive: e.target.checked })}
-                  className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
-                />
+              <div className="flex items-center justify-between gap-2 bg-muted/30 p-2 rounded-md border border-input w-full">
                 <span className="text-sm font-medium text-foreground">مقال حصري</span>
-              </label>
+                <Switch checked={Boolean(formData.is_exclusive)} onCheckedChange={(checked) => setFormData({ ...formData, is_exclusive: checked })} />
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">التاريخ</label>

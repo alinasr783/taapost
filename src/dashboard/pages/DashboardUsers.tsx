@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Edit, Trash2, Shield, Save, X } from 'lucide-react'
 import { supabase, type User, type Category, type UserPermission } from '../../lib/supabase'
+import Switch from '../components/Switch'
 
 export default function DashboardUsers() {
   const [users, setUsers] = useState<User[]>([])
@@ -198,7 +199,56 @@ export default function DashboardUsers() {
       </div>
 
       <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="md:hidden divide-y divide-border">
+          {users.map((user) => (
+            <div key={user.id} className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-foreground">{user.username}</div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                    {user.is_superadmin ? (
+                      <span className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 px-2 py-1 rounded font-medium">
+                        مدير عام
+                      </span>
+                    ) : (
+                      <span className="bg-muted text-muted-foreground px-2 py-1 rounded">مستخدم</span>
+                    )}
+                    <span className="text-muted-foreground">
+                      {new Date(user.created_at).toLocaleDateString('ar-EG')}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex shrink-0 gap-1">
+                  <button
+                    onClick={() => openPermissions(user)}
+                    className="p-2 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+                    title="الصلاحيات"
+                    disabled={user.is_superadmin}
+                  >
+                    <Shield size={18} />
+                  </button>
+                  <button
+                    onClick={() => openUserForm(user)}
+                    className="p-2 text-muted-foreground hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded transition-colors"
+                    title="تعديل"
+                  >
+                    <Edit size={18} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(user.id)}
+                    className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
+                    title="حذف"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-right">
             <thead className="bg-muted/50 text-muted-foreground font-medium">
               <tr>
@@ -287,14 +337,14 @@ export default function DashboardUsers() {
                 />
               </div>
               <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
+                <label htmlFor="is_superadmin" className="text-sm font-medium text-foreground flex-1">
+                  مدير عام (صلاحيات كاملة)
+                </label>
+                <Switch
                   id="is_superadmin"
                   checked={formData.is_superadmin}
-                  onChange={(e) => setFormData({ ...formData, is_superadmin: e.target.checked })}
-                  className="w-4 h-4 text-primary rounded border-input focus:ring-ring"
+                  onCheckedChange={(checked) => setFormData({ ...formData, is_superadmin: checked })}
                 />
-                <label htmlFor="is_superadmin" className="text-sm font-medium text-foreground">مدير عام (صلاحيات كاملة)</label>
               </div>
               <div className="flex justify-end gap-3 pt-4 border-t border-border">
                 <button
@@ -349,28 +399,28 @@ export default function DashboardUsers() {
                         <tr key={category.id} className="hover:bg-muted/30 transition-colors">
                           <td className="p-4 font-medium border-b border-border text-foreground">{category.name}</td>
                           <td className="p-4 border-b border-border text-center">
-                            <input
-                              type="checkbox"
-                              checked={perm.can_add}
-                              onChange={(e) => handlePermissionChange(category.id, 'can_add', e.target.checked)}
-                              className="w-5 h-5 text-primary rounded border-input focus:ring-ring"
-                            />
+                            <div className="flex justify-center">
+                              <Switch
+                                checked={perm.can_add}
+                                onCheckedChange={(checked) => handlePermissionChange(category.id, 'can_add', checked)}
+                              />
+                            </div>
                           </td>
                           <td className="p-4 border-b border-border text-center">
-                            <input
-                              type="checkbox"
-                              checked={perm.can_edit}
-                              onChange={(e) => handlePermissionChange(category.id, 'can_edit', e.target.checked)}
-                              className="w-5 h-5 text-primary rounded border-input focus:ring-ring"
-                            />
+                            <div className="flex justify-center">
+                              <Switch
+                                checked={perm.can_edit}
+                                onCheckedChange={(checked) => handlePermissionChange(category.id, 'can_edit', checked)}
+                              />
+                            </div>
                           </td>
                           <td className="p-4 border-b border-border text-center">
-                            <input
-                              type="checkbox"
-                              checked={perm.can_delete}
-                              onChange={(e) => handlePermissionChange(category.id, 'can_delete', e.target.checked)}
-                              className="w-5 h-5 text-primary rounded border-input focus:ring-ring"
-                            />
+                            <div className="flex justify-center">
+                              <Switch
+                                checked={perm.can_delete}
+                                onCheckedChange={(checked) => handlePermissionChange(category.id, 'can_delete', checked)}
+                              />
+                            </div>
                           </td>
                         </tr>
                       )

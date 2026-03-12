@@ -120,7 +120,75 @@ export default function DashboardArticles() {
           </div>
         </div>
         
-        <div className="overflow-x-auto">
+        <div className="md:hidden divide-y divide-border">
+          {filteredArticles.map((article) => {
+            const canEdit = user && hasPermission(user, permissions, article.category_id, 'edit')
+            const canDelete = user && hasPermission(user, permissions, article.category_id, 'delete')
+
+            return (
+              <div key={article.id} className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-foreground line-clamp-2">
+                      {article.title}
+                      {article.is_exclusive && (
+                        <span className="mr-2 inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/10">
+                          حصري
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                      <span className="bg-primary/10 text-primary px-2 py-1 rounded">
+                        {categories.find(c => c.id === article.category_id)?.name || article.category_id}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {new Date(article.created_at || article.date).toLocaleDateString('ar-EG')}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-1">
+                    <a
+                      href={`/post/${article.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded transition-colors"
+                      title="عرض"
+                    >
+                      <Eye size={18} />
+                    </a>
+                    {canEdit && (
+                      <button
+                        onClick={() => {
+                          setEditingArticle(article)
+                          setIsFormOpen(true)
+                        }}
+                        className="p-2 text-muted-foreground hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                        title="تعديل"
+                      >
+                        <Edit size={18} />
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        onClick={() => handleDelete(article.id)}
+                        className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
+                        title="حذف"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+          {filteredArticles.length === 0 && (
+            <div className="p-8 text-center text-muted-foreground">لا توجد مقالات لعرضها</div>
+          )}
+        </div>
+
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-right">
             <thead className="bg-muted/50 text-muted-foreground font-medium">
               <tr>

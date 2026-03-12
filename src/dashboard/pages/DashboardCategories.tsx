@@ -17,7 +17,6 @@ export default function DashboardCategories() {
   // Form State
   const [formData, setFormData] = useState({
     name: '',
-    slug: '',
     description: '',
     image: '',
     topics: '',
@@ -134,9 +133,8 @@ export default function DashboardCategories() {
     e.preventDefault()
     setIsSaving(true)
     try {
-      const dataToSave = {
+      const dataToSave: Record<string, unknown> = {
         name: formData.name,
-        slug: formData.slug,
         description: formData.description,
         image: formData.image,
         topics: formData.topics.split(',').map(t => t.trim()).filter(Boolean),
@@ -145,9 +143,19 @@ export default function DashboardCategories() {
       }
 
       if (editingCategory) {
-        await supabase.from('categories').update(dataToSave).eq('id', editingCategory.id)
+        const { error } = await supabase.from('categories').update(dataToSave).eq('id', editingCategory.id)
+        if (error) throw error
       } else {
-        await supabase.from('categories').insert([dataToSave])
+        const { error } = await supabase.from('categories').insert([dataToSave])
+        if (error) {
+          if (typeof error.message === 'string' && error.message.toLowerCase().includes('slug')) {
+            const slug = `c_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`
+            const retry = await supabase.from('categories').insert([{ ...dataToSave, slug }])
+            if (retry.error) throw retry.error
+          } else {
+            throw error
+          }
+        }
       }
       
       setIsFormOpen(false)
@@ -165,7 +173,6 @@ export default function DashboardCategories() {
       setEditingCategory(category)
       setFormData({
         name: category.name,
-        slug: category.slug,
         description: category.description || '',
         image: category.image || '',
         topics: category.topics ? category.topics.join(', ') : '',
@@ -176,7 +183,6 @@ export default function DashboardCategories() {
       setEditingCategory(null)
       setFormData({
         name: '',
-        slug: '',
         description: '',
         image: '',
         topics: '',
@@ -227,41 +233,79 @@ export default function DashboardCategories() {
       {/* Content */}
       <div className="bg-card rounded-lg shadow-sm border border-border p-6">
         {activeTab === 'list' && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-right">
-              <thead className="bg-muted/50 text-muted-foreground font-medium">
-                <tr>
-                  <th className="p-4">الاسم</th>
-                  <th className="p-4">الوصف</th>
-                  <th className="p-4">عدد المواضيع</th>
-                  <th className="p-4">الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {categories.map((category) => (
-                  <tr key={category.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="p-4 font-medium text-foreground">{category.name}</td>
-                    <td className="p-4 text-muted-foreground max-w-xs truncate">{category.description}</td>
-                    <td className="p-4 text-muted-foreground">{category.topics?.length || 0}</td>
-                    <td className="p-4 flex gap-2">
+          <>
+            <div className="md:hidden space-y-3">
+              {categories.map((category) => (
+                <div key={category.id} className="rounded-lg border border-border bg-muted/20 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-foreground">{category.name}</div>
+                      {category.description && (
+                        <div className="mt-1 text-sm text-muted-foreground line-clamp-2">{category.description}</div>
+                      )}
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        عدد المواضيع: {category.topics?.length || 0}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
                       <button
                         onClick={() => openForm(category)}
                         className="p-2 text-muted-foreground hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                        title="تعديل"
                       >
                         <Edit size={18} />
                       </button>
                       <button
                         onClick={() => handleDelete(category.id)}
                         className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
+                        title="حذف"
                       >
                         <Trash2 size={18} />
                       </button>
-                    </td>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-right">
+                <thead className="bg-muted/50 text-muted-foreground font-medium">
+                  <tr>
+                    <th className="p-4">الاسم</th>
+                    <th className="p-4">الوصف</th>
+                    <th className="p-4">عدد المواضيع</th>
+                    <th className="p-4">الإجراءات</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {categories.map((category) => (
+                    <tr key={category.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="p-4 font-medium text-foreground">{category.name}</td>
+                      <td className="p-4 text-muted-foreground max-w-xs truncate">{category.description}</td>
+                      <td className="p-4 text-muted-foreground">{category.topics?.length || 0}</td>
+                      <td className="p-4 flex gap-2">
+                        <button
+                          onClick={() => openForm(category)}
+                          className="p-2 text-muted-foreground hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                          title="تعديل"
+                        >
+                          <Edit size={18} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(category.id)}
+                          className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
+                          title="حذف"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         {activeTab === 'header_order' && (
@@ -335,25 +379,13 @@ export default function DashboardCategories() {
                   required
                   value={formData.name}
                   onChange={(e) => {
-                      const name = e.target.value;
+                      const name = e.target.value
                       setFormData(prev => ({
                           ...prev,
                           name,
-                          slug: editingCategory ? prev.slug : name.trim().replace(/\s+/g, '-')
                       }))
                   }}
                   className="w-full p-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">الرابط (Slug)</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.slug}
-                  onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                  className="w-full p-2 bg-muted/50 border border-input rounded-md focus:ring-2 focus:ring-ring outline-none"
-                  dir="ltr"
                 />
               </div>
               <div>

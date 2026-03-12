@@ -1,22 +1,69 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowRight, Calendar, Folder } from 'lucide-react'
+import {
+  AlertTriangle,
+  ArrowRight,
+  BarChart3,
+  Calendar,
+  Folder,
+  Image as ImageIcon,
+  Info,
+  Link2,
+  PieChart as PieChartIcon,
+  Send,
+  Sparkles,
+  Trash2,
+  TrendingUp,
+} from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase, type Article } from '../lib/supabase'
 import { useTrackView } from '../hooks/useTrackView'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 
-type ArticleSummary = {
-  lead: string
-  key_points: string[]
-  background: string[]
-  implications: string[]
-}
+type AiBlock =
+  | { type: 'html'; html: string }
+  | {
+      type: 'chart'
+      chartType: 'bar' | 'line' | 'pie'
+      title?: string
+      data: Record<string, unknown>[]
+      xKey?: string
+      yKey?: string
+      nameKey?: string
+      valueKey?: string
+    }
+  | { type: 'image'; src: string; alt?: string; caption?: string }
+  | {
+      type: 'articles'
+      title?: string
+      items: { id: number; title?: string; slug?: string; image?: string; reason?: string }[]
+    }
+  | { type: 'icons'; title?: string; items: { name: string; label?: string }[] }
+  | { type: 'divider'; label?: string }
 
 type ChatMessage = {
   role: 'user' | 'assistant'
   content: string
   citations?: string[]
+  blocks?: AiBlock[]
+  suggestedQuestions?: string[]
 }
+
+const CHART_COLORS = ['#7c2d12', '#a16207', '#0f766e', '#1d4ed8', '#6d28d9', '#c2410c']
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -57,17 +104,79 @@ function clampText(text: string, maxChars: number) {
   return text.slice(0, maxChars) + '…'
 }
 
-function toHex(buffer: ArrayBuffer) {
-  const bytes = new Uint8Array(buffer)
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
+function resolveImageSrc(input: string) {
+  const src = input.trim()
+  if (!src) return ''
+  if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:') || src.startsWith('blob:')) {
+    return src
+  }
+  if (src.startsWith('/') && typeof window !== 'undefined') {
+    return `${window.location.origin}${src}`
+  }
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}/${src.replace(/^\/+/, '')}`
+  }
+  return src
 }
 
-async function sha256Hex(input: string) {
-  const data = new TextEncoder().encode(input)
-  const digest = await crypto.subtle.digest('SHA-256', data)
-  return toHex(digest)
+async function searchArticlesInSupabase(args: { query: string; limit?: number; excludeId?: number | null }) {
+  const q = args.query.trim()
+  if (!q) return []
+  const limit = Math.max(1, Math.min(10, args.limit ?? 6))
+  const like = `%${q}%`
+
+  let query = supabase
+    .from('articles')
+    .select('id, slug, title, excerpt, image, date')
+    .or(`title.ilike.${like},excerpt.ilike.${like}`)
+    .order('date', { ascending: false })
+    .limit(limit)
+
+  if (args.excludeId) query = query.neq('id', args.excludeId)
+
+  const { data, error } = await query
+  if (error || !data) return []
+  return (data as unknown[]).filter(isRecord).map((r) => ({
+    id: Number(r.id),
+    slug: typeof r.slug === 'string' ? r.slug : '',
+    title: typeof r.title === 'string' ? r.title : '',
+    excerpt: typeof r.excerpt === 'string' ? r.excerpt : '',
+    image: typeof r.image === 'string' ? r.image : '',
+    date: typeof r.date === 'string' ? r.date : '',
+  }))
+}
+
+async function getArticleFromSupabase(args: { id?: number; slug?: string }) {
+  if (typeof args.id === 'number' && Number.isFinite(args.id) && args.id > 0) {
+    const { data, error } = await supabase.from('articles').select('id, slug, title, content, excerpt, image, date').eq('id', args.id).single()
+    if (error || !data) return null
+    const r = isRecord(data) ? data : null
+    if (!r) return null
+    return {
+      id: Number(r.id),
+      slug: typeof r.slug === 'string' ? r.slug : '',
+      title: typeof r.title === 'string' ? r.title : '',
+      excerpt: typeof r.excerpt === 'string' ? r.excerpt : '',
+      image: typeof r.image === 'string' ? r.image : '',
+      date: typeof r.date === 'string' ? r.date : '',
+      content: typeof r.content === 'string' ? r.content : '',
+    }
+  }
+  const slug = typeof args.slug === 'string' ? args.slug.trim() : ''
+  if (!slug) return null
+  const { data, error } = await supabase.from('articles').select('id, slug, title, content, excerpt, image, date').eq('slug', slug).single()
+  if (error || !data) return null
+  const r = isRecord(data) ? data : null
+  if (!r) return null
+  return {
+    id: Number(r.id),
+    slug: typeof r.slug === 'string' ? r.slug : '',
+    title: typeof r.title === 'string' ? r.title : '',
+    excerpt: typeof r.excerpt === 'string' ? r.excerpt : '',
+    image: typeof r.image === 'string' ? r.image : '',
+    date: typeof r.date === 'string' ? r.date : '',
+    content: typeof r.content === 'string' ? r.content : '',
+  }
 }
 
 function maskApiKey(value: string) {
@@ -231,19 +340,51 @@ function parseJsonObjectFromText(raw: string): Record<string, unknown> | null {
   return null
 }
 
-function extractGroqContent(data: unknown) {
-  const r = isRecord(data) ? data : null
-  const choices = r && Array.isArray(r.choices) ? r.choices : null
-  const first = choices && choices[0] && isRecord(choices[0]) ? choices[0] : null
-  const message = first && isRecord(first.message) ? first.message : null
-  const content = message && typeof message.content === 'string' ? message.content : ''
-  if (!content.trim()) {
-    throw new Error('Groq response missing content')
+async function* readGroqSseContent(res: Response) {
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`Groq stream failed: ${res.status} ${text}`)
   }
-  return content.trim()
+  const body = res.body
+  if (!body) throw new Error('Groq stream missing body')
+
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+
+    while (true) {
+      const sep = buffer.indexOf('\n')
+      if (sep === -1) break
+      const line = buffer.slice(0, sep).trimEnd()
+      buffer = buffer.slice(sep + 1)
+
+      const trimmed = line.trim()
+      if (!trimmed.startsWith('data:')) continue
+      const data = trimmed.slice(5).trim()
+      if (!data) continue
+      if (data === '[DONE]') return
+      let parsed: unknown = null
+      try {
+        parsed = JSON.parse(data)
+      } catch {
+        continue
+      }
+      const r = isRecord(parsed) ? parsed : null
+      const choices = r && Array.isArray(r.choices) ? r.choices : null
+      const first = choices && choices[0] && isRecord(choices[0]) ? choices[0] : null
+      const delta = first && isRecord(first.delta) ? first.delta : null
+      const content = delta && typeof delta.content === 'string' ? delta.content : ''
+      if (content) yield content
+    }
+  }
 }
 
-async function groqChatCompletionDirect(args: {
+async function groqChatCompletionStreamDirect(args: {
   apiKey: string
   model: string
   messages: { role: 'system' | 'user' | 'assistant'; content: string }[]
@@ -251,9 +392,11 @@ async function groqChatCompletionDirect(args: {
   maxCompletionTokens?: number
   topP?: number
   reasoningEffort?: 'low' | 'medium' | 'high'
+  signal?: AbortSignal
 }) {
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
+    signal: args.signal,
     headers: {
       Authorization: `Bearer ${args.apiKey}`,
       'Content-Type': 'application/json',
@@ -265,33 +408,28 @@ async function groqChatCompletionDirect(args: {
       max_completion_tokens: args.maxCompletionTokens ?? 900,
       top_p: args.topP ?? 1,
       reasoning_effort: args.reasoningEffort ?? 'medium',
-      stream: false,
+      stream: true,
       stop: null,
     }),
   })
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`Groq request failed: ${res.status} ${text}`)
-  }
-
-  const data: unknown = await res.json()
-  return extractGroqContent(data)
+  return readGroqSseContent(res)
 }
 
-async function groqChatCompletionProxy(args: {
+async function groqChatCompletionStreamProxy(args: {
   model: string
   messages: { role: 'system' | 'user' | 'assistant'; content: string }[]
   temperature?: number
   maxCompletionTokens?: number
   topP?: number
   reasoningEffort?: 'low' | 'medium' | 'high'
+  signal?: AbortSignal
 }) {
   const isDev = Boolean((import.meta as unknown as { env?: Record<string, unknown> }).env?.DEV)
   const url = '/api/groq-chat'
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    signal: args.signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
     body: JSON.stringify({
       model: args.model,
       messages: args.messages,
@@ -299,23 +437,20 @@ async function groqChatCompletionProxy(args: {
       max_completion_tokens: args.maxCompletionTokens ?? 900,
       top_p: args.topP ?? 1,
       reasoning_effort: args.reasoningEffort ?? 'medium',
+      stream: true,
     }),
   })
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    if (res.status === 404 && isDev) {
-      throw new Error(
-        'Groq proxy غير متاح أثناء npm run dev. حدّث dev server ثم أعد تشغيله، أو جرّب بوضع المفتاح في localStorage باسم taapost_groq_api_key.',
-      )
-    }
-    throw new Error(`Groq proxy failed: ${res.status} ${text || `url=${url}`}`)
+  if (res.status === 404 && isDev) {
+    throw new Error(
+      'Groq proxy غير متاح أثناء npm run dev. حدّث dev server ثم أعد تشغيله، أو جرّب بوضع المفتاح في localStorage باسم taapost_groq_api_key.',
+    )
   }
-  const data: unknown = await res.json()
-  return extractGroqContent(data)
+
+  return readGroqSseContent(res)
 }
 
-async function groqChatCompletionAuto(args: {
+async function groqChatCompletionStreamAuto(args: {
   apiKey: string
   model: string
   messages: { role: 'system' | 'user' | 'assistant'; content: string }[]
@@ -323,11 +458,12 @@ async function groqChatCompletionAuto(args: {
   maxCompletionTokens?: number
   topP?: number
   reasoningEffort?: 'low' | 'medium' | 'high'
+  signal?: AbortSignal
 }) {
   if (args.apiKey) {
-    return groqChatCompletionDirect(args)
+    return groqChatCompletionStreamDirect(args)
   }
-  return groqChatCompletionProxy(args)
+  return groqChatCompletionStreamProxy(args)
 }
 
 async function fetchChatHistoryFromDb(args: { articleId: number; visitorId: string }) {
@@ -355,19 +491,32 @@ async function fetchChatHistoryFromDb(args: { articleId: number; visitorId: stri
     if (!r) continue
     const role: ChatMessage['role'] | null = r.role === 'user' ? 'user' : r.role === 'assistant' ? 'assistant' : null
     const content = typeof r.content === 'string' ? r.content : ''
-    if (!role || !content.trim()) continue
+    if (!role) continue
+    if (role === 'user' && content.trim() === '[AUTO] smart_summary') continue
+    if (role === 'user' && !content.trim()) continue
     const message: ChatMessage = { role, content }
     if (role === 'assistant' && isRecord(r.response_json)) {
       const resp = r.response_json
-      const citations = Array.isArray(resp.citations)
+      const blocks =
+        Array.isArray(resp.blocks) ? resp.blocks.filter(isRecord).map((b) => b as unknown as AiBlock).slice(0, 40) : []
+      if (blocks.length > 0) message.blocks = blocks
+
+      const citationsStrings = toStringArray(resp.citations).slice(0, 4)
+      const citationsObjects = Array.isArray(resp.citations)
         ? resp.citations
             .filter(isRecord)
             .map((c) => (typeof c.quote === 'string' ? c.quote : ''))
             .filter((q) => q.trim().length > 0)
             .slice(0, 4)
         : []
+      const citations = citationsStrings.length > 0 ? citationsStrings : citationsObjects
       if (citations.length > 0) message.citations = citations
+
+      const suggested = toStringArray(resp.suggestedQuestions ?? resp.suggested_questions).slice(0, 4)
+      if (suggested.length > 0) message.suggestedQuestions = suggested
     }
+
+    if (!message.content.trim() && (!message.blocks || message.blocks.length === 0)) continue
     out.push(message)
   }
   return out.slice(-30)
@@ -397,57 +546,7 @@ async function insertChatLogToDb(args: {
   }
 }
 
-async function fetchSummaryFromDb(args: { articleId: number; model: string; expectedHash: string }) {
-  console.groupCollapsed('[AI Summary][DB] load')
-  console.log('articleId', args.articleId)
-  console.log('model', args.model)
-  const { data, error } = await supabase
-    .from('article_ai_summaries')
-    .select('summary_json, content_hash')
-    .eq('article_id', args.articleId)
-    .eq('model', args.model)
-    .maybeSingle()
-  if (error) {
-    console.log('error', error)
-    console.groupEnd()
-    return null
-  }
-  const hashOk = isRecord(data) && data.content_hash === args.expectedHash
-  console.log('found', Boolean(data))
-  console.log('hashOk', hashOk)
-  console.groupEnd()
-  if (!hashOk || !isRecord(data) || !isRecord(data.summary_json)) return null
-  const s = data.summary_json
-  const result: ArticleSummary = {
-    lead: typeof s.lead === 'string' ? s.lead : '',
-    key_points: toStringArray(s.key_points),
-    background: toStringArray(s.background),
-    implications: toStringArray(s.implications),
-  }
-  if (!result.lead && result.key_points.length === 0) return null
-  return result
-}
-
-async function upsertSummaryToDb(args: {
-  articleId: number
-  model: string
-  contentHash: string
-  summary: ArticleSummary
-}) {
-  const payload = {
-    article_id: args.articleId,
-    model: args.model,
-    content_hash: args.contentHash,
-    summary_json: args.summary,
-    updated_at: new Date().toISOString(),
-  }
-  const { error } = await supabase.from('article_ai_summaries').upsert(payload, { onConflict: 'article_id,model' })
-  if (error) {
-    console.log('[AI Summary][DB] upsert error', error)
-  } else {
-    console.log('[AI Summary][DB] upsert ok')
-  }
-}
+void 0
 
 const loadCachedChat = (visitorId: string, id: number) => {
   try {
@@ -461,12 +560,29 @@ const loadCachedChat = (visitorId: string, id: number) => {
       const role: ChatMessage['role'] | null =
         item.role === 'user' ? 'user' : item.role === 'assistant' ? 'assistant' : null
       const content = typeof item.content === 'string' ? item.content : ''
-      if (!role || !content.trim()) continue
+      if (!role) continue
+      if (role === 'user' && content.trim() === '[AUTO] smart_summary') continue
       const message: ChatMessage = { role, content }
+      if (!content.trim()) {
+        const blocks = Array.isArray(item.blocks)
+          ? item.blocks.filter(isRecord).map((b) => b as unknown as AiBlock)
+          : []
+        if (blocks.length > 0) message.blocks = blocks
+      } else {
+        const blocks = Array.isArray(item.blocks)
+          ? item.blocks.filter(isRecord).map((b) => b as unknown as AiBlock)
+          : []
+        if (blocks.length > 0) message.blocks = blocks
+      }
       const citations =
         Array.isArray(item.citations) &&
         item.citations.filter((x): x is string => typeof x === 'string' && x.trim().length > 0).slice(0, 4)
       if (citations && citations.length > 0) message.citations = citations
+      const suggestedQuestions =
+        Array.isArray(item.suggestedQuestions) &&
+        item.suggestedQuestions.filter((x): x is string => typeof x === 'string' && x.trim().length > 0).slice(0, 4)
+      if (suggestedQuestions && suggestedQuestions.length > 0) message.suggestedQuestions = suggestedQuestions
+      if (!message.content.trim() && (!message.blocks || message.blocks.length === 0)) continue
       out.push(message)
     }
     return out.slice(-30)
@@ -483,53 +599,11 @@ const cacheChat = (visitorId: string, id: number, messages: ChatMessage[]) => {
   }
 }
 
-const loadCachedSummary = (visitorId: string, model: string, id: number, expectedHash: string) => {
-  try {
-    const raw = localStorage.getItem(`taapost:${visitorId}:ai_summary:${id}`)
-    if (!raw) return null
-    const parsed: unknown = JSON.parse(raw)
-    if (!isRecord(parsed)) return null
-    if (parsed.model !== model) return null
-    if (typeof parsed.contentHash !== 'string' || parsed.contentHash !== expectedHash) return null
-    if (!isRecord(parsed.summary)) return null
-    const s = parsed.summary
-    const result: ArticleSummary = {
-      lead: typeof s.lead === 'string' ? s.lead : '',
-      key_points: toStringArray(s.key_points),
-      background: toStringArray(s.background),
-      implications: toStringArray(s.implications),
-    }
-    if (!result.lead && result.key_points.length === 0) return null
-    return result
-  } catch {
-    return null
-  }
-}
-
-const cacheSummary = (visitorId: string, model: string, id: number, contentHash: string, summary: ArticleSummary) => {
-  try {
-    localStorage.setItem(
-      `taapost:${visitorId}:ai_summary:${id}`,
-      JSON.stringify({
-        model,
-        contentHash,
-        summary,
-        savedAt: new Date().toISOString(),
-      }),
-    )
-  } catch {
-    return
-  }
-}
-
 export default function ArticlePage() {
   const { id, slug } = useParams()
   const navigate = useNavigate()
   const routeArticleId = id && /^\d+$/.test(id) ? Number(id) : null
   const routeSlug = slug ? decodeURIComponent(slug) : ''
-  const [summary, setSummary] = useState<ArticleSummary | null>(null)
-  const [summaryLoading, setSummaryLoading] = useState(false)
-  const [summaryError, setSummaryError] = useState<string | null>(null)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
@@ -537,7 +611,18 @@ export default function ArticlePage() {
   const visitorId = getOrCreateVisitorId()
   const aiModel = 'openai/gpt-oss-120b'
   const [aiPlainSource, setAiPlainSource] = useState<string>('')
-  const [aiSummaryHash, setAiSummaryHash] = useState<string>('')
+  const autoSmartSummaryDoneRef = useRef(false)
+  const activeStreamAbortRef = useRef<AbortController | null>(null)
+const iconWhitelist: Record<string, (props: { className?: string }) => ReactNode> = {
+    Sparkles,
+    TrendingUp,
+    Info,
+    AlertTriangle,
+    BarChart3,
+    PieChart: PieChartIcon,
+    Link2,
+    Image: ImageIcon,
+  }
 
   const siteSettingsQuery = useQuery({
     queryKey: ['site_settings'],
@@ -633,43 +718,42 @@ export default function ArticlePage() {
   const relatedArticles = articleQuery.data?.related ?? []
   const toc = articleQuery.data?.toc ?? []
   const articleId = article?.id ?? null
-  const [autoSummaryHashAttempted, setAutoSummaryHashAttempted] = useState('')
+
+  const clearChat = () => {
+    setChatMessages([])
+    setChatError(null)
+    if (articleId) localStorage.removeItem(`taapost:${visitorId}:ai_chat:${articleId}`)
+    autoSmartSummaryDoneRef.current = false
+  }
 
   useTrackView(article?.id || 0)
 
   useEffect(() => {
     if (!articleId || !article) return
     if (!showArticleSummary) {
-      setSummary(null)
-      setSummaryError(null)
       setChatMessages([])
       setChatInput('')
       setChatError(null)
       setAiPlainSource('')
-      setAiSummaryHash('')
+      autoSmartSummaryDoneRef.current = false
+      activeStreamAbortRef.current?.abort()
+      activeStreamAbortRef.current = null
       return
     }
     let cancelled = false
 
-    setSummary(null)
-    setSummaryError(null)
     setChatMessages([])
     setChatInput('')
     setChatError(null)
+    autoSmartSummaryDoneRef.current = false
+    activeStreamAbortRef.current?.abort()
+    activeStreamAbortRef.current = null
 
     void (async () => {
       const plain = stripHtml(article.content || '')
       const source = clampText(plain, 18_000)
-      const summaryHash = await sha256Hex(`${article.title}\n${clampText(plain, 14_000)}`)
-
       if (cancelled) return
       setAiPlainSource(source)
-      setAiSummaryHash(summaryHash)
-
-      const cachedSummary = loadCachedSummary(visitorId, aiModel, articleId, summaryHash)
-      if (cachedSummary) {
-        setSummary(cachedSummary)
-      }
 
       const cachedChat = loadCachedChat(visitorId, articleId)
       if (cachedChat.length > 0) {
@@ -682,20 +766,8 @@ export default function ArticlePage() {
       const apiKey = getGroqApiKey()
       console.log('groqKey', maskApiKey(apiKey))
       console.log('aiModel', aiModel)
-      console.log('hasLocalSummary', Boolean(cachedSummary))
       console.log('localChatMessages', cachedChat.length)
       console.groupEnd()
-
-      if (!cachedSummary) {
-        void (async () => {
-          const fromDb = await fetchSummaryFromDb({ articleId, model: aiModel, expectedHash: summaryHash }).catch(() => null)
-          if (cancelled) return
-          if (fromDb) {
-            setSummary(fromDb)
-            cacheSummary(visitorId, aiModel, articleId, summaryHash, fromDb)
-          }
-        })()
-      }
 
       void (async () => {
         const dbChat = await fetchChatHistoryFromDb({ articleId, visitorId }).catch(() => [])
@@ -709,136 +781,10 @@ export default function ArticlePage() {
 
     return () => {
       cancelled = true
+      activeStreamAbortRef.current?.abort()
+      activeStreamAbortRef.current = null
     }
   }, [articleId, article, visitorId, showArticleSummary])
-
-  const generateSummary = useCallback(async (force = false) => {
-    if (!articleId) return
-    if (!aiPlainSource.trim() || !aiSummaryHash.trim()) {
-      setSummaryError('تعذر تجهيز نص المقال للتلخيص')
-      return
-    }
-    if (!force) {
-      const cached = loadCachedSummary(visitorId, aiModel, articleId, aiSummaryHash)
-      if (cached) {
-        setSummary(cached)
-        return
-      }
-    }
-
-    setSummaryLoading(true)
-    setSummaryError(null)
-    try {
-      console.groupCollapsed('[AI Summary] generate')
-      console.log('articleId', articleId)
-      console.log('force', force)
-      console.log('visitorId', visitorId)
-      const apiKey = getGroqApiKey()
-      console.log('groqKey', maskApiKey(apiKey))
-      console.log('groqMode', apiKey ? 'direct' : 'proxy')
-
-      const system = {
-        role: 'system' as const,
-        content:
-          [
-            'أنت محرّر عربي محترف في منصة صحفية.',
-            'تلخّص المقال اعتمادًا على نصّه فقط: لا تضف معلومات خارجية، ولا تُخمّن، ولا تُبالغ.',
-            'اكتب بالعربية الفصحى الواضحة، بألفاظ منتقاة، وجُمَل قصيرة مكثفة.',
-            'يجوز سجعٌ خفيف أو خاتمة موزونة إن جاء عفوًا بلا تكلّف وبلا إطالة.',
-            'ممنوع ذكر أنك نموذج ذكاء اصطناعي أو الحديث عن السياسات أو الأدوات.',
-          ].join('\n'),
-      }
-      const user = {
-        role: 'user' as const,
-        content: [
-          'لخّص المقال التالي اعتمادًا على النص فقط.',
-          'أخرج الإجابة كـ JSON صالح 100% بدون Markdown وبدون أي نص إضافي.',
-          'الشكل المطلوب:',
-          '{',
-          '  "lead": "فقرة موجزة (جملتان كحد أقصى) تلخّص الخبر/الفكرة",',
-          '  "key_points": ["4-6 نقاط دقيقة بلا حشو"],',
-          '  "background": ["2-4 نقاط سياق من داخل المقال فقط"],',
-          '  "implications": ["2-4 نقاط: لماذا يهم هذا للقارئ"],',
-          '}',
-          '',
-          'قيود مهمة:',
-          '- لا تكرر العنوان حرفيًا إلا لضرورة.',
-          '- تجنّب العموميات (مثل: هذا أمر مهم) واستبدلها بمعنى محدد.',
-          '- لا تذكر مصادر خارج نص المقال.',
-          '',
-          `عنوان المقال: ${article?.title ?? ''}`,
-          '',
-          `نص المقال (مقتطف منسّق): ${aiPlainSource}`,
-        ].join('\n'),
-      }
-
-      console.log('request:groq', { model: aiModel, chars: aiPlainSource.length })
-      const raw = await groqChatCompletionAuto({
-        apiKey,
-        model: aiModel,
-        messages: [system, user],
-        temperature: 0.15,
-        maxCompletionTokens: 900,
-        topP: 1,
-        reasoningEffort: 'medium',
-      })
-      console.log('response:groq chars', raw.length)
-
-      let parsed = parseJsonObjectFromText(raw)
-      if (!parsed) {
-        console.log('parse:failed sample', raw.slice(0, 1200))
-        const raw2 = await groqChatCompletionAuto({
-          apiKey,
-          model: aiModel,
-          messages: [
-            system,
-            {
-              role: 'user' as const,
-              content: `${user.content}\n\nمهم جدًا: أرسل JSON فقط (بدون أي نص خارج JSON).`,
-            },
-          ],
-          temperature: 0,
-          maxCompletionTokens: 900,
-          topP: 1,
-          reasoningEffort: 'low',
-        })
-        console.log('response:groq retry chars', raw2.length)
-        parsed = parseJsonObjectFromText(raw2)
-        if (!parsed) {
-          console.log('parse:failed retry sample', raw2.slice(0, 1200))
-          console.groupEnd()
-          throw new Error('تعذر فهم مخرجات الذكاء الاصطناعي')
-        }
-      }
-
-      const s: ArticleSummary = {
-        lead: typeof parsed.lead === 'string' ? parsed.lead : '',
-        key_points: toStringArray(parsed.key_points),
-        background: toStringArray(parsed.background),
-        implications: toStringArray(parsed.implications),
-      }
-      setSummary(s)
-      cacheSummary(visitorId, aiModel, articleId, aiSummaryHash, s)
-      console.log('cache:local ok')
-      await upsertSummaryToDb({ articleId, model: aiModel, contentHash: aiSummaryHash, summary: s }).catch(() => void 0)
-      console.groupEnd()
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'تعذر تحميل ملخص المقال'
-      setSummaryError(message)
-    } finally {
-      setSummaryLoading(false)
-    }
-  }, [articleId, aiPlainSource, aiSummaryHash, visitorId, aiModel, article?.title])
-
-  useEffect(() => {
-    if (!articleId) return
-    if (!showArticleSummary) return
-    if (!aiSummaryHash.trim() || !aiPlainSource.trim()) return
-    if (summary || summaryLoading) return
-    if (autoSummaryHashAttempted === aiSummaryHash) return
-    setAutoSummaryHashAttempted(aiSummaryHash)
-    void generateSummary(false)
-  }, [articleId, aiSummaryHash, aiPlainSource, summary, summaryLoading, autoSummaryHashAttempted, generateSummary, showArticleSummary])
 
   const handleScrollTo = (id: string) => {
     const element = document.getElementById(id)
@@ -863,144 +809,483 @@ export default function ArticlePage() {
     return `${minutes} دقيقة قراءة`
   }
 
-  const sendChat = async (text?: string) => {
-    if (!articleId) return
-    const content = (text ?? chatInput).trim()
+  const sendChat = async (
+    text?: string,
+    opts?: {
+      silentUser?: boolean
+      preset?: 'smart_summary'
+    },
+  ) => {
+    if (!articleId || !article) return
+    activeStreamAbortRef.current?.abort()
+    activeStreamAbortRef.current = null
+    const userContent =
+      opts?.preset === 'smart_summary'
+        ? 'قدّم ملخص المقال الذكي كواجهة تفاعلية: فقرة افتتاحية مركزة، ثم نقاط أساسية، ثم سياق، ثم لماذا يهم. قدّم أيضًا سؤالين يقترحهما القارئ، واقترح مقالين من باقي المنصة للقراءة (إن وجدت).'
+        : (text ?? chatInput).trim()
+
+    const content = userContent.trim()
     if (!content) return
+
+    if (!aiPlainSource.trim()) {
+      setChatError('تعذر تجهيز نص المقال للمحادثة')
+      return
+    }
 
     setChatError(null)
     setChatLoading(true)
 
-    const withUser: ChatMessage[] = [...chatMessages, { role: 'user' as const, content }].slice(-30)
+    const baseMessages = opts?.silentUser ? chatMessages : [...chatMessages, { role: 'user' as const, content }]
+    const withUser = baseMessages.slice(-30)
     setChatMessages(withUser)
     cacheChat(visitorId, articleId, withUser)
-    if (!text) setChatInput('')
+    if (!opts?.silentUser && !text) setChatInput('')
 
-    try {
-      console.groupCollapsed('[AI Chat] send')
-      console.log('articleId', articleId)
-      console.log('visitorId', visitorId)
-      console.log('inputChars', content.length)
-      if (!aiPlainSource.trim()) {
-        console.groupEnd()
-        throw new Error('تعذر تجهيز نص المقال للمحادثة')
+    const assistantIndex = withUser.length
+    const placeholder: ChatMessage = {
+      role: 'assistant',
+      content: '',
+      blocks: [
+        {
+          type: 'html',
+          html:
+            opts?.preset === 'smart_summary'
+              ? '<p><strong>جاري إعداد ملخص المقال الذكي…</strong></p>'
+              : '<p><strong>جاري التفكير…</strong></p>',
+        },
+      ],
+    }
+    setChatMessages((prev) => [...prev.slice(0, assistantIndex), placeholder].slice(-30))
+
+    const updateAssistant = (patch: Partial<ChatMessage>) => {
+      setChatMessages((prev) => {
+        const next = [...prev]
+        const idx = Math.min(assistantIndex, next.length - 1)
+        const existing = next[idx]
+        if (!existing || existing.role !== 'assistant') return prev
+        next[idx] = { ...existing, ...patch }
+        cacheChat(visitorId, articleId, next)
+        return next
+      })
+    }
+
+    const buildSystemPrompt = (extraContext?: string) =>
+      [
+        'أنت مساعد صحفي عربي ذكي داخل منصة "TaaPost".',
+        'لا تذكر أنك نموذج ذكاء اصطناعي.',
+        'اجعل الإجابة Mobile-First: فقرات قصيرة، قوائم واضحة، بلا ازدحام.',
+        '',
+        'مهم: لديك نص المقال داخل هذا الـSystem Prompt، فاعتمد عليه أولًا عند التحليل والشرح.',
+        `قد يكون النص مقتطعًا بسبب قيود الطول؛ إن احتجت كامل المقال اطلب: {"type":"tool","name":"get_article","args":{"id":${articleId}}}.`,
+        '',
+        `معرّف المقال الحالي: ${articleId}`,
+        '',
+        `عنوان المقال: ${article.title}`,
+        '',
+        `نص المقال (مقتطف منسّق): ${aiPlainSource}`,
+        '',
+        'إضافات المنصة:',
+        '- يمكنك الاستعانة بمقالات أخرى داخل المنصة كمرجع أو اقتراح قراءة.',
+        '- ممنوع اختراع مقالات أو IDs أو روابط غير موجودة. عند إنشاء Block من نوع articles يجب أن تعتمد فقط على نتائج أدوات المنصة (search_articles / get_article).',
+        '- إذا لم تصلك نتائج أدوات، لا تُخرج Block من نوع articles.',
+        '- لا تضع روابط داخل html لمقالات داخلية إلا إذا كان الـid/slug جاء من نتائج الأدوات.',
+        '',
+        'التنقل (Navigation) داخل الموقع:',
+        '- صفحة المقال: /post/:id (مثال: /post/123).',
+        '- صفحة الأقسام: /categories و /category/:id.',
+        '- قائمة المقالات: /posts.',
+        '- يوجد مسارات عربية مكافئة: /المقالات و /الأقسام و /مقال/:slug و /قسم/:slug.',
+        '',
+        'قاعدة البيانات (Supabase) الحالية (للسياق فقط، لا تطلب مفاتيح ولا تعرضها):',
+        '- articles: id, slug, title, excerpt, content, image, category_id, type, date, author_id, is_exclusive.',
+        '- categories: id, slug, name, description, topics, image, order_index, display_order.',
+        '- authors: id, name, image, bio, role.',
+        '- article_ai_chat_logs: article_id, visitor_id, role, content, response_json, model, created_at.',
+        '- article_ai_summaries: article_id, model, content_hash, summary_json, updated_at.',
+        '- article_views: article_id, viewed_at, country, city, device_type, ip_hash.',
+        '- للوصول إلى قاعدة المقالات: اطلب أداة من الواجهة بإخراج سطر واحد فقط (JSON) بالشكل:',
+        '{"type":"tool","name":"search_articles","args":{"query":"كلمة","limit":6}}',
+        '{"type":"tool","name":"get_article","args":{"id":123}}',
+        '{"type":"tool","name":"get_article","args":{"slug":"..."} }',
+        'بعدها ستتلقى نتيجة الأداة ثم تُكمل الإجابة.',
+        '',
+        'صيغة الإخراج (Streaming NDJSON):',
+        '- اكتب كل Block في سطر JSON مستقل بدون Markdown.',
+        '- الأنواع المسموحة: html, chart, image, articles, icons, divider, meta, done.',
+        '- مثال html:',
+        '{"type":"html","html":"<p>نص</p>"}',
+        '- مثال chart (استخدم Recharts ضمنيًا):',
+        '{"type":"chart","chartType":"bar","title":"عنوان","data":[{"name":"X","value":10}],"xKey":"name","yKey":"value"}',
+        '- مثال articles:',
+        '{"type":"articles","title":"اقرأ أيضًا","items":[{"id":1,"title":"...","reason":"...","image":"..."}]}',
+        '- مثال icons:',
+        '{"type":"icons","title":"ملخص سريع","items":[{"name":"Sparkles","label":"..."}]}',
+        '- في النهاية أرسل meta ثم done:',
+        '{"type":"meta","citations":["اقتباس حرفي"],"suggestedQuestions":["سؤال"],"safeHtml":true}',
+        '{"type":"done"}',
+        '',
+        extraContext ? `سياق إضافي من أدوات المنصة:\n${extraContext}` : '',
+      ]
+        .filter((x) => x !== '')
+        .join('\n')
+
+    const toLlmMessages = (messages: ChatMessage[]) =>
+      messages
+        .filter((m) => m.content.trim().length > 0 || (m.blocks && m.blocks.length > 0))
+        .slice(-12)
+        .map((m) => {
+          if (m.role === 'user') return { role: 'user' as const, content: m.content }
+          const html =
+            m.blocks && m.blocks.length > 0
+              ? m.blocks
+                  .filter((b) => b.type === 'html')
+                  .map((b) => (b.type === 'html' ? b.html : ''))
+                  .join('\n')
+              : m.content
+          return { role: 'assistant' as const, content: clampText(stripHtml(html), 900) }
+        })
+
+    const parseJsonLine = (line: string) => {
+      const trimmed = line.trim()
+      if (!trimmed) return null
+      try {
+        const parsed: unknown = JSON.parse(trimmed)
+        return isRecord(parsed) ? parsed : null
+      } catch {
+        return null
       }
+    }
 
+    const renderBlockPreviewHtml = (blocks: AiBlock[]) => {
+      const html = blocks
+        .filter((b) => b.type === 'html')
+        .map((b) => (b.type === 'html' ? b.html : ''))
+        .join('\n')
+      return html.trim() ? html : '<p>…</p>'
+    }
+
+    let allowedArticles = new Map<number, { id: number; slug: string; title: string; excerpt: string; image: string; date: string; content?: string }>()
+
+    const sanitizeBlocks = (input: AiBlock[]) => {
+      const out: AiBlock[] = []
+      for (const b of input) {
+        if (b.type !== 'articles') {
+          out.push(b)
+          continue
+        }
+
+        if (allowedArticles.size === 0) continue
+        const items = b.items.flatMap((it) => {
+          const known = allowedArticles.get(it.id)
+          if (!known) return []
+          const title = known.title || it.title
+          const slug = known.slug || it.slug
+          const image = known.image || it.image
+          const reason = it.reason
+          return [
+            {
+              id: known.id,
+              ...(title ? { title } : {}),
+              ...(slug ? { slug } : {}),
+              ...(image ? { image } : {}),
+              ...(reason ? { reason } : {}),
+            },
+          ]
+        })
+        if (items.length > 0) out.push({ ...b, items: items.slice(0, 6) })
+      }
+      return out
+    }
+
+    const runOnce = async (extraContext?: string) => {
       const apiKey = getGroqApiKey()
-      console.log('groqKey', maskApiKey(apiKey))
-      console.log('groqMode', apiKey ? 'direct' : 'proxy')
+      const abort = new AbortController()
+      activeStreamAbortRef.current = abort
 
-      void insertChatLogToDb({ articleId, visitorId, role: 'user', content, model: aiModel })
+      const llmMessages = [
+        { role: 'system' as const, content: buildSystemPrompt(extraContext) },
+        ...toLlmMessages(withUser),
+        { role: 'user' as const, content },
+      ]
 
-      const payloadMessages = withUser.slice(-14)
-      const system = {
-        role: 'system' as const,
-        content:
-          [
-            'أنت محرّر مساعد يجيب عن أسئلة القارئ مستندًا إلى نص هذا المقال، مع ذكاء في وصل المعاني وربط الخيوط.',
-            'اجعل نص المقال مرجعك الأول: استخرج منه ما يسند جوابك حرفيًا قدر الإمكان.',
-            'إن كان السؤال بعيدًا عن موضوع المقال: لا ترفض ولا تعتذر ولا تقل إن السؤال غير متماشٍ مع السياق؛ بل اصنع جسرًا بلاغيًا نحو ما ورد في المقال ثم قدّم جوابًا عامًا منضبطًا.',
-            'إذا احتجت لمعلومة لا يذكرها المقال صراحة: صِغ ذلك بلباقة (مثل: "لا يورد المقال تفصيلًا مباشرًا عن...") ثم قدّم إطارًا معرفيًا عامًا بدون اختلاق حقائق أو أرقام أو أسماء.',
-            'اكتب بالعربية الفصحى الواضحة، بإيجاز، وبأسلوب صحفي رصين.',
-            'يجوز سجع خفيف أو خاتمة موزونة في جملة واحدة إن لاقَ المقام بلا تكلّف.',
-            'ممنوع ذكر أنك نموذج ذكاء اصطناعي.',
-          ].join('\n'),
-      }
-      const instructions = {
-        role: 'user' as const,
-        content: [
-          'ستتلقى نص المقال ثم سؤال القارئ.',
-          'أجب بإيجاز واضح ودقيق. حتى لو كان السؤال بعيدًا: ابدأ بجملة تربط السؤال بالمقال، ثم قدّم جوابًا مفيدًا ومتسقًا مع زاوية المقال.',
-          'اكتب الإجابة داخل answer كـ HTML منسّق (بدون Markdown). استخدم فقط: <p> <strong> <em> <ul> <ol> <li> <blockquote> <br> <a>.',
-          'في كل الأحوال أخرج JSON صالح 100% بدون Markdown وبدون أي نص إضافي بالشكل:',
-          '{',
-          '  "answer": "HTML",',
-          '  "citations": [{"quote": "اقتباس قصير حرفيًا من النص"}, {"quote": "اقتباس قصير آخر"}],',
-          '}',
-          '',
-          'قواعد الاستشهاد:',
-          '- اجعل citations من داخل نص المقال حرفيًا وباختصار متى أمكن، حتى لو كانت الاستشهادات لخدمة الربط لا لإعطاء معلومة خارج النص.',
-          '- إن تعذّر استخراج أي اقتباس مناسب حرفيًا: اجعل citations = [].',
-          '',
-          `عنوان المقال: ${article?.title ?? ''}`,
-          '',
-          `نص المقال (مقتطف): ${aiPlainSource}`,
-          '',
-          `سؤال القارئ: ${content}`,
-        ].join('\n'),
-      }
-
-      console.log('request:groq', { model: aiModel, messages: payloadMessages.length })
-      const raw = await groqChatCompletionAuto({
+      const stream = await groqChatCompletionStreamAuto({
         apiKey,
         model: aiModel,
-        messages: [system, ...payloadMessages.map((m) => ({ role: m.role, content: m.content })), instructions],
-        temperature: 0.35,
-        maxCompletionTokens: 900,
+        messages: llmMessages,
+        temperature: opts?.preset === 'smart_summary' ? 0.2 : 0.35,
+        maxCompletionTokens: 1200,
         topP: 1,
         reasoningEffort: 'medium',
+        signal: abort.signal,
       })
-      console.log('response:groq chars', raw.length)
 
-      let parsed = parseJsonObjectFromText(raw)
-      if (!parsed) {
-        console.log('parse:failed sample', raw.slice(0, 1200))
-        const raw2 = await groqChatCompletionAuto({
-          apiKey,
-          model: aiModel,
-          messages: [
-            system,
-            ...payloadMessages.map((m) => ({ role: m.role, content: m.content })),
-            {
-              role: 'user' as const,
-              content: `${instructions.content}\n\nمهم جدًا: أرسل JSON فقط (بدون أي نص خارج JSON).`,
-            },
-          ],
-          temperature: 0,
-          maxCompletionTokens: 900,
-          topP: 1,
-          reasoningEffort: 'low',
+      let ndjsonBuffer = ''
+      let rawText = ''
+      const blocks: AiBlock[] = []
+      let citations: string[] = []
+      let suggestedQuestions: string[] = []
+      let toolRequest: { name: string; args: Record<string, unknown> } | null = null
+
+      for await (const chunk of stream) {
+        rawText += chunk
+        ndjsonBuffer += chunk
+        while (true) {
+          const nl = ndjsonBuffer.indexOf('\n')
+          if (nl === -1) break
+          const line = ndjsonBuffer.slice(0, nl)
+          ndjsonBuffer = ndjsonBuffer.slice(nl + 1)
+          const obj = parseJsonLine(line)
+          if (!obj) continue
+
+          const type = typeof obj.type === 'string' ? obj.type : ''
+          if (type === 'tool') {
+            const name = typeof obj.name === 'string' ? obj.name : ''
+            const args = isRecord(obj.args) ? obj.args : {}
+            if (name) {
+              toolRequest = { name, args }
+              abort.abort()
+              break
+            }
+            continue
+          }
+          if (type === 'meta') {
+            citations = toStringArray(obj.citations).slice(0, 4)
+            suggestedQuestions = toStringArray(obj.suggestedQuestions).slice(0, 4)
+            continue
+          }
+          if (type === 'done') {
+            continue
+          }
+
+          if (type === 'html') {
+            const html = typeof obj.html === 'string' ? obj.html : ''
+            blocks.push({ type: 'html', html: enforceNoApologyOrRejection(html) })
+          } else if (type === 'divider') {
+            blocks.push({ type: 'divider', label: typeof obj.label === 'string' ? obj.label : undefined })
+          } else if (type === 'image') {
+            const src = typeof obj.src === 'string' ? obj.src : ''
+            if (src) {
+              blocks.push({
+                type: 'image',
+                src,
+                alt: typeof obj.alt === 'string' ? obj.alt : undefined,
+                caption: typeof obj.caption === 'string' ? obj.caption : undefined,
+              })
+            }
+          } else if (type === 'chart') {
+            const chartType = obj.chartType === 'bar' || obj.chartType === 'line' || obj.chartType === 'pie' ? obj.chartType : null
+            const data = Array.isArray(obj.data) ? obj.data.filter(isRecord).slice(0, 20) : []
+            if (chartType && data.length > 0) {
+              blocks.push({
+                type: 'chart',
+                chartType,
+                title: typeof obj.title === 'string' ? obj.title : undefined,
+                data,
+                xKey: typeof obj.xKey === 'string' ? obj.xKey : undefined,
+                yKey: typeof obj.yKey === 'string' ? obj.yKey : undefined,
+                nameKey: typeof obj.nameKey === 'string' ? obj.nameKey : undefined,
+                valueKey: typeof obj.valueKey === 'string' ? obj.valueKey : undefined,
+              })
+            }
+          } else if (type === 'articles') {
+            const rawItems = Array.isArray(obj.items)
+              ? obj.items
+                  .filter(isRecord)
+                  .map((it) => ({
+                    id: Number(it.id),
+                    title: typeof it.title === 'string' ? it.title : undefined,
+                    slug: typeof it.slug === 'string' ? it.slug : undefined,
+                    image: typeof it.image === 'string' ? it.image : undefined,
+                    reason: typeof it.reason === 'string' ? it.reason : undefined,
+                  }))
+                  .filter((it) => Number.isFinite(it.id) && it.id > 0)
+                  .slice(0, 6)
+              : []
+            if (allowedArticles.size > 0) {
+              const items = rawItems.flatMap((it) => {
+                const known = allowedArticles.get(it.id)
+                if (!known) return []
+                const title = known.title || it.title
+                const slug = known.slug || it.slug
+                const image = known.image || it.image
+                const reason = it.reason
+                return [
+                  {
+                    id: known.id,
+                    ...(title ? { title } : {}),
+                    ...(slug ? { slug } : {}),
+                    ...(image ? { image } : {}),
+                    ...(reason ? { reason } : {}),
+                  },
+                ]
+              })
+              if (items.length > 0) {
+                blocks.push({
+                  type: 'articles',
+                  title: typeof obj.title === 'string' ? obj.title : undefined,
+                  items: items.slice(0, 6),
+                })
+              }
+            }
+          } else if (type === 'icons') {
+            const items = Array.isArray(obj.items)
+              ? obj.items
+                  .filter(isRecord)
+                  .map((it) => ({
+                    name: typeof it.name === 'string' ? it.name : '',
+                    label: typeof it.label === 'string' ? it.label : undefined,
+                  }))
+                  .filter((it) => it.name && it.name in iconWhitelist)
+                  .slice(0, 8)
+              : []
+            if (items.length > 0) blocks.push({ type: 'icons', title: typeof obj.title === 'string' ? obj.title : undefined, items })
+          }
+
+          updateAssistant({
+            blocks: blocks.length > 0 ? [...blocks] : undefined,
+            content: renderBlockPreviewHtml(blocks),
+          })
+        }
+        if (toolRequest) break
+      }
+
+      if (!toolRequest && blocks.length === 0 && rawText.trim()) {
+        const parsed = parseJsonObjectFromText(rawText)
+        if (parsed) {
+          const answer = typeof parsed.answer === 'string' ? parsed.answer : ''
+          const parsedBlocks = Array.isArray(parsed.blocks) ? parsed.blocks.filter(isRecord).map((b) => b as unknown as AiBlock) : []
+          if (parsedBlocks.length > 0) {
+            blocks.push(...sanitizeBlocks(parsedBlocks))
+          } else if (answer.trim()) {
+            blocks.push({ type: 'html', html: enforceNoApologyOrRejection(answer) })
+          }
+
+          const suggested = toStringArray(parsed.suggestedQuestions ?? parsed.suggested_questions).slice(0, 4)
+          if (suggested.length > 0) suggestedQuestions = suggested
+
+          const extractedCitations = Array.isArray(parsed.citations)
+            ? parsed.citations
+                .filter(isRecord)
+                .map((c) => (typeof c.quote === 'string' ? c.quote : ''))
+                .filter((q) => q.trim().length > 0)
+                .slice(0, 4)
+            : []
+          if (extractedCitations.length > 0) citations = extractedCitations
+        }
+
+        if (blocks.length === 0) {
+          blocks.push({
+            type: 'html',
+            html: `<p>${escapeHtml(rawText.trim()).replaceAll('\n', '<br />')}</p>`,
+          })
+        }
+
+        updateAssistant({
+          blocks: [...blocks],
+          content: renderBlockPreviewHtml(blocks),
         })
-        console.log('response:groq retry chars', raw2.length)
-        parsed = parseJsonObjectFromText(raw2)
-        if (!parsed) {
-          console.log('parse:failed retry sample', raw2.slice(0, 1200))
-          console.groupEnd()
-          throw new Error('تعذر فهم مخرجات الذكاء الاصطناعي')
+      }
+
+      return { blocks, citations, suggestedQuestions, toolRequest }
+    }
+
+    try {
+      if (!opts?.silentUser) {
+        void insertChatLogToDb({ articleId, visitorId, role: 'user', content, model: aiModel })
+      }
+
+      let extraContext = ''
+      let finalBlocks: AiBlock[] = []
+      let citations: string[] = []
+      let suggestedQuestions: string[] = []
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const result = await runOnce(extraContext)
+        finalBlocks = sanitizeBlocks(result.blocks)
+        citations = result.citations
+        suggestedQuestions = result.suggestedQuestions
+
+        if (!result.toolRequest) break
+
+        updateAssistant({
+          blocks: [
+            ...(finalBlocks.length > 0 ? finalBlocks : []),
+            { type: 'divider', label: 'جاري جلب معلومات من أرشيف المنصة…' },
+          ],
+          content: renderBlockPreviewHtml(finalBlocks),
+        })
+
+        const name = result.toolRequest.name
+        const args = result.toolRequest.args
+        if (name === 'search_articles') {
+          const query = typeof args.query === 'string' ? args.query : ''
+          const limit = typeof args.limit === 'number' ? args.limit : 6
+          const rows = await searchArticlesInSupabase({ query, limit, excludeId: articleId })
+          allowedArticles = new Map(rows.map((r) => [r.id, r]))
+          extraContext = `نتيجة search_articles(query=${JSON.stringify(query)}):\n${JSON.stringify(rows)}`
+        } else if (name === 'get_article') {
+          const idArg = typeof args.id === 'number' ? args.id : Number(args.id)
+          const slugArg = typeof args.slug === 'string' ? args.slug : ''
+          const row = await getArticleFromSupabase({ id: Number.isFinite(idArg) ? idArg : undefined, slug: slugArg || undefined })
+          if (row && typeof row.id === 'number' && Number.isFinite(row.id)) {
+            allowedArticles.set(row.id, {
+              id: row.id,
+              slug: row.slug ?? '',
+              title: row.title ?? '',
+              excerpt: row.excerpt ?? '',
+              image: row.image ?? '',
+              date: row.date ?? '',
+              content: row.content ?? '',
+            })
+          }
+          extraContext = `نتيجة get_article:\n${JSON.stringify(row)}`
+        } else {
+          extraContext = `الأداة غير معروفة: ${name}`
         }
       }
 
-      const answer = typeof parsed.answer === 'string' ? enforceNoApologyOrRejection(parsed.answer) : ''
-      const citations = Array.isArray(parsed.citations)
-        ? parsed.citations
-            .filter(isRecord)
-            .map((c) => (typeof c.quote === 'string' ? c.quote : ''))
-            .filter((q) => q.trim().length > 0)
-            .slice(0, 4)
-        : []
+      const safeBlocks: AiBlock[] =
+        finalBlocks.length > 0 ? finalBlocks : ([{ type: 'html', html: '<p>تعذر توليد إجابة مفهومة حاليًا.</p>' } as AiBlock] as AiBlock[])
+      updateAssistant({
+        blocks: safeBlocks,
+        citations: citations.length > 0 ? citations : undefined,
+        suggestedQuestions: suggestedQuestions.length > 0 ? suggestedQuestions : undefined,
+        content: renderBlockPreviewHtml(safeBlocks),
+      })
 
-      const next: ChatMessage[] = [
-        ...withUser,
-        { role: 'assistant' as const, content: answer || '<p>تعذر توليد إجابة مفهومة حاليًا.</p>', citations },
-      ].slice(-30)
-      setChatMessages(next)
-      cacheChat(visitorId, articleId, next)
+      const dbContent = renderBlockPreviewHtml(safeBlocks)
       void insertChatLogToDb({
         articleId,
         visitorId,
         role: 'assistant',
-        content: answer || '<p>تعذر توليد إجابة مفهومة حاليًا.</p>',
-        responseJson: { answer, citations: citations.map((q) => ({ quote: q })) },
+        content: dbContent,
+        responseJson: { blocks: safeBlocks, citations, suggested_questions: suggestedQuestions },
         model: aiModel,
       })
       console.groupEnd()
     } catch (e) {
       const message = e instanceof Error ? e.message : 'تعذر إرسال سؤالك'
+      updateAssistant({
+        blocks: [{ type: 'html', html: `<p><strong>تعذر إكمال الرد:</strong> ${escapeHtml(message)}</p>` }],
+        content: `<p><strong>تعذر إكمال الرد:</strong> ${escapeHtml(message)}</p>`,
+      })
       setChatError(message)
     } finally {
       setChatLoading(false)
+      activeStreamAbortRef.current = null
+      if (opts?.preset === 'smart_summary') autoSmartSummaryDoneRef.current = true
     }
   }
+
+  useEffect(() => {
+    if (!articleId) return
+    if (!showArticleSummary) return
+    if (!aiPlainSource.trim()) return
+    if (chatLoading) return
+    if (autoSmartSummaryDoneRef.current) return
+    autoSmartSummaryDoneRef.current = true
+    void sendChat(undefined, { silentUser: true, preset: 'smart_summary' })
+  }, [articleId, showArticleSummary, aiPlainSource, chatLoading, sendChat])
 
   if (articleQuery.isLoading) {
     return (
@@ -1095,9 +1380,9 @@ export default function ArticlePage() {
                     <button
                       onClick={() => handleScrollTo('article-summary')}
                       className="text-sm text-muted-foreground hover:text-primary transition-colors text-right w-full block truncate"
-                      title="ملخص المقال"
+                      title="ملخص المقال الذكي"
                     >
-                      <span className="font-bold ml-1">★</span> ملخص المقال
+                      <span className="font-bold ml-1">★</span> ملخص المقال الذكي
                     </button>
                   </li>
                 )}
@@ -1149,156 +1434,287 @@ export default function ArticlePage() {
           )}
 
           {showArticleSummary && (
-            <section id="article-summary" className="rounded-[5px] border border-border/40 bg-card/30 p-6 backdrop-blur-sm md:p-8">
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <h2 className="text-xl md:text-2xl font-bold text-foreground">ملخص المقال</h2>
-                  <p className="text-sm text-muted-foreground">تلخيص ذكي ومنظم يعتمد على نص المقال نفسه</p>
+            <section
+              id="article-summary"
+              className="rounded-[6px] border border-border/40 bg-card/20 p-4 shadow-lg backdrop-blur-xl md:p-6"
+            >
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-[6px] bg-primary/10 text-primary">
+                    <Sparkles className="h-5 w-5" />
+                  </div>
+                  <div className="relative w-full">
+                    {chatMessages.length > 0 && (
+                      <button
+                        onClick={clearChat}
+                        className="absolute left-0 top-0 inline-flex h-9 w-9 items-center justify-center rounded-[6px] border border-border/60 bg-background/30 text-foreground backdrop-blur-md hover:border-primary/50 hover:bg-primary/5 transition-colors md:hidden"
+                        aria-label="مسح المحادثة"
+                        title="مسح المحادثة"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                    <h2 className="pl-11 text-xl font-bold text-foreground md:pl-0 md:text-2xl">ملخص المقال الذكي</h2>
+                    <p className="text-sm text-muted-foreground">
+                      واجهة دردشة زجاجية تعتمد على نص المقال وتستعين بأرشيف المنصة عند الحاجة
+                    </p>
+                  </div>
                 </div>
+
                 <div className="flex flex-wrap items-center gap-2">
                   {chatMessages.length > 0 && (
                     <button
-                      onClick={() => {
-                        setChatMessages([])
-                        setChatError(null)
-                        if (articleId) {
-                          localStorage.removeItem(`taapost:${visitorId}:ai_chat:${articleId}`)
-                        }
-                      }}
-                      className="rounded-[5px] border border-border/60 bg-card/60 px-3 py-2 text-sm text-foreground hover:border-primary/50 hover:bg-primary/5 transition-colors"
+                      onClick={clearChat}
+                      className="hidden items-center gap-2 rounded-[6px] border border-border/60 bg-background/30 px-3 py-2 text-sm text-foreground backdrop-blur-md hover:border-primary/50 hover:bg-primary/5 transition-colors md:inline-flex"
                     >
+                      <Trash2 className="h-4 w-4" />
                       مسح المحادثة
                     </button>
                   )}
-                  <button
-                    onClick={() => void generateSummary(true)}
-                    className="rounded-[5px] bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                    disabled={summaryLoading}
-                  >
-                    {summaryLoading ? 'جاري التلخيص…' : 'تحديث الملخص'}
-                  </button>
                 </div>
               </div>
 
-              {summaryError && (
-                <div className="mt-4 rounded-[5px] border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                  تعذر إظهار الملخص حاليًا: {summaryError}
-                </div>
-              )}
-
               {chatError && (
-                <div className="mt-4 rounded-[5px] border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                <div className="mt-4 rounded-[6px] border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                   تعذر إكمال المحادثة: {chatError}
                 </div>
               )}
 
-              {!summaryError && !summary && summaryLoading && (
-                <div className="mt-5 text-sm text-muted-foreground">جاري إعداد ملخص المقال…</div>
-              )}
-
-              {summary && (
-                <div className="mt-6 space-y-6">
-                  {summary.lead && <p className="text-foreground/90 leading-relaxed">{summary.lead}</p>}
-
-                  {summary.key_points?.length > 0 && (
-                    <div className="space-y-2">
-                      <h3 className="font-bold text-foreground">أهم النقاط</h3>
-                      <ul className="list-disc pr-6 space-y-1 text-foreground/90">
-                        {summary.key_points.slice(0, 8).map((p, i) => (
-                          <li key={i}>{p}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {(summary.background?.length > 0 || summary.implications?.length > 0) && (
-                    <div className="grid gap-6 md:grid-cols-2">
-                      {summary.background?.length > 0 && (
-                        <div className="space-y-2">
-                          <h3 className="font-bold text-foreground">الخلفية والسياق</h3>
-                          <ul className="list-disc pr-6 space-y-1 text-foreground/90">
-                            {summary.background.slice(0, 8).map((p, i) => (
-                              <li key={i}>{p}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                      {summary.implications?.length > 0 && (
-                        <div className="space-y-2">
-                          <h3 className="font-bold text-foreground">لماذا يهم؟</h3>
-                          <ul className="list-disc pr-6 space-y-1 text-foreground/90">
-                            {summary.implications.slice(0, 8).map((p, i) => (
-                              <li key={i}>{p}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="mt-6 rounded-[5px] border border-border/50 bg-card/40 p-4 md:p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm font-bold text-foreground">ناقش المقال</div>
-                  <div className="text-xs text-muted-foreground">محادثة على ضوء المقال وما يتصل به</div>
-                </div>
-
-                <div className="mt-4 space-y-3">
+              <div className="mt-5 rounded-[6px] border border-border/40 bg-background/20 backdrop-blur-xl">
+                <div className="max-h-[65vh] overflow-y-auto px-3 py-4 md:px-4">
                   {chatMessages.length === 0 && (
-                    <div className="rounded-[5px] border border-border/50 bg-card/50 px-4 py-4 text-sm text-muted-foreground">
-                      اكتب سؤالك، وسأجيبك على ضوء المقال وما يفتحه من أبواب المعنى.
+                    <div className="rounded-[6px] border border-border/40 bg-background/30 px-4 py-4 text-sm text-muted-foreground">
+                      جاري إعداد الملخص الذكي… يمكنك أيضًا كتابة سؤال الآن.
                     </div>
                   )}
 
-                  {chatMessages.map((m, idx) => {
-                    if (m.role === 'user') {
+                  <div className="space-y-3">
+                    {chatMessages.map((m, idx) => {
+                      if (m.role === 'user') {
+                        return (
+                          <div key={idx} className="flex justify-end">
+                            <div className="max-w-[92%] rounded-[6px] border border-primary/20 bg-primary px-4 py-3 text-sm leading-relaxed text-primary-foreground">
+                              <div className="whitespace-pre-wrap">{m.content}</div>
+                            </div>
+                          </div>
+                        )
+                      }
+
+                      const blocks: AiBlock[] =
+                        m.blocks && m.blocks.length > 0 ? m.blocks : [{ type: 'html', html: m.content } as AiBlock]
+
                       return (
-                        <div key={idx} className="flex justify-end">
-                          <div className="max-w-[92%] rounded-[5px] px-4 py-3 text-sm leading-relaxed border bg-primary text-primary-foreground border-primary/20">
-                            <div className="whitespace-pre-wrap">{m.content}</div>
+                        <div key={idx} className="w-full">
+                          <div className="w-full rounded-[6px] border border-border/40 bg-background/30 px-4 py-3 backdrop-blur-xl">
+                            <div className="space-y-3">
+                              {blocks.map((b, bi) => {
+                                if (b.type === 'divider') {
+                                  return (
+                                    <div key={bi} className="flex items-center gap-3 py-1">
+                                      <div className="h-px flex-1 bg-border/60" />
+                                      {b.label && <div className="text-xs text-muted-foreground">{b.label}</div>}
+                                      <div className="h-px flex-1 bg-border/60" />
+                                    </div>
+                                  )
+                                }
+
+                                if (b.type === 'icons') {
+                                  return (
+                                    <div key={bi} className="space-y-2">
+                                      {b.title && <div className="text-sm font-bold text-foreground">{b.title}</div>}
+                                      <div className="flex flex-wrap gap-2">
+                                        {b.items.map((it, ii) => {
+                                          const Icon = (it.name in iconWhitelist ? iconWhitelist[it.name] : null) as
+                                            | null
+                                            | ((props: { className?: string }) => ReactNode)
+                                          if (!Icon) return null
+                                          return (
+                                            <div
+                                              key={ii}
+                                              className="inline-flex items-center gap-2 rounded-[999px] border border-border/50 bg-background/40 px-3 py-2 text-xs text-foreground"
+                                            >
+                                              <Icon className="h-4 w-4 text-primary" />
+                                              <span className="leading-none">{it.label ?? it.name}</span>
+                                            </div>
+                                          )
+                                        })}
+                                      </div>
+                                    </div>
+                                  )
+                                }
+
+                                if (b.type === 'chart') {
+                                  const xKey = b.xKey ?? 'name'
+                                  const yKey = b.yKey ?? 'value'
+                                  const nameKey = b.nameKey ?? 'name'
+                                  const valueKey = b.valueKey ?? 'value'
+                                  return (
+                                    <div key={bi} className="rounded-[6px] border border-border/40 bg-background/30 p-3">
+                                      {b.title && <div className="mb-2 text-sm font-bold text-foreground">{b.title}</div>}
+                                      <div className="h-[220px] w-full">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                          {b.chartType === 'bar' ? (
+                                            <BarChart data={b.data}>
+                                              <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                                              <XAxis dataKey={xKey} tick={{ fontSize: 12 }} />
+                                              <YAxis tick={{ fontSize: 12 }} />
+                                              <Tooltip />
+                                              <Legend />
+                                              <Bar dataKey={yKey} fill={CHART_COLORS[1]} radius={[6, 6, 0, 0]} />
+                                            </BarChart>
+                                          ) : b.chartType === 'line' ? (
+                                            <LineChart data={b.data}>
+                                              <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                                              <XAxis dataKey={xKey} tick={{ fontSize: 12 }} />
+                                              <YAxis tick={{ fontSize: 12 }} />
+                                              <Tooltip />
+                                              <Legend />
+                                              <Line type="monotone" dataKey={yKey} stroke={CHART_COLORS[0]} strokeWidth={2} dot={false} />
+                                            </LineChart>
+                                          ) : (
+                                            <PieChart>
+                                              <Tooltip />
+                                              <Legend />
+                                              <Pie data={b.data} dataKey={valueKey} nameKey={nameKey} outerRadius={75}>
+                                                {b.data.map((_: Record<string, unknown>, ci: number) => (
+                                                  <Cell key={ci} fill={CHART_COLORS[ci % CHART_COLORS.length]} />
+                                                ))}
+                                              </Pie>
+                                            </PieChart>
+                                          )}
+                                        </ResponsiveContainer>
+                                      </div>
+                                    </div>
+                                  )
+                                }
+
+                                if (b.type === 'image') {
+                                  return (
+                                    <figure key={bi} className="overflow-hidden rounded-[6px] border border-border/40 bg-background/30">
+                                      <img
+                                        src={resolveImageSrc(b.src)}
+                                        alt={b.alt ?? ''}
+                                        loading="lazy"
+                                        className="h-auto w-full object-cover"
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none'
+                                        }}
+                                      />
+                                      {b.caption && (
+                                        <figcaption className="px-3 py-2 text-xs text-muted-foreground">{b.caption}</figcaption>
+                                      )}
+                                    </figure>
+                                  )
+                                }
+
+                                if (b.type === 'articles') {
+                                  return (
+                                    <div key={bi} className="space-y-2">
+                                      <div className="flex items-center gap-2">
+                                        <Link2 className="h-4 w-4 text-primary" />
+                                        <div className="text-sm font-bold text-foreground">{b.title ?? 'اقرأ أيضًا'}</div>
+                                      </div>
+                                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                        {b.items.map((it: { id: number; title?: string; slug?: string; image?: string; reason?: string }) => (
+                                          <Link
+                                            key={it.id}
+                                            to={`/post/${it.id}`}
+                                            className="flex overflow-hidden rounded-[6px] border border-border/50 bg-background/30 hover:border-primary/40 transition-colors"
+                                          >
+                                            <div className="h-20 w-24 shrink-0 bg-muted/30">
+                                              {it.image ? (
+                                                <img
+                                                  src={resolveImageSrc(it.image)}
+                                                  alt={it.title ?? ''}
+                                                  loading="lazy"
+                                                  className="h-full w-full object-cover"
+                                                  onError={(e) => {
+                                                    e.currentTarget.style.display = 'none'
+                                                  }}
+                                                />
+                                              ) : (
+                                                <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                                                  <ImageIcon className="h-5 w-5" />
+                                                </div>
+                                              )}
+                                            </div>
+                                            <div className="flex-1 p-3 text-right">
+                                              <div className="line-clamp-2 text-sm font-bold text-foreground">{it.title ?? 'مقال'}</div>
+                                              {it.reason && <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{it.reason}</div>}
+                                            </div>
+                                          </Link>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )
+                                }
+
+                                if (b.type === 'html') {
+                                  return (
+                                    <div
+                                      key={bi}
+                                      className="prose prose-sm max-w-none dark:prose-invert prose-headings:font-bold prose-headings:text-primary prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-img:rounded-[6px] prose-p:text-foreground/90 prose-strong:text-foreground prose-li:text-foreground/90 prose-blockquote:border-primary prose-blockquote:bg-primary/5 prose-blockquote:py-1 prose-blockquote:pr-4 prose-blockquote:rounded-r-sm [&_a]:break-all"
+                                      dangerouslySetInnerHTML={{ __html: sanitizeAiHtml(b.html) }}
+                                    />
+                                  )
+                                }
+
+                                return null
+                              })}
+                            </div>
+
+                            {m.suggestedQuestions && m.suggestedQuestions.length > 0 && (
+                              <div className="mt-3 border-t border-border/40 pt-3">
+                                <div className="mb-2 text-xs text-muted-foreground">أسئلة مقترحة</div>
+                                <div className="flex flex-wrap gap-2">
+                                  {m.suggestedQuestions.map((q, qi) => (
+                                    <button
+                                      key={qi}
+                                      onClick={() => void sendChat(q)}
+                                      className="rounded-[999px] border border-border/50 bg-background/40 px-3 py-2 text-xs text-foreground hover:border-primary/40 hover:bg-primary/5 transition-colors"
+                                      disabled={chatLoading}
+                                    >
+                                      {q}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {m.citations && m.citations.length > 0 && (
+                              <div className="mt-3 border-t border-border/40 pt-3">
+                                <div className="mb-2 text-xs text-muted-foreground">استشهادات من المقال</div>
+                                <ul className="space-y-1">
+                                  {m.citations.map((q, i) => (
+                                    <li key={i} className="text-xs text-foreground/90">
+                                      “{q}”
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )
-                    }
+                    })}
+                  </div>
+                </div>
 
-                    return (
-                      <div key={idx} className="w-full">
-                        <div className="w-full rounded-[5px] border border-border/50 bg-card/70 px-4 py-3">
-                          <div
-                            className="prose prose-sm md:prose-base max-w-none dark:prose-invert prose-headings:font-bold prose-headings:text-primary prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-img:rounded-[5px] prose-p:text-foreground/90 prose-strong:text-foreground prose-li:text-foreground/90 prose-blockquote:border-primary prose-blockquote:bg-primary/5 prose-blockquote:py-1 prose-blockquote:pr-4 prose-blockquote:rounded-r-sm [&_a]:break-all"
-                            dangerouslySetInnerHTML={{ __html: sanitizeAiHtml(m.content) }}
-                          />
-                          {m.citations && m.citations.length > 0 && (
-                            <div className="mt-3 border-t border-border/40 pt-3">
-                              <div className="text-xs text-muted-foreground mb-2">استشهادات من المقال</div>
-                              <ul className="space-y-1">
-                                {m.citations.map((q, i) => (
-                                  <li key={i} className="text-xs text-foreground/90">
-                                    “{q}”
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-
+                <div className="border-t border-border/40 bg-background/10 p-3 md:p-4">
                   <div className="flex flex-col gap-2 md:flex-row md:items-end">
                     <textarea
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
                       placeholder="اكتب رسالتك هنا…"
-                      className="min-h-[90px] w-full resize-none rounded-[5px] border border-border/60 bg-background/60 px-4 py-3 text-sm text-foreground outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
+                      className="min-h-[88px] w-full resize-none rounded-[6px] border border-border/60 bg-background/40 px-4 py-3 text-sm text-foreground outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
                       disabled={chatLoading}
                     />
                     <button
                       onClick={() => void sendChat()}
-                      className="rounded-[5px] bg-primary px-5 py-3 text-primary-foreground hover:bg-primary/90 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="inline-flex items-center justify-center gap-2 rounded-[6px] bg-primary px-5 py-3 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
                       disabled={chatLoading || !chatInput.trim()}
                     >
+                      <Send className="h-4 w-4" />
                       {chatLoading ? 'جاري الإرسال…' : 'إرسال'}
                     </button>
                   </div>
@@ -1326,9 +1742,12 @@ export default function ArticlePage() {
                 >
                   <div className="relative h-56 w-full">
                     <img 
-                      src={related.image} 
+                      src={resolveImageSrc(related.image ?? '')} 
                       alt={related.title} 
                       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none'
+                      }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
                     {related.is_exclusive && (

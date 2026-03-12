@@ -4,6 +4,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { SortableItem } from '../components/SortableItem'
 import { Plus, Trash2, Eye, EyeOff } from 'lucide-react'
+import Switch from '../components/Switch'
 
 export default function DashboardHomeCustomization() {
   type SectionType = 'carousel' | 'category_grid' | 'category_list' | 'custom' | 'latest_grid'
@@ -365,11 +366,10 @@ export default function DashboardHomeCustomization() {
                       <div className="max-h-40 overflow-y-auto border rounded-md p-2 bg-background space-y-2">
                         {categories.map(cat => (
                           <label key={cat.id} className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-1 rounded">
-                            <input
-                              type="checkbox"
+                            <Switch
                               checked={formData.source_ids.includes(cat.id)}
-                              onChange={(e) => {
-                                const newIds = e.target.checked
+                              onCheckedChange={(checked) => {
+                                const newIds = checked
                                   ? [...formData.source_ids, cat.id]
                                   : formData.source_ids.filter(id => id !== cat.id)
                                 setFormData({ ...formData, source_ids: newIds })

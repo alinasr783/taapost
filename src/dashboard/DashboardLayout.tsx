@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, FileText, FolderTree, Users, LogOut, Settings, PenTool, LayoutTemplate, Menu, X, type LucideIcon } from 'lucide-react'
+import { LayoutDashboard, FileText, FolderTree, Users, LogOut, Settings, PenTool, LayoutTemplate, Menu, X, Moon, Sun, type LucideIcon } from 'lucide-react'
 import type { User } from '../lib/supabase'
 
 export default function DashboardLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light')
   const [user] = useState<User | null>(() => {
     const storedUser = localStorage.getItem('dashboard_user')
     if (!storedUser) return null
@@ -29,6 +30,22 @@ export default function DashboardLayout() {
       navigate('/dashboard/login')
     }
   }, [user, navigate])
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [theme])
+
+  const toggleTheme = () => {
+    const t = theme === 'dark' ? 'light' : 'dark'
+    setTheme(t)
+    if (t === 'dark') document.documentElement.classList.add('dark')
+    else document.documentElement.classList.remove('dark')
+    localStorage.setItem('theme', t)
+  }
 
   const handleLogout = () => {
     localStorage.removeItem('dashboard_user')
@@ -101,6 +118,17 @@ export default function DashboardLayout() {
         <div className="p-6 border-b border-border">
           <h2 className="text-xl font-bold text-primary">لوحة التحكم</h2>
           <p className="text-sm text-muted-foreground mt-1">{user.username}</p>
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <div className="text-xs text-muted-foreground">الثيم</div>
+            <button
+              type="button"
+              aria-label="تبديل الثيم"
+              onClick={toggleTheme}
+              className="inline-flex items-center justify-center rounded-[6px] border border-border bg-background/60 px-3 py-2 hover:bg-muted/40 transition"
+            >
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+          </div>
         </div>
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           {navItems.map((item) => (
@@ -120,14 +148,24 @@ export default function DashboardLayout() {
 
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 border-b border-border bg-card/90 backdrop-blur-sm">
         <div className="flex h-14 items-center justify-between px-4">
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen(true)}
-            className="inline-flex items-center justify-center rounded-[6px] border border-border bg-background/60 px-3 py-2 hover:bg-muted/40 transition"
-            aria-label="فتح القائمة"
-          >
-            <Menu size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              className="inline-flex items-center justify-center rounded-[6px] border border-border bg-background/60 px-3 py-2 hover:bg-muted/40 transition"
+              aria-label="فتح القائمة"
+            >
+              <Menu size={20} />
+            </button>
+            <button
+              type="button"
+              aria-label="تبديل الثيم"
+              onClick={toggleTheme}
+              className="inline-flex items-center justify-center rounded-[6px] border border-border bg-background/60 px-3 py-2 hover:bg-muted/40 transition"
+            >
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+          </div>
           <div className="text-sm font-bold text-foreground">لوحة التحكم</div>
           <button
             type="button"
