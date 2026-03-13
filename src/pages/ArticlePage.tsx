@@ -351,11 +351,31 @@ async function* readGroqSseContent(res: Response) {
   const reader = body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
+  let fullText = ''
+  let yielded = false
+
+  const tryExtractJsonContent = (raw: string) => {
+    const trimmed = raw.trim()
+    if (!trimmed) return ''
+    try {
+      const parsed: unknown = JSON.parse(trimmed)
+      const r = isRecord(parsed) ? parsed : null
+      const choices = r && Array.isArray(r.choices) ? r.choices : null
+      const first = choices && choices[0] && isRecord(choices[0]) ? choices[0] : null
+      const msg = first && isRecord(first.message) ? first.message : null
+      const content = msg && typeof msg.content === 'string' ? msg.content : ''
+      return content || ''
+    } catch {
+      return ''
+    }
+  }
 
   while (true) {
     const { value, done } = await reader.read()
     if (done) break
-    buffer += decoder.decode(value, { stream: true })
+    const chunkText = decoder.decode(value, { stream: true })
+    fullText += chunkText
+    buffer += chunkText
 
     while (true) {
       const sep = buffer.indexOf('\n')
@@ -379,8 +399,57 @@ async function* readGroqSseContent(res: Response) {
       const first = choices && choices[0] && isRecord(choices[0]) ? choices[0] : null
       const delta = first && isRecord(first.delta) ? first.delta : null
       const content = delta && typeof delta.content === 'string' ? delta.content : ''
-      if (content) yield content
+      const altText = delta && typeof (delta as Record<string, unknown>).text === 'string' ? String((delta as Record<string, unknown>).text) : ''
+      const deltaContentValue = delta ? (delta as Record<string, unknown>).content : null
+      const contentParts =
+        Array.isArray(deltaContentValue)
+          ? deltaContentValue
+              .filter(isRecord)
+              .map((p: Record<string, unknown>) => (typeof p.text === 'string' ? p.text : ''))
+              .join('')
+          : ''
+      const message = first && isRecord(first.message) ? first.message : null
+      const messageContent = message && typeof message.content === 'string' ? message.content : ''
+      const out = content || contentParts || altText || messageContent
+      if (out) {
+        yielded = true
+        yield out
+      }
     }
+  }
+
+  if (buffer.trim()) {
+    fullText += buffer
+    buffer += '\n'
+    while (true) {
+      const sep = buffer.indexOf('\n')
+      if (sep === -1) break
+      const line = buffer.slice(0, sep).trimEnd()
+      buffer = buffer.slice(sep + 1)
+      const trimmed = line.trim()
+      if (!trimmed.startsWith('data:')) continue
+      const data = trimmed.slice(5).trim()
+      if (!data || data === '[DONE]') continue
+      try {
+        const parsed: unknown = JSON.parse(data)
+        const r = isRecord(parsed) ? parsed : null
+        const choices = r && Array.isArray(r.choices) ? r.choices : null
+        const first = choices && choices[0] && isRecord(choices[0]) ? choices[0] : null
+        const delta = first && isRecord(first.delta) ? first.delta : null
+        const content = delta && typeof delta.content === 'string' ? delta.content : ''
+        if (content) {
+          yielded = true
+          yield content
+        }
+      } catch {
+        continue
+      }
+    }
+  }
+
+  if (!yielded) {
+    const extracted = tryExtractJsonContent(fullText)
+    if (extracted) yield extracted
   }
 }
 
