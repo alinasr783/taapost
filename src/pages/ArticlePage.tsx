@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -33,6 +33,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import Seo from '../components/Seo'
 
 type AiBlock =
   | { type: 'html'; html: string }
@@ -64,6 +65,17 @@ type ChatMessage = {
 }
 
 const CHART_COLORS = ['#7c2d12', '#a16207', '#0f766e', '#1d4ed8', '#6d28d9', '#c2410c']
+
+const iconWhitelist: Record<string, (props: { className?: string }) => ReactNode> = {
+  Sparkles,
+  TrendingUp,
+  Info,
+  AlertTriangle,
+  BarChart3,
+  PieChart: PieChartIcon,
+  Link2,
+  Image: ImageIcon,
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -682,16 +694,6 @@ export default function ArticlePage() {
   const [aiPlainSource, setAiPlainSource] = useState<string>('')
   const autoSmartSummaryDoneRef = useRef(false)
   const activeStreamAbortRef = useRef<AbortController | null>(null)
-const iconWhitelist: Record<string, (props: { className?: string }) => ReactNode> = {
-    Sparkles,
-    TrendingUp,
-    Info,
-    AlertTriangle,
-    BarChart3,
-    PieChart: PieChartIcon,
-    Link2,
-    Image: ImageIcon,
-  }
 
   const siteSettingsQuery = useQuery({
     queryKey: ['site_settings'],
@@ -878,7 +880,7 @@ const iconWhitelist: Record<string, (props: { className?: string }) => ReactNode
     return `${minutes} دقيقة قراءة`
   }
 
-  const sendChat = async (
+  const sendChat = useCallback(async (
     text?: string,
     opts?: {
       silentUser?: boolean
@@ -1344,7 +1346,7 @@ const iconWhitelist: Record<string, (props: { className?: string }) => ReactNode
       activeStreamAbortRef.current = null
       if (opts?.preset === 'smart_summary') autoSmartSummaryDoneRef.current = true
     }
-  }
+  }, [aiModel, aiPlainSource, article, articleId, chatInput, chatMessages, visitorId])
 
   useEffect(() => {
     if (!articleId) return
@@ -1375,6 +1377,7 @@ const iconWhitelist: Record<string, (props: { className?: string }) => ReactNode
   if (!article) {
     return (
       <div className="container flex flex-col items-center justify-center py-20 text-center">
+        <Seo title="المقال غير موجود" description="عذراً، هذا المقال غير موجود" robots="noindex,follow" />
         <h2 className="mb-4 text-2xl font-bold text-foreground">عذراً، المقال غير موجود</h2>
         <button 
           onClick={() => navigate('/')}
@@ -1388,6 +1391,23 @@ const iconWhitelist: Record<string, (props: { className?: string }) => ReactNode
 
   return (
     <div className="container max-w-7xl py-8 md:py-12">
+      <Seo
+        title={article.title}
+        description={article.excerpt || article.title}
+        canonicalPath={article.slug ? `/مقال/${encodeURIComponent(article.slug)}` : `/post/${article.id}`}
+        ogType="article"
+        image={article.image}
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'Article',
+          headline: article.title,
+          description: article.excerpt || '',
+          datePublished: article.date || '',
+          image: article.image ? [{ '@type': 'ImageObject', url: article.image }] : undefined,
+          author: article.authors?.name ? { '@type': 'Person', name: article.authors.name } : undefined,
+          inLanguage: 'ar',
+        }}
+      />
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         {/* Breadcrumb / Back button */}
         <button 

@@ -3,10 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase, type Category, type Article } from '../lib/supabase'
+import Seo from '../components/Seo'
+import { useSiteSettings } from '../components/useSiteSettings'
 
 export default function CategoryPage() {
   const { id, slug } = useParams()
   const navigate = useNavigate()
+  const site = useSiteSettings()
   const categoryId = id && /^\d+$/.test(id) ? Number(id) : null
   const categorySlug = slug ? decodeURIComponent(slug) : ''
   const categoryQuery = useQuery({
@@ -64,6 +67,7 @@ export default function CategoryPage() {
   if (loading) {
     return (
       <div className="container py-8 space-y-8">
+        <Seo title="القسم" description={`قسم من أقسام ${site.site_name}`} ogType="website" />
         <div className="space-y-4">
           <div className="h-6 w-32 rounded bg-muted/40 animate-pulse" />
           <div className="rounded-[5px] border border-border/40 bg-card/30 p-6 backdrop-blur-[2px] md:p-8">
@@ -96,6 +100,7 @@ export default function CategoryPage() {
   if (!category) {
     return (
       <div className="container flex flex-col items-center justify-center py-20 text-center">
+        <Seo title="القسم غير موجود" description={`القسم غير موجود في ${site.site_name}`} robots="noindex,follow" />
         <h2 className="mb-4 text-2xl font-bold text-foreground">عذراً، القسم غير موجود</h2>
         <button 
           onClick={() => navigate('/')}
@@ -109,6 +114,20 @@ export default function CategoryPage() {
 
   return (
     <div className="container py-8 space-y-8">
+      <Seo
+        title={category.name}
+        description={category.description || `مقالات قسم ${category.name} في ${site.site_name}`}
+        canonicalPath={category.slug ? `/قسم/${encodeURIComponent(category.slug)}` : `/category/${category.id}`}
+        ogType="website"
+        jsonLd={[
+          {
+            '@type': 'CollectionPage',
+            name: category.name,
+            description: category.description || '',
+            inLanguage: 'ar',
+          },
+        ]}
+      />
       {/* Header */}
       <div className="space-y-4">
         <button 

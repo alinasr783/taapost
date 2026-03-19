@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase, type Article, type HomepageSection } from '../lib/supabase'
 import HomeCarousel from '../components/HomeCarousel'
+import Seo from '../components/Seo'
+import { useSiteSettings } from '../components/useSiteSettings'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -38,6 +40,7 @@ const emptySections: HomepageSection[] = []
 
 export default function Home() {
   const navigate = useNavigate()
+  const site = useSiteSettings()
   const limit = 60
 
   const homeQuery = useQuery({
@@ -46,7 +49,7 @@ export default function Home() {
       const [articlesRes, sectionsRes] = await Promise.all([
         supabase
           .from('articles')
-          .select('id,title,excerpt,content,image,category_id,type,date,is_exclusive,categories(id,name,slug)')
+          .select('id,slug,title,excerpt,content,image,category_id,type,date,is_exclusive,categories(id,name,slug)')
           .order('date', { ascending: false })
           .limit(limit),
         supabase
@@ -89,11 +92,13 @@ export default function Home() {
           const joined = a.categories
           const categoryRow = Array.isArray(joined) ? (joined[0] as unknown) : joined
           const categoryName = isRecord(categoryRow) ? getString(categoryRow.name, '') : ''
+          const category = isRecord(categoryRow) ? (categoryRow as unknown) : null
           return {
             ...(a as unknown as Article),
             categoryId: typeof a.category_id === 'number' ? a.category_id : undefined,
             category: categoryName,
             contentHtml: typeof a.content === 'string' ? a.content : undefined,
+            categories: category ? (category as Article['categories']) : undefined,
           } as Article
         })
 
@@ -114,6 +119,33 @@ export default function Home() {
   if (homeQuery.isLoading) {
     return (
       <div className="container py-8 space-y-6">
+        <Seo
+          title=""
+          description={site.site_description}
+          canonicalPath="/"
+          ogType="website"
+          jsonLd={[
+            {
+              '@type': 'WebSite',
+              name: site.site_name,
+              description: site.site_description,
+              inLanguage: 'ar',
+            },
+            site.logo_url
+              ? {
+                  '@type': 'Organization',
+                  name: site.site_name,
+                  logo: {
+                    '@type': 'ImageObject',
+                    url: site.logo_url,
+                  },
+                }
+              : {
+                  '@type': 'Organization',
+                  name: site.site_name,
+                },
+          ]}
+        />
         <div className="h-10 w-48 rounded bg-muted/40 animate-pulse" />
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, idx) => (
@@ -132,6 +164,33 @@ export default function Home() {
 
   return (
     <div className="space-y-8 pb-10 md:space-y-10">
+      <Seo
+        title=""
+        description={site.site_description}
+        canonicalPath="/"
+        ogType="website"
+        jsonLd={[
+          {
+            '@type': 'WebSite',
+            name: site.site_name,
+            description: site.site_description,
+            inLanguage: 'ar',
+          },
+          site.logo_url
+            ? {
+                '@type': 'Organization',
+                name: site.site_name,
+                logo: {
+                  '@type': 'ImageObject',
+                  url: site.logo_url,
+                },
+              }
+            : {
+                '@type': 'Organization',
+                name: site.site_name,
+              },
+        ]}
+      />
       {sections.map((section) => {
         if (section.type === 'carousel') {
            const count = getSettingsCount(section.settings, 5)
@@ -177,7 +236,9 @@ export default function Home() {
                      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                         {list.map((article) => (
                            <div key={article.id} 
-                                onClick={() => navigate(`/post/${article.id}`)}
+                                onClick={() =>
+                                  navigate(article.slug ? `/مقال/${encodeURIComponent(article.slug)}` : `/post/${article.id}`)
+                                }
                                 className="group cursor-pointer space-y-3"
                            >
                                 <div className="relative aspect-video overflow-hidden rounded-lg shadow-sm group-hover:shadow-md transition-all border border-border/50 group-hover:border-primary/50">
@@ -251,7 +312,7 @@ export default function Home() {
                       key={article.id}
                       type="button"
                       onClick={() =>
-                        navigate(`/post/${article.id}`)
+                        navigate(article.slug ? `/مقال/${encodeURIComponent(article.slug)}` : `/post/${article.id}`)
                       }
                       className="relative flex min-w-[360px] max-w-[480px] flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md"
                     >

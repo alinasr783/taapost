@@ -2,14 +2,17 @@ import { useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase, type Article } from '../lib/supabase'
+import Seo from '../components/Seo'
+import { useSiteSettings } from '../components/useSiteSettings'
 
 export default function Articles() {
   const [params] = useSearchParams()
   const q = params.get('q')?.trim() || ''
+  const site = useSiteSettings()
 
   type ArticleCard = Pick<
     Article,
-    'id' | 'title' | 'excerpt' | 'image' | 'date' | 'is_exclusive'
+    'id' | 'slug' | 'title' | 'excerpt' | 'image' | 'date' | 'is_exclusive'
   >
 
   const normalizedQ = useMemo(() => q.replaceAll(',', ' ').trim(), [q])
@@ -20,7 +23,7 @@ export default function Articles() {
     queryFn: async () => {
       let query = supabase
         .from('articles')
-        .select('id,title,excerpt,image,date,is_exclusive')
+        .select('id,slug,title,excerpt,image,date,is_exclusive')
         .order('date', { ascending: false })
         .limit(limit)
 
@@ -42,6 +45,17 @@ export default function Articles() {
   if (articlesQuery.isLoading) {
     return (
       <div className="container py-8 space-y-4">
+        <Seo
+          title={normalizedQ ? `نتائج البحث: ${normalizedQ}` : 'المقالات'}
+          description={
+            normalizedQ
+              ? `نتائج بحث في مقالات ${site.site_name} عن: ${normalizedQ}`
+              : `أحدث المقالات في ${site.site_name}`
+          }
+          canonicalPath="/posts"
+          robots={normalizedQ ? 'noindex,follow' : undefined}
+          ogType="website"
+        />
         <h1 className="mb-4 text-2xl font-bold">المقالات</h1>
         <div className="grid gap-6 md:grid-cols-2">
           {Array.from({ length: 6 }).map((_, idx) => (
@@ -63,12 +77,28 @@ export default function Articles() {
 
   return (
     <div className="container py-8 space-y-4">
+      <Seo
+        title={normalizedQ ? `نتائج البحث: ${normalizedQ}` : 'المقالات'}
+        description={
+          normalizedQ ? `نتائج بحث في مقالات ${site.site_name} عن: ${normalizedQ}` : `أحدث المقالات في ${site.site_name}`
+        }
+        canonicalPath="/posts"
+        robots={normalizedQ ? 'noindex,follow' : undefined}
+        ogType="website"
+        jsonLd={[
+          {
+            '@type': 'CollectionPage',
+            name: normalizedQ ? `نتائج البحث: ${normalizedQ}` : 'المقالات',
+            inLanguage: 'ar',
+          },
+        ]}
+      />
       <h1 className="mb-4 text-2xl font-bold">المقالات</h1>
       <div className="grid gap-6 md:grid-cols-2">
         {list.map((i) => (
           <Link
             key={i.id}
-            to={`/post/${i.id}`}
+            to={i.slug ? `/مقال/${encodeURIComponent(i.slug)}` : `/post/${i.id}`}
             className="relative flex flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md"
           >
             <div className="relative h-52 w-full">

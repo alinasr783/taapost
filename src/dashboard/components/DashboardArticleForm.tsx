@@ -68,7 +68,7 @@ export default function DashboardArticleForm({ article, categories, user, permis
         setFormData(prev => ({ ...prev, category_id: availableCategories[0].id }))
       }
     }
-  }, [article, categories, user, permissions])
+  }, [article, categories, user, permissions, formData.category_id])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

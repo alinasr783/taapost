@@ -58,6 +58,17 @@ export default function Footer({ siteSettings }: Props) {
           {/* Brand & Description */}
           <div className="space-y-4 md:col-span-2">
             <h2 className="text-2xl font-bold text-primary flex items-center gap-2">
+              {siteSettings?.logo_url ? (
+                <img
+                  src={siteSettings.logo_url}
+                  alt={siteSettings?.site_name || 'تاء بوست'}
+                  className="h-10 w-10 object-contain"
+                  width={40}
+                  height={40}
+                  loading="lazy"
+                  decoding="async"
+                />
+              ) : null}
               <span className="w-2 h-8 bg-primary rounded-full inline-block"></span>
               {siteSettings?.site_name || 'تاء بوست'}
             </h2>

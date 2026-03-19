@@ -1,8 +1,11 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase, type Category } from '../lib/supabase'
+import Seo from '../components/Seo'
+import { useSiteSettings } from '../components/useSiteSettings'
 
 export default function Categories() {
+  const site = useSiteSettings()
   const categoriesQuery = useQuery({
     queryKey: ['categories'],
     queryFn: async () => {
@@ -16,6 +19,7 @@ export default function Categories() {
   if (categoriesQuery.isLoading) {
     return (
       <div className="container py-8">
+        <Seo title="الأقسام" description={`أقسام ${site.site_name} وتصفح المحتوى حسب الموضوع`} canonicalPath="/categories" ogType="website" />
         <h1 className="mb-4 text-2xl font-bold">الأقسام</h1>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, idx) => (
@@ -39,12 +43,25 @@ export default function Categories() {
 
   return (
     <div className="container py-8">
+      <Seo
+        title="الأقسام"
+        description={`أقسام ${site.site_name} وتصفح المحتوى حسب الموضوع`}
+        canonicalPath="/categories"
+        ogType="website"
+        jsonLd={[
+          {
+            '@type': 'CollectionPage',
+            name: 'الأقسام',
+            inLanguage: 'ar',
+          },
+        ]}
+      />
       <h1 className="mb-4 text-2xl font-bold">الأقسام</h1>
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {categories.map((c) => (
           <Link
             key={c.id}
-            to={`/category/${c.id}`}
+            to={c.slug ? `/قسم/${encodeURIComponent(c.slug)}` : `/category/${c.id}`}
             className="flex flex-col overflow-hidden rounded-[5px] border border-white/10 bg-background/10 shadow-sm backdrop-blur-md hover:bg-background/20"
           >
             <img
@@ -52,6 +69,7 @@ export default function Categories() {
               alt={c.name}
               className="h-40 w-full object-cover"
               loading="lazy"
+              decoding="async"
             />
             <div className="space-y-2 px-4 py-3 text-right">
               <div className="text-sm font-semibold">{c.name}</div>

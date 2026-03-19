@@ -78,5 +78,21 @@ export default defineConfig(({ mode }) => {
   const groqApiKey = env.GROQ_API_KEY || process.env.GROQ_API_KEY || ''
   return {
     plugins: [react(), groqProxyDevPlugin(groqApiKey)],
+    build: {
+      target: 'es2020',
+      cssCodeSplit: true,
+      sourcemap: false,
+      chunkSizeWarningLimit: 900,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            router: ['react-router-dom'],
+            query: ['@tanstack/react-query'],
+            charts: ['recharts'],
+            supabase: ['@supabase/supabase-js'],
+          },
+        },
+      },
+    },
   }
 })

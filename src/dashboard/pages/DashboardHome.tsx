@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -35,11 +35,7 @@ export default function DashboardHome() {
     topCategories: []
   })
 
-  useEffect(() => {
-    fetchAnalytics()
-  }, [])
-
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     try {
       setLoading(true)
 
@@ -141,7 +137,11 @@ export default function DashboardHome() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    void fetchAnalytics()
+  }, [fetchAnalytics])
 
   if (loading) return <div className="flex h-96 items-center justify-center"><Loader2 className="animate-spin" size={48} /></div>
 
