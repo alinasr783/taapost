@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Facebook, Twitter, Instagram, Linkedin, Youtube, MessageCircle, Send, Mail, Globe, Link as LinkIcon, FileText, type LucideIcon } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { supabase, type LogoSetting } from '../lib/supabase'
 
 type SocialLink = {
   id: number
@@ -35,6 +35,22 @@ type Props = {
 
 export default function Footer({ siteSettings }: Props) {
   const [socialLinks, setSocialLinks] = useState<SocialLink[]>([])
+  const [activeLogo, setActiveLogo] = useState<LogoSetting | null>(null)
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'))
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains('dark'))
+    })
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [])
+
+  const getLogoUrl = () => {
+    if (!activeLogo) return siteSettings?.logo_url || null
+    if (isDark && activeLogo.logo_url_dark?.trim()) return activeLogo.logo_url_dark.trim()
+    return activeLogo.logo_url?.trim() || null
+  }
 
   useEffect(() => {
     async function fetchSocialLinks() {
@@ -48,7 +64,18 @@ export default function Footer({ siteSettings }: Props) {
         setSocialLinks(data)
       }
     }
+    async function fetchActiveLogo() {
+      const { data } = await supabase
+        .from('logo_settings')
+        .select('*')
+        .eq('is_active', true)
+        .maybeSingle()
+      if (data) {
+        setActiveLogo(data as LogoSetting)
+      }
+    }
     fetchSocialLinks()
+    fetchActiveLogo()
   }, [])
 
   return (
@@ -58,9 +85,9 @@ export default function Footer({ siteSettings }: Props) {
           {/* Brand & Description */}
           <div className="space-y-4 md:col-span-2">
             <h2 className="text-2xl font-bold text-primary flex items-center gap-2">
-              {siteSettings?.logo_url ? (
+              {getLogoUrl() ? (
                 <img
-                  src={siteSettings.logo_url}
+                  src={getLogoUrl()!}
                   alt={siteSettings?.site_name || 'تاء بوست'}
                   className="h-10 w-10 object-contain"
                   width={40}

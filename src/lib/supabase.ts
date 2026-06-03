@@ -98,3 +98,19 @@ export type HomepageSection = {
   settings?: Record<string, unknown>
   categories?: Category // For joined data
 }
+
+export type LogoSetting = {
+  id: number
+  logo_url: string
+  logo_url_dark: string | null
+  logo_name: string
+  is_active: boolean
+  logo_width: string
+  logo_max_width: string
+  logo_height: string
+  position_x: number
+  position_y: number
+  alignment: string
+  created_at: string
+  updated_at: string
+}

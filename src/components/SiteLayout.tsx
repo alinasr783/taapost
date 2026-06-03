@@ -3,7 +3,7 @@ import type { FormEvent, ReactNode } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { BrainCircuit, Home, LayoutGrid, Moon, Sun, FileText } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
-import { supabase, type Category } from '../lib/supabase'
+import { supabase, type Category, type LogoSetting } from '../lib/supabase'
 import Footer from './Footer'
 import { SiteSettingsProvider } from './SiteSettingsProvider'
 import { defaultSiteSettings } from './siteSettingsModel'
@@ -77,8 +77,48 @@ export default function SiteLayout({ children }: Props) {
     staleTime: 5 * 60_000,
   })
 
+  const activeLogoQuery = useQuery({
+    queryKey: ['logo_settings_active'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('logo_settings')
+        .select('*')
+        .eq('is_active', true)
+        .maybeSingle()
+      if (error && error.code !== 'PGRST116') throw error
+      return (data as LogoSetting | null) ?? null
+    },
+    staleTime: 5 * 60_000,
+  })
+
   const categories = categoriesQuery.data ?? []
   const siteSettings = siteSettingsQuery.data ?? defaultSiteSettings
+  const activeLogo = activeLogoQuery.data
+
+  const mergedSettings = {
+    ...(siteSettingsQuery.data ?? defaultSiteSettings),
+    logo_url: activeLogo?.logo_url?.trim() || siteSettings.logo_url?.trim() || null,
+    active_logo: activeLogo
+      ? {
+          id: activeLogo.id,
+          logo_url: activeLogo.logo_url,
+          logo_url_dark: activeLogo.logo_url_dark,
+          logo_name: activeLogo.logo_name,
+          logo_width: activeLogo.logo_width,
+          logo_max_width: activeLogo.logo_max_width,
+          logo_height: activeLogo.logo_height,
+          position_x: activeLogo.position_x,
+          position_y: activeLogo.position_y,
+          alignment: activeLogo.alignment,
+        }
+      : null,
+  }
+
+  const getActiveLogoUrl = () => {
+    if (!activeLogo) return siteSettings.logo_url?.trim() || null
+    if (theme === 'dark' && activeLogo.logo_url_dark?.trim()) return activeLogo.logo_url_dark.trim()
+    return activeLogo.logo_url?.trim() || null
+  }
 
   useEffect(() => {
     if (siteSettings.site_name) {
@@ -99,7 +139,7 @@ export default function SiteLayout({ children }: Props) {
     themeMeta.setAttribute('name', 'theme-color')
     themeMeta.setAttribute('content', siteSettings.primary_color || '#000000')
 
-    const iconHref = siteSettings.logo_url?.trim() || '/favicon.svg'
+    const iconHref = getActiveLogoUrl() || '/favicon.svg'
     const icon =
       (head.querySelector('link[rel="icon"]') as HTMLLinkElement | null) ??
       (head.appendChild(document.createElement('link')) as HTMLLinkElement)
@@ -111,7 +151,7 @@ export default function SiteLayout({ children }: Props) {
       (head.appendChild(document.createElement('link')) as HTMLLinkElement)
     apple.setAttribute('rel', 'apple-touch-icon')
     apple.setAttribute('href', iconHref)
-  }, [siteSettings.logo_url, siteSettings.primary_color])
+  }, [])
 
   const toggle = () => {
     const t = theme === 'dark' ? 'light' : 'dark'
@@ -122,26 +162,40 @@ export default function SiteLayout({ children }: Props) {
   }
 
   return (
-    <SiteSettingsProvider value={siteSettings}>
+    <SiteSettingsProvider value={mergedSettings}>
       <div className="min-h-dvh bg-background text-foreground flex flex-col pb-24 md:pb-0">
         <header className="border-b border-border/60 bg-background/80 backdrop-blur">
-          <div className="container flex flex-wrap items-center justify-between gap-3 py-4">
-            <Link to="/" className="flex items-center gap-3">
-              {siteSettings.logo_url ? (
-                <img
-                  src={siteSettings.logo_url}
-                  alt={siteSettings.site_name}
-                  className="h-10 w-10 object-contain"
-                  width={40}
-                  height={40}
-                  decoding="async"
-                />
-              ) : (
-                <BrainCircuit className="h-6 w-6 text-primary" />
-              )}
-              <div className="flex flex-col">
-                <span className="text-lg font-bold leading-tight">{siteSettings.site_name}</span>
-                <span className="text-xs text-muted-foreground leading-tight">
+          <div className="container flex items-center justify-between gap-3 py-4">
+            <Link
+              to="/"
+              className="flex items-center gap-3 min-w-0 flex-shrink"
+            >
+              {(() => {
+                const displayLogoUrl = getActiveLogoUrl()
+                if (displayLogoUrl) {
+                  return (
+                    <img
+                      src={displayLogoUrl}
+                      alt={siteSettings.site_name}
+                      style={{
+                        objectFit: 'contain',
+                        width: activeLogo?.logo_width === 'auto' ? 'auto' : (activeLogo?.logo_width ?? 'auto'),
+                        maxWidth: activeLogo?.logo_max_width && activeLogo.logo_max_width !== 'none'
+                          ? activeLogo.logo_max_width
+                          : undefined,
+                        height: activeLogo?.logo_height === 'auto' ? 'auto' : (activeLogo?.logo_height ?? 'auto'),
+                        maxHeight: '44px',
+                      }}
+                      className="flex-shrink-0"
+                      decoding="async"
+                    />
+                  )
+                }
+                return <BrainCircuit className="h-6 w-6 text-primary flex-shrink-0" />
+              })()}
+              <div className="flex flex-col min-w-0">
+                <span className="text-lg font-bold leading-tight truncate">{siteSettings.site_name}</span>
+                <span className="text-xs text-muted-foreground leading-tight truncate hidden sm:block">
                   {siteSettings.site_description}
                 </span>
               </div>

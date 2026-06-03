@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Save, Plus, Trash2, GripVertical, X, Facebook, Twitter, Instagram, Linkedin, Youtube, MessageCircle, Send, Mail, Globe, Link as LinkIcon, Loader2 } from 'lucide-react'
+import { Save, Plus, Trash2, GripVertical, X, Facebook, Twitter, Instagram, Linkedin, Youtube, MessageCircle, Send, Mail, Globe, Link as LinkIcon, Loader2, Settings, Image } from 'lucide-react'
 import { supabase, type SocialLink } from '../../lib/supabase'
-import ImageUpload from '../components/ImageUpload'
 import Switch from '../components/Switch'
+import LogoController from '../components/LogoController'
 
 const AVAILABLE_ICONS = [
   { name: 'Facebook', icon: Facebook },
@@ -27,7 +27,16 @@ type SiteSettings = {
   show_article_summary: boolean
 }
 
+type TabKey = 'general' | 'logo' | 'social'
+
+const TABS: { key: TabKey; label: string; icon: typeof Settings }[] = [
+  { key: 'general', label: 'إعدادات الموقع', icon: Settings },
+  { key: 'logo', label: 'التحكم باللوجو', icon: Image },
+  { key: 'social', label: 'التواصل الاجتماعي', icon: Globe },
+]
+
 export default function DashboardSettings() {
+  const [activeTab, setActiveTab] = useState<TabKey>('general')
   const [links, setLinks] = useState<SocialLink[]>([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -64,7 +73,7 @@ export default function DashboardSettings() {
       .single()
     
     if (error) {
-      if (error.code !== 'PGRST116') { // Not found error code might differ, but single() returns error if no rows
+      if (error.code !== 'PGRST116') {
         console.error('Error fetching site settings:', error)
       }
     } else if (data) {
@@ -171,7 +180,7 @@ export default function DashboardSettings() {
     }
   }
 
-  const renderForm = (link: Partial<SocialLink>, isNew: boolean = false) => {
+  const renderForm = (link: Partial<SocialLink>, isNew = false) => {
     const updateLink = (updates: Partial<SocialLink>) => {
       if (isNew) {
         setNewLink(prev => prev ? { ...prev, ...updates } : null)
@@ -250,7 +259,7 @@ export default function DashboardSettings() {
               setNewLink(null)
             } else {
               setEditingId(null)
-              fetchLinks() // Reset changes
+              fetchLinks()
             }
           }} className="p-2 bg-gray-500 text-white rounded hover:bg-gray-600 flex items-center gap-2">
             <X size={18} /> إلغاء
@@ -260,161 +269,171 @@ export default function DashboardSettings() {
     )
   }
 
-  if (loading) return <div className="p-8 text-center">جاري التحميل...</div>
+  if (loading && activeTab !== 'logo') return <div className="p-8 text-center">جاري التحميل...</div>
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">إعدادات الموقع</h1>
       </div>
 
-      <div className="bg-card rounded-lg shadow-sm border border-border p-6 mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold">المعلومات الأساسية</h2>
-          <button 
-            onClick={handleSaveSettings} 
-            disabled={savingSettings}
-            className="bg-primary text-primary-foreground px-4 py-2 rounded-md flex items-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-70"
+      {/* Tabs */}
+      <div className="flex gap-1 bg-muted/40 p-1 rounded-lg mb-6 w-fit border border-border">
+        {TABS.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === tab.key
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
           >
-            {savingSettings ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
-            <span>حفظ الإعدادات</span>
+            <tab.icon size={16} />
+            <span className="hidden sm:inline">{tab.label}</span>
           </button>
-        </div>
+        ))}
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Tab Content */}
+      {activeTab === 'general' && (
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold">المعلومات الأساسية</h2>
+            <button 
+              onClick={handleSaveSettings} 
+              disabled={savingSettings}
+              className="bg-primary text-primary-foreground px-4 py-2 rounded-md flex items-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-70"
+            >
+              {savingSettings ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+              <span>حفظ الإعدادات</span>
+            </button>
+          </div>
+
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">اسم الموقع</label>
-              <input
-                type="text"
-                value={siteSettings.site_name}
-                onChange={(e) => setSiteSettings({ ...siteSettings, site_name: e.target.value })}
-                className="w-full p-2 bg-background border border-input rounded-md"
-                placeholder="اسم الموقع"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">وصف الموقع</label>
-              <textarea
-                value={siteSettings.site_description}
-                onChange={(e) => setSiteSettings({ ...siteSettings, site_description: e.target.value })}
-                className="w-full p-2 bg-background border border-input rounded-md min-h-[80px]"
-                placeholder="وصف مختصر يظهر في محركات البحث وتذييل الصفحة"
-              />
-            </div>
-
-            <div className="flex items-center gap-2 rounded-md border border-border bg-muted/20 px-3 py-3">
-              <label htmlFor="show-article-summary" className="text-sm font-medium">
-                إظهار ملخص المقال أسفل صفحة المقال
-              </label>
-              <div className="mr-auto">
-                <Switch
-                  id="show-article-summary"
-                  checked={siteSettings.show_article_summary !== false}
-                  onCheckedChange={(checked) => setSiteSettings({ ...siteSettings, show_article_summary: checked })}
+              <div>
+                <label className="block text-sm font-medium mb-1">اسم الموقع</label>
+                <input
+                  type="text"
+                  value={siteSettings.site_name}
+                  onChange={(e) => setSiteSettings({ ...siteSettings, site_name: e.target.value })}
+                  className="w-full p-2 bg-background border border-input rounded-md"
+                  placeholder="اسم الموقع"
                 />
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">اللون الأساسي</label>
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="color"
-                    value={siteSettings.primary_color}
-                    onChange={(e) => setSiteSettings({ ...siteSettings, primary_color: e.target.value })}
-                    className="h-10 w-10 p-1 rounded cursor-pointer"
+                <label className="block text-sm font-medium mb-1">وصف الموقع</label>
+                <textarea
+                  value={siteSettings.site_description}
+                  onChange={(e) => setSiteSettings({ ...siteSettings, site_description: e.target.value })}
+                  className="w-full p-2 bg-background border border-input rounded-md min-h-[80px]"
+                  placeholder="وصف مختصر يظهر في محركات البحث وتذييل الصفحة"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 rounded-md border border-border bg-muted/20 px-3 py-3">
+                <label htmlFor="show-article-summary" className="text-sm font-medium">
+                  إظهار ملخص المقال أسفل صفحة المقال
+                </label>
+                <div className="mr-auto">
+                  <Switch
+                    id="show-article-summary"
+                    checked={siteSettings.show_article_summary !== false}
+                    onCheckedChange={(checked) => setSiteSettings({ ...siteSettings, show_article_summary: checked })}
                   />
-                  <span className="text-sm font-mono">{siteSettings.primary_color}</span>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">اللون الثانوي</label>
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="color"
-                    value={siteSettings.secondary_color}
-                    onChange={(e) => setSiteSettings({ ...siteSettings, secondary_color: e.target.value })}
-                    className="h-10 w-10 p-1 rounded cursor-pointer"
-                  />
-                  <span className="text-sm font-mono">{siteSettings.secondary_color}</span>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">اللون الأساسي</label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="color"
+                      value={siteSettings.primary_color}
+                      onChange={(e) => setSiteSettings({ ...siteSettings, primary_color: e.target.value })}
+                      className="h-10 w-10 p-1 rounded cursor-pointer"
+                    />
+                    <span className="text-sm font-mono">{siteSettings.primary_color}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">اللون الثانوي</label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="color"
+                      value={siteSettings.secondary_color}
+                      onChange={(e) => setSiteSettings({ ...siteSettings, secondary_color: e.target.value })}
+                      className="h-10 w-10 p-1 rounded cursor-pointer"
+                    />
+                    <span className="text-sm font-mono">{siteSettings.secondary_color}</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2">شعار الموقع (اللوجو)</label>
-            <div className="bg-muted/30 p-4 rounded-lg border border-border">
-              <ImageUpload
-                value={siteSettings.logo_url || ''}
-                onChange={(url) => setSiteSettings({ ...siteSettings, logo_url: url })}
-              />
-              <p className="text-xs text-muted-foreground mt-2 text-center">
-                يفضل استخدام صورة بخلفية شفافة (PNG) بحجم لا يقل عن 200x200 بكسل
-              </p>
-            </div>
-          </div>
         </div>
-      </div>
+      )}
 
-      <div className="bg-card rounded-lg shadow-sm border border-border p-6">
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <h2 className="text-xl font-semibold">حسابات التواصل الاجتماعي</h2>
-          <button
-            onClick={() => setNewLink({ platform: '', url: '', icon: 'Link', is_active: true, sort_order: links.length + 1 })}
-            className="bg-primary text-primary-foreground px-4 py-2 rounded-md flex items-center gap-2 hover:bg-primary/90 transition-colors"
-          >
-            <Plus size={20} />
-            <span>إضافة رابط</span>
-          </button>
-        </div>
-        
-        <div className="space-y-4">
-          {links.map((link) => (
-            <div key={link.id} className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg border border-border">
-              {editingId === link.id ? (
-                renderForm(link)
-              ) : (
-                <>
-                  <div className="p-2 bg-background rounded border border-border text-muted-foreground cursor-grab">
-                    <GripVertical size={20} />
-                  </div>
-                  <div className="p-2 bg-background rounded-full border border-border">
-                    {(() => {
-                      const IconItem = AVAILABLE_ICONS.find(i => i.name === link.icon) || AVAILABLE_ICONS.find(i => i.name === 'Link')
-                      const Icon = IconItem?.icon || LinkIcon
-                      return <Icon size={20} />
-                    })()}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-bold flex items-center gap-2">
-                      {link.platform}
-                      {!link.is_active && <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">غير نشط</span>}
+      {activeTab === 'logo' && <LogoController />}
+
+      {activeTab === 'social' && (
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <h2 className="text-xl font-semibold">حسابات التواصل الاجتماعي</h2>
+            <button
+              onClick={() => setNewLink({ platform: '', url: '', icon: 'Link', is_active: true, sort_order: links.length + 1 })}
+              className="bg-primary text-primary-foreground px-4 py-2 rounded-md flex items-center gap-2 hover:bg-primary/90 transition-colors"
+            >
+              <Plus size={20} />
+              <span>إضافة رابط</span>
+            </button>
+          </div>
+          
+          <div className="space-y-4">
+            {links.map((link) => (
+              <div key={link.id} className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg border border-border">
+                {editingId === link.id ? (
+                  renderForm(link)
+                ) : (
+                  <>
+                    <div className="p-2 bg-background rounded border border-border text-muted-foreground cursor-grab">
+                      <GripVertical size={20} />
                     </div>
-                    <div className="text-sm text-muted-foreground truncate w-[220px] sm:w-[260px] md:w-[340px]">{link.url}</div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => setEditingId(link.id)} className="p-2 hover:bg-muted rounded text-blue-600">تعديل</button>
-                    <button onClick={() => handleDelete(link.id)} className="p-2 hover:bg-muted rounded text-red-600">
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          ))}
+                    <div className="p-2 bg-background rounded-full border border-border">
+                      {(() => {
+                        const IconItem = AVAILABLE_ICONS.find(i => i.name === link.icon) || AVAILABLE_ICONS.find(i => i.name === 'Link')
+                        const Icon = IconItem?.icon || LinkIcon
+                        return <Icon size={20} />
+                      })()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold flex items-center gap-2">
+                        {link.platform}
+                        {!link.is_active && <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">غير نشط</span>}
+                      </div>
+                      <div className="text-sm text-muted-foreground truncate w-[220px] sm:w-[260px] md:w-[340px]">{link.url}</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => setEditingId(link.id)} className="p-2 hover:bg-muted rounded text-blue-600">تعديل</button>
+                      <button onClick={() => handleDelete(link.id)} className="p-2 hover:bg-muted rounded text-red-600">
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
 
-          {newLink && (
-            <div className="flex items-center gap-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
-              {renderForm(newLink, true)}
-            </div>
-          )}
+            {newLink && (
+              <div className="flex items-center gap-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
+                {renderForm(newLink, true)}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
