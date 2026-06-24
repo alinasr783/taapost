@@ -49,7 +49,7 @@ export default async function handler(req, res) {
     }
 
     for (const a of articles) {
-      const loc = a.slug ? `${base}/مقال/${encodeURIComponent(a.slug)}` : `${base}/post/${a.id}`
+      const loc = a.slug ? `${base}/post/${encodeURIComponent(a.slug)}` : `${base}/post/${a.id}`
       push(loc, a.updated_at || a.date || now, 'daily', '0.9')
     }
 

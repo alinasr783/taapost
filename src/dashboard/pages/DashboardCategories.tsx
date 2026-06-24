@@ -5,6 +5,8 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, horizontalListSortingStrategy } from '@dnd-kit/sortable'
 import { SortableItem } from '../components/SortableItem'
 import ImageUpload from '../components/ImageUpload'
+import IconPicker from '../../components/IconPicker'
+import DynamicIcon from '../../components/DynamicIcon'
 
 export default function DashboardCategories() {
   const [categories, setCategories] = useState<Category[]>([])
@@ -20,6 +22,7 @@ export default function DashboardCategories() {
     description: '',
     image: '',
     topics: '',
+    icon: '',
     order_index: 0,
     display_order: 0
   })
@@ -138,6 +141,7 @@ export default function DashboardCategories() {
         description: formData.description,
         image: formData.image,
         topics: formData.topics.split(',').map(t => t.trim()).filter(Boolean),
+        icon: formData.icon || null,
         order_index: formData.order_index,
         display_order: formData.display_order
       }
@@ -176,6 +180,7 @@ export default function DashboardCategories() {
         description: category.description || '',
         image: category.image || '',
         topics: category.topics ? category.topics.join(', ') : '',
+        icon: category.icon || '',
         order_index: category.order_index || 0,
         display_order: category.display_order || 0
       })
@@ -186,6 +191,7 @@ export default function DashboardCategories() {
         description: '',
         image: '',
         topics: '',
+        icon: '',
         order_index: 0,
         display_order: 0
       })
@@ -431,6 +437,28 @@ export default function DashboardCategories() {
                   value={formData.image}
                   onChange={(url) => setFormData({ ...formData, image: url })}
                   label="صورة القسم"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                  الأيقونة
+                  {formData.icon && (
+                    <span className="inline-flex items-center gap-1 mr-2 text-xs text-muted-foreground">
+                      <DynamicIcon name={formData.icon} size={14} />
+                      <span className="font-mono">{formData.icon}</span>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, icon: '' })}
+                        className="text-destructive hover:underline"
+                      >
+                        إزالة
+                      </button>
+                    </span>
+                  )}
+                </label>
+                <IconPicker
+                  value={formData.icon}
+                  onChange={(iconName) => setFormData({ ...formData, icon: iconName })}
                 />
               </div>
               <div className="flex justify-end gap-3 pt-4 border-t border-border">

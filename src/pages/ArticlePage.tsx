@@ -9,6 +9,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase, type Article } from '../lib/supabase'
 import { useTrackView } from '../hooks/useTrackView'
 import Seo from '../components/Seo'
+import ShareButton from '../components/ShareButton'
 
 function resolveImageSrc(input: string) {
   const src = input.trim()
@@ -29,7 +30,8 @@ export default function ArticlePage() {
   const { id, slug } = useParams()
   const navigate = useNavigate()
   const routeArticleId = id && /^\d+$/.test(id) ? Number(id) : null
-  const routeSlug = slug ? decodeURIComponent(slug) : ''
+  const routeSlugFromId = id && !/^\d+$/.test(id) ? decodeURIComponent(id) : ''
+  const routeSlug = slug ? decodeURIComponent(slug) : routeSlugFromId
 
   const articleQueryKey = useMemo(() => {
     if (routeArticleId) return { type: 'id' as const, value: routeArticleId }
@@ -44,7 +46,7 @@ export default function ArticlePage() {
 
       const baseQuery = supabase
         .from('articles')
-        .select('*, categories(name), authors(name, image, bio, role)')
+        .select('*, categories(name), authors(id, name, image, bio, role)')
 
       const { data, error } =
         articleQueryKey.type === 'id'
@@ -96,6 +98,13 @@ export default function ArticlePage() {
       // Normalize: replace non-breaking spaces with regular spaces for proper wrapping
       const processedHtml = doc.body.innerHTML.replace(/&nbsp;/gi, ' ').replace(/\u00A0/g, ' ')
 
+      // Replace YouTube markers with responsive iframes (after DOM processing so styles are preserved)
+      const youTubeMarkerRegex = /\{\{youtube:([a-zA-Z0-9_-]{11})\}\}/g
+      const contentHtml = processedHtml.replace(youTubeMarkerRegex, (_match: string, videoId: string) => {
+        const embedUrl = `https://www.youtube.com/embed/${videoId}`
+        return `<div class="ql-video-wrapper" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%;margin:1.5em 0;"><iframe class="ql-video" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" src="${embedUrl}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`
+      })
+
       const h2s = doc.querySelectorAll('h2')
       const toc: { id: string; text: string }[] = []
       h2s.forEach((h2, index) => {
@@ -112,7 +121,7 @@ export default function ArticlePage() {
         ...(data as Article),
         category: (Array.isArray(data.categories) ? data.categories[0]?.name : data.categories?.name) || '',
         authors: authorData,
-        contentHtml: processedHtml,
+        contentHtml: contentHtml,
       } as Article
 
       const { data: relatedData } = await supabase
@@ -136,12 +145,23 @@ export default function ArticlePage() {
     retry: 1,
   })
 
+  const buildArticleUrl = (article: Article | null) => {
+    if (!article) return ''
+    if (article.slug) return `/post/${encodeURIComponent(article.slug)}`
+    return `/post/${article.id}`
+  }
+
   useEffect(() => {
     const redirectToId = articleQuery.data?.redirectToId
+    const article = articleQuery.data?.article
     if (redirectToId) {
-      navigate(`/post/${redirectToId}`, { replace: true })
+      if (article?.slug) {
+        navigate(`/post/${encodeURIComponent(article.slug)}`, { replace: true })
+      } else {
+        navigate(`/post/${redirectToId}`, { replace: true })
+      }
     }
-  }, [articleQuery.data?.redirectToId, navigate])
+  }, [articleQuery.data?.redirectToId, articleQuery.data?.article, navigate])
 
   const article = articleQuery.data?.article ?? null
   const relatedArticles = articleQuery.data?.related ?? []
@@ -207,7 +227,7 @@ export default function ArticlePage() {
       <Seo
         title={article.title}
         description={article.excerpt || article.title}
-        canonicalPath={article.slug ? `/مقال/${encodeURIComponent(article.slug)}` : `/post/${article.id}`}
+        canonicalPath={article.slug ? `/post/${encodeURIComponent(article.slug)}` : `/post/${article.id}`}
         ogType="article"
         image={article.image}
         jsonLd={{
@@ -377,6 +397,28 @@ export default function ArticlePage() {
             }
             .dark .article-body pre { background: hsl(0 0% 15%); }
             .article-body iframe { max-width: 100%; }
+            .article-body .ql-video-wrapper {
+              position: relative !important;
+              padding-bottom: 56.25% !important;
+              height: 0 !important;
+              overflow: hidden !important;
+              max-width: 100% !important;
+              margin: 1.5em 0 !important;
+            }
+            .article-body .ql-video-wrapper .ql-video {
+              position: absolute !important;
+              top: 0 !important;
+              left: 0 !important;
+              width: 100% !important;
+              height: 100% !important;
+              border: 0 !important;
+            }
+            .article-body .ql-video {
+              max-width: 100%;
+              aspect-ratio: 16 / 9;
+              width: 100%;
+              height: auto;
+            }
             .article-body figure { max-width: 100%; margin: 1.5em 0; }
             .article-body figcaption { font-size: 0.875rem; opacity: 0.7; margin-top: 0.5em; text-align: center; }
           `}</style>
@@ -393,7 +435,10 @@ export default function ArticlePage() {
           </section>
 
           {article.authors && article.authors.name && (
-            <div className="rounded-[5px] border border-border/40 bg-card/50 p-6 backdrop-blur-sm flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-right">
+            <Link
+              to={`/author/${article.authors.id}`}
+              className="rounded-[5px] border border-border/40 bg-card/50 p-6 backdrop-blur-sm flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-right hover:border-primary/30 hover:shadow-md transition-all"
+            >
               <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-primary/20 shrink-0">
                 {article.authors.image ? (
                   <img src={article.authors.image} alt={article.authors.name} className="w-full h-full object-cover" />
@@ -405,13 +450,21 @@ export default function ArticlePage() {
               </div>
               <div className="flex-1 space-y-2">
                 <div className="flex flex-col md:flex-row items-center md:items-end gap-2 justify-center md:justify-start">
-                  <h3 className="text-xl font-bold text-foreground">{article.authors.name}</h3>
+                  <h3 className="text-xl font-bold text-foreground hover:text-primary transition-colors">{article.authors.name}</h3>
                   {article.authors.role && <span className="text-sm text-primary bg-primary/10 px-2 py-0.5 rounded-full">{article.authors.role}</span>}
                 </div>
                 <p className="text-muted-foreground">{article.authors.bio}</p>
               </div>
-            </div>
+            </Link>
           )}
+
+          <div className="border-t border-border/40 pt-8 mt-8">
+            <ShareButton
+              url={`${window.location.origin}${buildArticleUrl(article)}`}
+              title={article.title}
+              description={article.excerpt}
+            />
+          </div>
         </article>
       </div>
 
@@ -427,7 +480,7 @@ export default function ArticlePage() {
               {relatedArticles.map((related) => (
                 <Link 
                   key={related.id} 
-                  to={`/post/${related.id}`}
+                  to={related.slug ? `/post/${encodeURIComponent(related.slug)}` : `/post/${related.id}`}
                   className="relative flex min-w-[360px] max-w-[480px] flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md group"
                 >
                   <div className="relative h-56 w-full">

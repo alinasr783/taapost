@@ -237,7 +237,7 @@ export default function Home() {
                         {list.map((article) => (
                            <div key={article.id} 
                                 onClick={() =>
-                                  navigate(article.slug ? `/مقال/${encodeURIComponent(article.slug)}` : `/post/${article.id}`)
+                                  navigate(article.slug ? `/post/${encodeURIComponent(article.slug)}` : `/post/${article.id}`)
                                 }
                                 className="group cursor-pointer space-y-3"
                            >
@@ -312,7 +312,7 @@ export default function Home() {
                       key={article.id}
                       type="button"
                       onClick={() =>
-                        navigate(article.slug ? `/مقال/${encodeURIComponent(article.slug)}` : `/post/${article.id}`)
+                        navigate(article.slug ? `/post/${encodeURIComponent(article.slug)}` : `/post/${article.id}`)
                       }
                       className="relative flex min-w-[360px] max-w-[480px] flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md"
                     >

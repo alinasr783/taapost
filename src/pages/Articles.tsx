@@ -98,7 +98,7 @@ export default function Articles() {
         {list.map((i) => (
           <Link
             key={i.id}
-            to={i.slug ? `/مقال/${encodeURIComponent(i.slug)}` : `/post/${i.id}`}
+            to={i.slug ? `/post/${encodeURIComponent(i.slug)}` : `/post/${i.id}`}
             className="relative flex flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md"
           >
             <div className="relative h-52 w-full">

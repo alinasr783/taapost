@@ -36,10 +36,11 @@ export default function DashboardArticles() {
 
   const fetchData = async () => {
     setLoading(true)
-    const [articlesRes, categoriesRes] = await Promise.all([
+      const [articlesRes, categoriesRes] = await Promise.all([
       supabase.from('articles').select('*, categories(*)').order('created_at', { ascending: false }),
       supabase.from('categories').select('*')
     ])
+    // Articles already have slug from the select * query
 
     if (articlesRes.data) setArticles(articlesRes.data)
     if (categoriesRes.data) setCategories(categoriesRes.data)
@@ -148,80 +149,8 @@ export default function DashboardArticles() {
                   </div>
 
                   <div className="flex shrink-0 items-center gap-1">
-                    <a
-                      href={`/post/${article.id}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded transition-colors"
-                      title="عرض"
-                    >
-                      <Eye size={18} />
-                    </a>
-                    {canEdit && (
-                      <button
-                        onClick={() => {
-                          setEditingArticle(article)
-                          setIsFormOpen(true)
-                        }}
-                        className="p-2 text-muted-foreground hover:text-green-600 hover:bg-green-50 rounded transition-colors"
-                        title="تعديل"
-                      >
-                        <Edit size={18} />
-                      </button>
-                    )}
-                    {canDelete && (
-                      <button
-                        onClick={() => handleDelete(article.id)}
-                        className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
-                        title="حذف"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-          {filteredArticles.length === 0 && (
-            <div className="p-8 text-center text-muted-foreground">لا توجد مقالات لعرضها</div>
-          )}
-        </div>
-
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-right">
-            <thead className="bg-muted/50 text-muted-foreground font-medium">
-              <tr>
-                <th className="p-4">العنوان</th>
-                <th className="p-4">القسم</th>
-                <th className="p-4">التاريخ</th>
-                <th className="p-4">الإجراءات</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filteredArticles.map((article) => {
-                const canEdit = user && hasPermission(user, permissions, article.category_id, 'edit')
-                const canDelete = user && hasPermission(user, permissions, article.category_id, 'delete')
-
-                return (
-                  <tr key={article.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="p-4 font-medium text-foreground">
-                      {article.title}
-                      {article.is_exclusive && (
-                        <span className="mr-2 inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/10">
-                          حصري
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-4">
-                      <span className="bg-primary/10 text-primary px-2 py-1 rounded text-sm">
-                        {categories.find(c => c.id === article.category_id)?.name || article.category_id}
-                      </span>
-                    </td>
-                    <td className="p-4 text-muted-foreground">{new Date(article.created_at || article.date).toLocaleDateString('ar-EG')}</td>
-                    <td className="p-4 flex gap-2">
                       <a
-                        href={`/post/${article.id}`}
+                        href={article.slug ? `/post/${encodeURIComponent(article.slug)}` : `/post/${article.id}`}
                         target="_blank"
                         rel="noreferrer"
                         className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded transition-colors"
@@ -250,20 +179,92 @@ export default function DashboardArticles() {
                           <Trash2 size={18} />
                         </button>
                       )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+            {filteredArticles.length === 0 && (
+              <div className="p-8 text-center text-muted-foreground">لا توجد مقالات لعرضها</div>
+            )}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-right">
+              <thead className="bg-muted/50 text-muted-foreground font-medium">
+                <tr>
+                  <th className="p-4">العنوان</th>
+                  <th className="p-4">القسم</th>
+                  <th className="p-4">التاريخ</th>
+                  <th className="p-4">الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {filteredArticles.map((article) => {
+                  const canEdit = user && hasPermission(user, permissions, article.category_id, 'edit')
+                  const canDelete = user && hasPermission(user, permissions, article.category_id, 'delete')
+
+                  return (
+                    <tr key={article.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="p-4 font-medium text-foreground">
+                        {article.title}
+                        {article.is_exclusive && (
+                          <span className="mr-2 inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/10">
+                            حصري
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        <span className="bg-primary/10 text-primary px-2 py-1 rounded text-sm">
+                          {categories.find(c => c.id === article.category_id)?.name || article.category_id}
+                        </span>
+                      </td>
+                      <td className="p-4 text-muted-foreground">{new Date(article.created_at || article.date).toLocaleDateString('ar-EG')}</td>
+                      <td className="p-4 flex gap-2">
+                        <a
+                          href={`/post/${article.id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded transition-colors"
+                          title="عرض"
+                        >
+                          <Eye size={18} />
+                        </a>
+                        {canEdit && (
+                          <button
+                            onClick={() => {
+                              setEditingArticle(article)
+                              setIsFormOpen(true)
+                            }}
+                            className="p-2 text-muted-foreground hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                            title="تعديل"
+                          >
+                            <Edit size={18} />
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button
+                            onClick={() => handleDelete(article.id)}
+                            className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
+                            title="حذف"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+                {filteredArticles.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="p-8 text-center text-muted-foreground">
+                      لا توجد مقالات لعرضها
                     </td>
                   </tr>
-                )
-              })}
-              {filteredArticles.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="p-8 text-center text-muted-foreground">
-                    لا توجد مقالات لعرضها
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                )}
+              </tbody>
+            </table>
+          </div>
       </div>
 
       {isFormOpen && (

@@ -35,10 +35,10 @@ export default function CategoryPage() {
         return { category: null, articles: [], redirectToId: null as number | null }
       }
 
-      type CategoryArticle = Pick<Article, 'id' | 'title' | 'excerpt' | 'image' | 'date' | 'is_exclusive'>
+      type CategoryArticle = Pick<Article, 'id' | 'slug' | 'title' | 'excerpt' | 'image' | 'date' | 'is_exclusive'>
       const { data: artData, error: artError } = await supabase
         .from('articles')
-        .select('id,title,excerpt,image,date,is_exclusive')
+        .select('id,slug,title,excerpt,image,date,is_exclusive')
         .eq('category_id', catData.id)
         .order('date', { ascending: false })
         .limit(60)
@@ -155,7 +155,7 @@ export default function CategoryPage() {
             {articles.map((i) => (
               <button
                 key={i.id}
-                onClick={() => navigate(`/post/${i.id}`)}
+                onClick={() => navigate(i.slug ? `/post/${encodeURIComponent(i.slug)}` : `/post/${i.id}`)}
                 className="relative flex flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md hover:border-white/20 transition-colors w-full"
               >
                 <div className="relative h-56 w-full">

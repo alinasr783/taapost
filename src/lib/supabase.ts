@@ -20,6 +20,7 @@ export type Category = {
   description: string
   topics: string[]
   image: string
+  icon?: string
   order_index?: number
   display_order?: number
 }
@@ -86,6 +87,10 @@ export type Author = {
   image: string
   bio: string
   role?: string
+  banner?: string
+  social_links?: Record<string, string>
+  website?: string
+  slug?: string
 }
 
 export type HomepageSection = {

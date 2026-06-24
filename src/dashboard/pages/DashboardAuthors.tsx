@@ -40,6 +40,7 @@ export default function DashboardAuthors() {
           .update({
             name: formData.name,
             image: formData.image,
+            banner: formData.banner,
             bio: formData.bio,
             role: formData.role
           })
@@ -52,6 +53,7 @@ export default function DashboardAuthors() {
           .insert([{
             name: formData.name,
             image: formData.image,
+            banner: formData.banner,
             bio: formData.bio,
             role: formData.role
           }])
@@ -204,11 +206,16 @@ export default function DashboardAuthors() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <ImageUpload
                   value={formData.image || ''}
                   onChange={(url) => setFormData({ ...formData, image: url })}
                   label="صورة الكاتب"
+                />
+                <ImageUpload
+                  value={formData.banner || ''}
+                  onChange={(url) => setFormData({ ...formData, banner: url })}
+                  label="صورة الغلاف (بانر)"
                 />
               </div>
 

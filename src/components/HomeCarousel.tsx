@@ -6,6 +6,10 @@ type Props = {
   articles: Article[]
 }
 
+function articleUrl(article: Article) {
+  return article.slug ? `/post/${encodeURIComponent(article.slug)}` : `/post/${article.id}`
+}
+
 export default function HomeCarousel({ articles }: Props) {
   const navigate = useNavigate()
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -77,7 +81,7 @@ export default function HomeCarousel({ articles }: Props) {
           <div 
             key={activeSlide.id} 
             className="relative w-full flex-shrink-0 snap-center h-64 sm:h-80 md:h-[380px] lg:h-[430px] cursor-pointer"
-            onClick={() => navigate(`/post/${activeSlide.id}`)}
+            onClick={() => navigate(articleUrl(activeSlide))}
           >
             <img
               src={activeSlide.image}
@@ -129,7 +133,7 @@ export default function HomeCarousel({ articles }: Props) {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation()
-                    navigate(`/post/${articles[carouselIndex].id}`)
+                    navigate(articleUrl(articles[carouselIndex]))
                   }}
                   className="rounded-[5px] border border-white/40 bg-black/40 px-5 py-2.5 text-xs font-semibold text-white shadow-sm backdrop-blur md:text-sm"
                 >
@@ -189,7 +193,7 @@ export default function HomeCarousel({ articles }: Props) {
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  navigate(`/post/${articles[carouselIndex].id}`)
+                  navigate(articleUrl(articles[carouselIndex]))
                 }}
                 className="rounded-[5px] border border-white/40 bg-black/40 px-4 py-2 text-xs font-semibold text-white shadow-sm backdrop-blur"
               >
