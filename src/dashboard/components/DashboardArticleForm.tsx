@@ -10,11 +10,13 @@ import Quill from 'quill'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/atom-one-dark.min.css'
 
-const DirectionStyle = Quill.import('attributors/style/direction')
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const DirectionStyle = Quill.import('attributors/style/direction') as any
 DirectionStyle.whitelist = ['ltr', 'rtl']
 Quill.register(DirectionStyle, true)
 
-const AlignStyle = Quill.import('attributors/style/align')
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const AlignStyle = Quill.import('attributors/style/align') as any
 AlignStyle.whitelist = ['right', 'center', 'justify']
 Quill.register(AlignStyle, true)
 
