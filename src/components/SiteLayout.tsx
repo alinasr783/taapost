@@ -202,7 +202,7 @@ export default function SiteLayout({ children }: Props) {
 
   return (
     <SiteSettingsProvider value={mergedSettings}>
-      <div className="min-h-dvh bg-background text-foreground flex flex-col pb-24 md:pb-0">
+      <div className="min-h-dvh bg-background text-foreground flex flex-col">
         <header className="border-b border-border/60 bg-background/80 backdrop-blur">
           <div className="container flex items-center justify-between gap-3 py-4">
             <Link
@@ -417,36 +417,6 @@ export default function SiteLayout({ children }: Props) {
           </aside>
         </div>
         <main className="flex-1">{children}</main>
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 pb-[env(safe-area-inset-bottom)] pt-1">
-          <div className="container flex justify-center">
-            <div className="flex w-full max-w-xs items-center justify-between rounded-[50px] border border-border/60 bg-background/70 px-4 py-2 text-[10px] text-muted-foreground shadow-lg backdrop-blur-[2px] md:text-xs">
-              <button
-                type="button"
-                onClick={() => navigate('/')}
-                className={`flex flex-1 flex-col items-center gap-1 rounded-[5px] px-2 py-1 transition-colors ${location.pathname === '/' ? 'text-primary font-bold' : 'hover:bg-white/5 hover:text-primary'}`}
-              >
-                <Home className={`h-4 w-4 ${location.pathname === '/' ? 'fill-primary/20' : ''}`} />
-                <span>رئيسية</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/categories')}
-                className={`flex flex-1 flex-col items-center gap-1 rounded-[5px] px-2 py-1 transition-colors ${location.pathname.includes('/categories') || location.pathname.includes('/category') || location.pathname.includes('/قسم') ? 'text-primary font-bold' : 'hover:bg-white/5 hover:text-primary'}`}
-              >
-                <LayoutGrid className={`h-4 w-4 ${location.pathname.includes('/categories') || location.pathname.includes('/category') || location.pathname.includes('/قسم') ? 'fill-primary/20' : ''}`} />
-                <span>أقسام</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/posts')}
-                className={`flex flex-1 flex-col items-center gap-1 rounded-[5px] px-2 py-1 transition-colors ${location.pathname.includes('/posts') || location.pathname.includes('/post') || location.pathname.includes('/مقال') ? 'text-primary font-bold' : 'hover:bg-white/5 hover:text-primary'}`}
-              >
-                <FileText className={`h-4 w-4 ${location.pathname.includes('/posts') || location.pathname.includes('/post') || location.pathname.includes('/مقال') ? 'fill-primary/20' : ''}`} />
-                <span>مقالات</span>
-              </button>
-            </div>
-          </div>
-        </nav>
         <Footer siteSettings={siteSettings} />
       </div>
     </SiteSettingsProvider>

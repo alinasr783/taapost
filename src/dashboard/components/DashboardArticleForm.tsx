@@ -6,6 +6,17 @@ import ImageUpload from './ImageUpload'
 import Switch from './Switch'
 import ReactQuill from 'react-quill-new'
 import 'react-quill-new/dist/quill.snow.css'
+import Quill from 'quill'
+import hljs from 'highlight.js'
+import 'highlight.js/styles/atom-one-dark.min.css'
+
+const DirectionStyle = Quill.import('attributors/style/direction')
+DirectionStyle.whitelist = ['ltr', 'rtl']
+Quill.register(DirectionStyle, true)
+
+const AlignStyle = Quill.import('attributors/style/align')
+AlignStyle.whitelist = ['right', 'center', 'justify']
+Quill.register(AlignStyle, true)
 
 type Props = {
   article: Article | null
@@ -404,12 +415,23 @@ export default function DashboardArticleForm({ article, categories, user, permis
                 value={formData.content}
                 onChange={(value: string) => setFormData({ ...formData, content: value })}
                 className="h-64 mb-12"
+                placeholder="اكتب محتوى المقال هنا..."
                 modules={{
+                  syntax: { hljs },
                   toolbar: {
                     container: [
-                      [{ 'header': [1, 2, 3, false] }],
-                      ['bold', 'italic', 'underline', 'strike', 'blockquote'],
-                      [{'list': 'ordered'}, {'list': 'bullet'}, {'indent': '-1'}, {'indent': '+1'}],
+                      [{ font: [] }],
+                      [{ size: ['small', false, 'large', 'huge'] }],
+                      [{ header: [1, 2, 3, 4, 5, 6, false] }],
+                      ['bold', 'italic', 'underline', 'strike'],
+                      [{ script: 'sub' }, { script: 'super' }],
+                      [{ color: [] }],
+                      [{ background: [] }],
+                      [{ list: 'ordered' }, { list: 'bullet' }],
+                      [{ indent: '-1' }, { indent: '+1' }],
+                      [{ direction: 'rtl' }],
+                      [{ align: [] }],
+                      ['blockquote', 'code-block'],
                       ['link', 'image', 'video'],
                       ['clean']
                     ],
@@ -418,6 +440,17 @@ export default function DashboardArticleForm({ article, categories, user, permis
                     }
                   }
                 }}
+                formats={[
+                  'font', 'size',
+                  'header',
+                  'bold', 'italic', 'underline', 'strike',
+                  'script',
+                  'color', 'background',
+                  'list', 'bullet', 'indent',
+                  'direction', 'align',
+                  'blockquote', 'code-block', 'code-token',
+                  'link', 'image', 'video'
+                ]}
               />
             </div>
           </div>

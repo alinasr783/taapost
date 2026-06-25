@@ -1,9 +1,12 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowRight,
   Calendar,
   Folder,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase, type Article } from '../lib/supabase'
@@ -168,6 +171,47 @@ export default function ArticlePage() {
   const toc = articleQuery.data?.toc ?? []
   useTrackView(article?.id || 0)
 
+  // Font size control
+  const [fontSize, setFontSize] = useState(() => {
+    try {
+      const saved = localStorage.getItem('article_font_size')
+      return saved ? Number(saved) : 1.125
+    } catch {
+      return 1.125
+    }
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('article_font_size', String(fontSize))
+    } catch { /* ignore */ }
+  }, [fontSize])
+
+  // Author's other articles
+  const [authorArticlesShowCount, setAuthorArticlesShowCount] = useState(6)
+  const authorId = article?.authors?.id
+
+  const authorArticlesQuery = useQuery({
+    queryKey: ['author_articles', authorId],
+    queryFn: async () => {
+      if (!authorId) return [] as Article[]
+      const { data, error } = await supabase
+        .from('articles')
+        .select('id, slug, title, image, date, excerpt, is_exclusive')
+        .eq('author_id', authorId)
+        .order('date', { ascending: false })
+        .limit(100)
+      if (error) throw error
+      return (data ?? []) as Article[]
+    },
+    enabled: Boolean(authorId),
+    staleTime: 60_000,
+  })
+
+  const authorArticles = authorArticlesQuery.data ?? []
+  const visibleAuthorArticles = authorArticles.filter(a => a.id !== article?.id).slice(0, authorArticlesShowCount)
+  const hasMoreAuthorArticles = authorArticles.filter(a => a.id !== article?.id).length > authorArticlesShowCount
+
   const handleScrollTo = (id: string) => {
     const element = document.getElementById(id)
     if (element) {
@@ -327,7 +371,6 @@ export default function ArticlePage() {
             }
             .article-body {
               overflow: hidden !important;
-              font-size: 1.125rem;
               line-height: 2;
               color: inherit;
               direction: rtl;
@@ -424,12 +467,41 @@ export default function ArticlePage() {
           `}</style>
 
           <section className="rounded-[5px] border border-border/40 bg-card/30 backdrop-blur-sm overflow-hidden relative">
-            <div className="border-b border-border/40 px-4 sm:px-6 md:px-10 py-3">
-              <h2 className="text-lg font-bold text-foreground">نصوص المقال</h2>
+            <div className="border-b border-border/40 px-4 sm:px-6 md:px-10 py-3 flex items-center justify-between">
+              <div />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setFontSize(prev => Math.min(prev + 0.125, 2.5))}
+                  className="inline-flex items-center gap-1 rounded-[5px] border border-border/60 bg-background/60 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all"
+                  title="تكبير الخط"
+                >
+                  <ZoomIn className="h-3.5 w-3.5" />
+                  <span>تكبير</span>
+                </button>
+                <button
+                  onClick={() => setFontSize(prev => Math.max(prev - 0.125, 0.75))}
+                  className="inline-flex items-center gap-1 rounded-[5px] border border-border/60 bg-background/60 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all"
+                  title="تصغير الخط"
+                >
+                  <ZoomOut className="h-3.5 w-3.5" />
+                  <span>تصغير</span>
+                </button>
+                {fontSize !== 1.125 && (
+                  <button
+                    onClick={() => setFontSize(1.125)}
+                    className="inline-flex items-center gap-1 rounded-[5px] border border-border/60 bg-background/60 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all"
+                    title="إعادة ضبط الخط"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    <span>إعادة ضبط</span>
+                  </button>
+                )}
+              </div>
             </div>
             <div
               className="article-body w-full p-4 sm:p-6 md:p-10"
               lang="ar"
+              style={{ fontSize: `${fontSize}rem` }}
               dangerouslySetInnerHTML={{ __html: article.contentHtml || '' }}
             />
           </section>
@@ -456,6 +528,70 @@ export default function ArticlePage() {
                 <p className="text-muted-foreground">{article.authors.bio}</p>
               </div>
             </Link>
+          )}
+
+          {/* Read more from same author */}
+          {authorArticles.length > 1 && article.authors && (
+            <section className="rounded-[5px] border border-border/40 bg-card/30 backdrop-blur-sm overflow-hidden">
+              <div className="border-b border-border/40 px-4 sm:px-6 md:px-10 py-3">
+                <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                  <span className="w-1 h-6 bg-primary rounded-full" />
+                  اقرأ لنفس الكاتب
+                </h2>
+              </div>
+              <div className="p-4 sm:p-6 md:p-10">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {visibleAuthorArticles.map((authArticle) => (
+                    <Link
+                      key={authArticle.id}
+                      to={authArticle.slug ? `/post/${encodeURIComponent(authArticle.slug)}` : `/post/${authArticle.id}`}
+                      className="group rounded-[5px] border border-border/40 bg-background/50 overflow-hidden hover:border-primary/30 hover:shadow-md transition-all"
+                    >
+                      <div className="relative h-40 w-full overflow-hidden">
+                        <img
+                          src={authArticle.image || ''}
+                          alt={authArticle.title}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          loading="lazy"
+                          onError={(e) => { e.currentTarget.style.display = 'none' }}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+                        {authArticle.is_exclusive && (
+                          <div className="absolute right-2 top-2 rounded-[5px] border border-white/30 bg-red-600/80 px-2 py-1 text-[10px] text-white/90 backdrop-blur font-bold">
+                            حصرياً
+                          </div>
+                        )}
+                        <div className="absolute inset-x-2 bottom-2">
+                          <div className="line-clamp-2 text-sm font-semibold text-white">
+                            {authArticle.title}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-3">
+                        <div className="line-clamp-2 text-xs text-muted-foreground">
+                          {authArticle.excerpt}
+                        </div>
+                        {authArticle.date && (
+                          <div className="mt-2 text-[10px] text-muted-foreground/70">
+                            {new Date(authArticle.date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}
+                          </div>
+                        )}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+                {hasMoreAuthorArticles && (
+                  <div className="mt-6 text-center">
+                    <button
+                      onClick={() => setAuthorArticlesShowCount(prev => prev + 6)}
+                      className="inline-flex items-center gap-2 rounded-[5px] border border-primary/30 bg-primary/5 px-6 py-2.5 text-sm font-medium text-primary hover:bg-primary hover:text-primary-foreground transition-all"
+                    >
+                      عرض المزيد
+                    </button>
+                  </div>
+                )}
+              </div>
+            </section>
           )}
 
           <div className="border-t border-border/40 pt-8 mt-8">

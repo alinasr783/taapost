@@ -121,3 +121,94 @@ body {
   width: 100%;
   height: auto;
 }
+
+/* RTL Editor Styles */
+.ql-editor {
+  direction: rtl;
+  text-align: right;
+  font-family: Amiri, serif;
+  line-height: 1.8;
+}
+
+.ql-editor.ql-blank::before {
+  right: 1em;
+  left: auto;
+  font-style: normal;
+  color: hsl(var(--muted-foreground));
+}
+
+/* RTL Toolbar */
+.ql-toolbar.ql-snow {
+  direction: rtl;
+}
+
+.ql-snow .ql-picker {
+  direction: rtl;
+}
+
+.ql-snow .ql-picker-label {
+  padding-right: 0;
+  padding-left: 0;
+}
+
+/* RTL Lists */
+.ql-editor ol, .ql-editor ul {
+  padding-right: 1.5em;
+  padding-left: 0;
+}
+
+.ql-editor li {
+  padding-right: 0;
+}
+
+/* Code Blocks RTL Fix */
+.ql-editor pre.ql-syntax {
+  direction: ltr;
+  text-align: left;
+  font-family: 'Fira Code', 'Consolas', 'Monaco', monospace;
+  font-size: 14px;
+  background: hsl(0 0% 95%);
+  border-radius: 6px;
+  padding: 1em;
+}
+
+.dark .ql-editor pre.ql-syntax {
+  background: hsl(0 0% 15%);
+}
+
+/* Syntax Highlighting Override */
+.ql-editor pre.ql-syntax .hljs-keyword,
+.ql-editor pre.ql-syntax .hljs-selector-tag,
+.ql-editor pre.ql-syntax .hljs-built_in {
+  color: hsl(28 30% 45%);
+}
+
+.ql-editor pre.ql-syntax .hljs-string,
+.ql-editor pre.ql-syntax .hljs-attr {
+  color: hsl(120 40% 40%);
+}
+
+.ql-editor pre.ql-syntax .hljs-comment {
+  color: hsl(0 0% 60%);
+  font-style: italic;
+}
+
+/* Font Size Classes */
+.ql-editor .ql-size-small { font-size: 0.75em; }
+.ql-editor .ql-size-large { font-size: 1.5em; }
+.ql-editor .ql-size-huge { font-size: 2.5em; }
+
+/* Blockquote RTL */
+.ql-editor blockquote {
+  border-right: 4px solid hsl(var(--primary));
+  border-left: none;
+  padding-right: 1em;
+  padding-left: 0;
+  margin-right: 0;
+  margin-left: auto;
+}
+
+/* Color Picker Z-index fix */
+.ql-snow .ql-picker-options {
+  z-index: 100;
+}

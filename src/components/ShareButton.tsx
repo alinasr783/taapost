@@ -63,8 +63,6 @@ function CopyButton({ url }: { url: string }) {
 }
 
 export default function ShareButton({ url, title, description: _description }: Props) {
-  const [isOpen, setIsOpen] = useState(false)
-
   const shareButtons = [
     {
       Button: FacebookShareButton,
@@ -105,48 +103,30 @@ export default function ShareButton({ url, title, description: _description }: P
   ]
 
   return (
-    <div className="relative">
-      {!isOpen ? (
-        <button
-          onClick={() => setIsOpen(true)}
-          className="inline-flex items-center gap-2 rounded-[5px] border border-border/60 bg-background px-4 py-2.5 text-sm font-medium text-muted-foreground shadow-sm hover:text-primary hover:border-primary/40 hover:shadow-md transition-all duration-200"
-        >
-          <Share2 className="h-4 w-4" />
-          <span>مشاركة المقال</span>
-        </button>
-      ) : (
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-bold text-foreground">مشاركة عبر</span>
-            <button
-              onClick={() => setIsOpen(false)}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              إغلاق ✕
-            </button>
-          </div>
-          <div className="flex flex-wrap items-center gap-4">
-            {shareButtons.map(({ Button, Icon, label }) => (
-              <Button
-                key={label}
-                url={url}
-                title={title}
-                {...(['TwitterShareButton', 'XIcon'].includes(label === 'تويتر' ? 'TwitterShareButton' : '') ? {} : {})}
-              >
-                <div className="flex flex-col items-center gap-1.5 group">
-                  <div className="w-11 h-11 rounded-[5px] flex items-center justify-center transition-all duration-200 border border-border/40 shadow-sm bg-background group-hover:-translate-y-0.5 group-hover:shadow-md">
-                    <Icon size={36} round />
-                  </div>
-                  <span className="text-[10px] text-muted-foreground group-hover:text-foreground transition-colors">
-                    {label}
-                  </span>
-                </div>
-              </Button>
-            ))}
-            <CopyButton url={url} />
-          </div>
-        </div>
-      )}
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <Share2 className="h-4 w-4 text-primary" />
+        <span className="text-sm font-bold text-foreground">مشاركة المقال</span>
+      </div>
+      <div className="flex flex-wrap items-center gap-4">
+        {shareButtons.map(({ Button, Icon, label }) => (
+          <Button
+            key={label}
+            url={url}
+            title={title}
+          >
+            <div className="flex flex-col items-center gap-1.5 group">
+              <div className="w-11 h-11 rounded-[5px] flex items-center justify-center transition-all duration-200 border border-border/40 shadow-sm bg-background group-hover:-translate-y-0.5 group-hover:shadow-md">
+                <Icon size={36} round />
+              </div>
+              <span className="text-[10px] text-muted-foreground group-hover:text-foreground transition-colors">
+                {label}
+              </span>
+            </div>
+          </Button>
+        ))}
+        <CopyButton url={url} />
+      </div>
     </div>
   )
 }
