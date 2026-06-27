@@ -418,7 +418,6 @@ export default function DashboardArticles() {
         message="هل أنت متأكد من حذف هذا المقال؟ لا يمكن التراجع عن هذا الإجراء."
         confirmLabel="حذف"
         cancelLabel="إلغاء"
-        variant="danger"
         onConfirm={handleDelete}
         onCancel={() => { setConfirmOpen(false); setDeleteTarget(null) }}
       />

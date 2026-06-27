@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight, Save, Video, Check, AlertCircle, Loader2 } from 'lucide-react'
-import { supabase, type Article, type Category, type User, type UserPermission, type Author } from '../../lib/supabase'
+import { supabase, type Category, type User, type UserPermission, type Author } from '../../lib/supabase'
 import { hasPermission } from '../utils'
 import ImageUpload from '../components/ImageUpload'
 import Switch from '../components/Switch'

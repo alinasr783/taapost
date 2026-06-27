@@ -3,10 +3,9 @@ import {
   BookOpen, LayoutDashboard, FileText, FolderTree, PenTool, Users,
   Settings, LayoutTemplate, Eye, Plus, Edit, Trash2, Search, Save,
   ChevronDown, ChevronUp, GripVertical, Image, Share2, Globe, Shield,
-  ArrowLeft, Lock, Palette, Type, Hash, MessageCircle, Send, Mail,
-  Youtube, Facebook, Twitter, ToggleLeft, ListOrdered, BarChart3,
-  PieChart, LineChart, Calendar, Download, Upload, Star, AlertTriangle,
-  CheckCircle2, Info, Lightbulb, Zap
+  Lock, Palette, ListOrdered, BarChart3,
+  PieChart, LineChart, Calendar, AlertTriangle,
+  CheckCircle2, Info, Lightbulb, Zap, Download
 } from 'lucide-react'
 
 type SectionId =

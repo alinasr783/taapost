@@ -20,7 +20,7 @@ export default function DashboardCategories() {
   const [isSaving, setIsSaving] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
-  const [orderSnapshot, setOrderSnapshot] = useState<Category[]>([])
+  const [, setOrderSnapshot] = useState<Category[]>([])
   
   // Form State
   const [formData, setFormData] = useState({
@@ -580,7 +580,6 @@ export default function DashboardCategories() {
         message="هل أنت متأكد من حذف هذا القسم؟ سيتم حذف جميع المقالات المرتبطة به!"
         confirmLabel="حذف"
         cancelLabel="إلغاء"
-        variant="danger"
         onConfirm={handleDelete}
         onCancel={() => { setConfirmOpen(false); setDeleteTarget(null) }}
       />

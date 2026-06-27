@@ -469,7 +469,6 @@ export default function DashboardUsers() {
         message="هل أنت متأكد من حذف هذا المستخدم؟"
         confirmLabel="حذف"
         cancelLabel="إلغاء"
-        variant="danger"
         onConfirm={handleDelete}
         onCancel={() => { setConfirmOpen(false); setDeleteTarget(null) }}
       />
