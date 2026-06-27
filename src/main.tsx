@@ -29,10 +29,11 @@ if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dar
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 60_000,
+      staleTime: 5 * 60_000,
       gcTime: 30 * 60_000,
       refetchOnWindowFocus: false,
       retry: 1,
+      refetchOnReconnect: false,
     },
   },
 })
@@ -44,3 +45,9 @@ createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </StrictMode>,
 )
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  })
+}

@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react'
 import { Plus, Edit, Trash2, Shield, Save, X } from 'lucide-react'
 import { supabase, type User, type Category, type UserPermission } from '../../lib/supabase'
 import Switch from '../components/Switch'
+import ConfirmDialog from '../components/ConfirmDialog'
+import { useToast } from '../components/Toast'
 
 export default function DashboardUsers() {
+  const { showToast } = useToast()
   const [users, setUsers] = useState<User[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -11,6 +14,8 @@ export default function DashboardUsers() {
   const [isPermModalOpen, setIsPermModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [userPermissions, setUserPermissions] = useState<UserPermission[]>([])
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
 
   // User Form State
   const [formData, setFormData] = useState({
@@ -36,15 +41,23 @@ export default function DashboardUsers() {
     if (data) setCategories(data)
   }
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا المستخدم؟')) return
+  const openDeleteConfirm = (id: number) => {
+    setDeleteTarget(id)
+    setConfirmOpen(true)
+  }
+
+  const handleDelete = async () => {
+    if (deleteTarget === null) return
     
-    const { error } = await supabase.from('users').delete().eq('id', id)
+    const { error } = await supabase.from('users').delete().eq('id', deleteTarget)
     if (error) {
-      alert('حدث خطأ أثناء الحذف')
+      showToast('حدث خطأ أثناء الحذف', 'error')
     } else {
-      setUsers(users.filter(u => u.id !== id))
+      setUsers(users.filter(u => u.id !== deleteTarget))
+      showToast('تم حذف المستخدم بنجاح', 'success')
     }
+    setConfirmOpen(false)
+    setDeleteTarget(null)
   }
 
   const handleUserSubmit = async (e: React.FormEvent) => {
@@ -95,10 +108,11 @@ export default function DashboardUsers() {
       }
 
       setIsFormOpen(false)
+      showToast(editingUser ? 'تم تعديل المستخدم بنجاح' : 'تم إنشاء المستخدم بنجاح', 'success')
       fetchUsers()
     } catch (err) {
       console.error(err)
-      alert('حدث خطأ أثناء الحفظ')
+      showToast('حدث خطأ أثناء الحفظ', 'error')
     }
   }
 
@@ -176,10 +190,10 @@ export default function DashboardUsers() {
       }
       
       setIsPermModalOpen(false)
-      alert('تم حفظ الصلاحيات بنجاح')
+      showToast('تم حفظ الصلاحيات بنجاح', 'success')
     } catch (err) {
       console.error(err)
-      alert('حدث خطأ أثناء حفظ الصلاحيات')
+      showToast('حدث خطأ أثناء حفظ الصلاحيات', 'error')
     }
   }
 
@@ -236,7 +250,7 @@ export default function DashboardUsers() {
                     <Edit size={18} />
                   </button>
                   <button
-                    onClick={() => handleDelete(user.id)}
+                    onClick={() => openDeleteConfirm(user.id)}
                     className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
                     title="حذف"
                   >
@@ -287,7 +301,7 @@ export default function DashboardUsers() {
                       <Edit size={18} />
                     </button>
                     <button
-                      onClick={() => handleDelete(user.id)}
+                      onClick={() => openDeleteConfirm(user.id)}
                       className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
                       title="حذف"
                     >
@@ -448,6 +462,17 @@ export default function DashboardUsers() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        title="حذف المستخدم"
+        message="هل أنت متأكد من حذف هذا المستخدم؟"
+        confirmLabel="حذف"
+        cancelLabel="إلغاء"
+        variant="danger"
+        onConfirm={handleDelete}
+        onCancel={() => { setConfirmOpen(false); setDeleteTarget(null) }}
+      />
     </div>
   )
 }

@@ -7,14 +7,20 @@ import { SortableItem } from '../components/SortableItem'
 import ImageUpload from '../components/ImageUpload'
 import IconPicker from '../../components/IconPicker'
 import DynamicIcon from '../../components/DynamicIcon'
+import ConfirmDialog from '../components/ConfirmDialog'
+import { useToast } from '../components/Toast'
 
 export default function DashboardCategories() {
+  const { showToast } = useToast()
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'list' | 'header_order' | 'home_order'>('list')
+  const [activeTab, setActiveTab] = useState<'list' | 'header_order' | 'home_order' | 'sidebar_order'>('list')
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
+  const [orderSnapshot, setOrderSnapshot] = useState<Category[]>([])
   
   // Form State
   const [formData, setFormData] = useState({
@@ -47,9 +53,12 @@ export default function DashboardCategories() {
     const { data } = await supabase
       .from('categories')
       .select('*')
-      .order('order_index', { ascending: true }) // Default sort by header order
+      .order('order_index', { ascending: true })
     
-    if (data) setCategories(data)
+    if (data) {
+      setCategories(data)
+      setOrderSnapshot([...data])
+    }
     setLoading(false)
   }
 
@@ -71,12 +80,6 @@ export default function DashboardCategories() {
   const handleDragEndHome = async (event: DragEndEvent) => {
     const { active, over } = event
     if (active.id !== over?.id) {
-      // For home order, we might want to sort the local state by display_order first?
-      // Or just reorder the current list? 
-      // The current list is sorted by order_index (header).
-      // When switching tabs, we should probably resort the list based on the active tab's criteria.
-      // But arrayMove works on indices.
-      // So, when tab changes, I should sort the categories array based on that tab's order field.
       setCategories((items) => {
         const oldIndex = items.findIndex((item) => item.id === active.id)
         const newIndex = items.findIndex((item) => item.id === over?.id)
@@ -88,7 +91,21 @@ export default function DashboardCategories() {
     }
   }
 
-  const saveOrder = async (items: Category[], field: 'order_index' | 'display_order') => {
+  const handleDragEndSidebar = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (active.id !== over?.id) {
+      setCategories((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id)
+        const newIndex = items.findIndex((item) => item.id === over?.id)
+        const newItems = arrayMove(items, oldIndex, newIndex)
+        
+        saveOrder(newItems, 'sidebar_order')
+        return newItems
+      })
+    }
+  }
+
+  const saveOrder = async (items: Category[], field: 'order_index' | 'display_order' | 'sidebar_order') => {
     try {
       setIsSaving(true)
       const updates = items.map((item, index) => ({
@@ -99,11 +116,12 @@ export default function DashboardCategories() {
       await Promise.all(updates.map(u => 
         supabase.from('categories').update({ [field]: u[field] }).eq('id', u.id)
       ))
-      
-      // Notify success (optional)
+
+      setOrderSnapshot([...items])
+      showToast('تم حفظ الترتيب بنجاح', 'success')
     } catch (err) {
       console.error('Error saving order:', err)
-      alert('حدث خطأ أثناء حفظ الترتيب')
+      showToast('حدث خطأ أثناء حفظ الترتيب', 'error')
     } finally {
       setIsSaving(false)
     }
@@ -115,21 +133,30 @@ export default function DashboardCategories() {
       setCategories(prev => [...prev].sort((a, b) => (a.order_index || 0) - (b.order_index || 0)))
     } else if (activeTab === 'home_order') {
       setCategories(prev => [...prev].sort((a, b) => (a.display_order || 0) - (b.display_order || 0)))
+    } else if (activeTab === 'sidebar_order') {
+      setCategories(prev => [...prev].sort((a, b) => (a.sidebar_order || 0) - (b.sidebar_order || 0)))
     } else {
-      // Default list view - maybe sort by ID or name?
       setCategories(prev => [...prev].sort((a, b) => a.id - b.id))
     }
   }, [activeTab])
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا القسم؟ سيتم حذف جميع المقالات المرتبطة به!')) return
+  const openDeleteConfirm = (id: number) => {
+    setDeleteTarget(id)
+    setConfirmOpen(true)
+  }
+
+  const handleDelete = async () => {
+    if (deleteTarget === null) return
     
-    const { error } = await supabase.from('categories').delete().eq('id', id)
+    const { error } = await supabase.from('categories').delete().eq('id', deleteTarget)
     if (error) {
-      alert('حدث خطأ أثناء الحذف')
+      showToast('حدث خطأ أثناء الحذف', 'error')
     } else {
-      setCategories(categories.filter(c => c.id !== id))
+      setCategories(categories.filter(c => c.id !== deleteTarget))
+      showToast('تم حذف القسم بنجاح', 'success')
     }
+    setConfirmOpen(false)
+    setDeleteTarget(null)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -163,10 +190,11 @@ export default function DashboardCategories() {
       }
       
       setIsFormOpen(false)
+      showToast(editingCategory ? 'تم تعديل القسم بنجاح' : 'تم إنشاء القسم بنجاح', 'success')
       fetchCategories()
     } catch (err) {
       console.error(err)
-      alert('حدث خطأ أثناء الحفظ')
+      showToast('حدث خطأ أثناء الحفظ', 'error')
     } finally {
       setIsSaving(false)
     }
@@ -234,6 +262,12 @@ export default function DashboardCategories() {
         >
           ترتيب الرئيسية (أعلى لأسفل)
         </button>
+        <button
+          onClick={() => setActiveTab('sidebar_order')}
+          className={`px-4 py-2 rounded-md transition-colors ${activeTab === 'sidebar_order' ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:bg-muted'}`}
+        >
+          ترتيب القائمة الجانبية
+        </button>
       </div>
 
       {/* Content */}
@@ -262,7 +296,7 @@ export default function DashboardCategories() {
                         <Edit size={18} />
                       </button>
                       <button
-                        onClick={() => handleDelete(category.id)}
+                        onClick={() => openDeleteConfirm(category.id)}
                         className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
                         title="حذف"
                       >
@@ -299,7 +333,7 @@ export default function DashboardCategories() {
                           <Edit size={18} />
                         </button>
                         <button
-                          onClick={() => handleDelete(category.id)}
+                          onClick={() => openDeleteConfirm(category.id)}
                           className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
                           title="حذف"
                         >
@@ -316,9 +350,19 @@ export default function DashboardCategories() {
 
         {activeTab === 'header_order' && (
           <div>
-            <p className="mb-4 text-sm text-muted-foreground">
-              اسحب الأقسام لترتيبها كما ستظهر في القائمة العلوية (من اليمين إلى اليسار).
-            </p>
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-muted-foreground">
+                اسحب الأقسام لترتيبها كما ستظهر في القائمة العلوية (من اليمين إلى اليسار).
+              </p>
+              <button
+                onClick={() => saveOrder(categories, 'order_index')}
+                disabled={isSaving}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50"
+              >
+                <Save size={16} />
+                <span>{isSaving ? 'جاري الحفظ...' : 'حفظ الترتيب'}</span>
+              </button>
+            </div>
             <DndContext 
               sensors={sensors} 
               collisionDetection={closestCenter} 
@@ -342,13 +386,59 @@ export default function DashboardCategories() {
 
         {activeTab === 'home_order' && (
           <div>
-            <p className="mb-4 text-sm text-muted-foreground">
-              اسحب الأقسام لترتيبها كما ستظهر في الصفحة الرئيسية (من الأعلى إلى الأسفل).
-            </p>
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-muted-foreground">
+                اسحب الأقسام لترتيبها كما ستظهر في الصفحة الرئيسية (من الأعلى إلى الأسفل).
+              </p>
+              <button
+                onClick={() => saveOrder(categories, 'display_order')}
+                disabled={isSaving}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50"
+              >
+                <Save size={16} />
+                <span>{isSaving ? 'جاري الحفظ...' : 'حفظ الترتيب'}</span>
+              </button>
+            </div>
             <DndContext 
               sensors={sensors} 
               collisionDetection={closestCenter} 
               onDragEnd={handleDragEndHome}
+            >
+              <SortableContext 
+                items={categories.map(c => c.id)} 
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="flex flex-col gap-2 max-w-md mx-auto">
+                  {categories.map((category) => (
+                    <SortableItem key={category.id} id={category.id} className="w-full bg-card shadow-sm border border-border">
+                      {category.name}
+                    </SortableItem>
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          </div>
+        )}
+
+        {activeTab === 'sidebar_order' && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-muted-foreground">
+                اسحب الأقسام لترتيبها كما ستظهر في القائمة الجانبية للمستخدم العادي (من الأعلى إلى الأسفل).
+              </p>
+              <button
+                onClick={() => saveOrder(categories, 'sidebar_order')}
+                disabled={isSaving}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50"
+              >
+                <Save size={16} />
+                <span>{isSaving ? 'جاري الحفظ...' : 'حفظ الترتيب'}</span>
+              </button>
+            </div>
+            <DndContext 
+              sensors={sensors} 
+              collisionDetection={closestCenter} 
+              onDragEnd={handleDragEndSidebar}
             >
               <SortableContext 
                 items={categories.map(c => c.id)} 
@@ -483,6 +573,17 @@ export default function DashboardCategories() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        title="حذف القسم"
+        message="هل أنت متأكد من حذف هذا القسم؟ سيتم حذف جميع المقالات المرتبطة به!"
+        confirmLabel="حذف"
+        cancelLabel="إلغاء"
+        variant="danger"
+        onConfirm={handleDelete}
+        onCancel={() => { setConfirmOpen(false); setDeleteTarget(null) }}
+      />
     </div>
   )
 }

@@ -21,6 +21,7 @@ export type Category = {
   icon?: string
   order_index?: number
   display_order?: number
+  sidebar_order?: number
 }
 
 export type Article = {
@@ -37,6 +38,7 @@ export type Article = {
   author_id?: number
   authors?: Author
   is_exclusive?: boolean
+  content_source?: string
   // Helper for frontend compatibility
   category?: string
   categoryId?: number
@@ -116,4 +118,23 @@ export type LogoSetting = {
   alignment: string
   created_at: string
   updated_at: string
+}
+
+export type ShareMessage = {
+  id: number
+  platform: string
+  message_template: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export type SiteSettingsSeo = {
+  meta_title: string | null
+  meta_description: string | null
+  og_title: string | null
+  og_description: string | null
+  og_image: string | null
+  twitter_handle: string | null
+  keywords: string | null
 }

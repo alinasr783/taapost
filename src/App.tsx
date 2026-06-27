@@ -13,11 +13,16 @@ const DashboardLogin = lazy(() => import('./dashboard/pages/DashboardLogin'))
 import DashboardLayout from './dashboard/DashboardLayout'
 const DashboardHome = lazy(() => import('./dashboard/pages/DashboardHome'))
 const DashboardArticles = lazy(() => import('./dashboard/pages/DashboardArticles'))
+const DashboardArticleEditor = lazy(() => import('./dashboard/pages/DashboardArticleEditor'))
 const DashboardCategories = lazy(() => import('./dashboard/pages/DashboardCategories'))
 const DashboardUsers = lazy(() => import('./dashboard/pages/DashboardUsers'))
 const DashboardAuthors = lazy(() => import('./dashboard/pages/DashboardAuthors'))
 const DashboardHomeCustomization = lazy(() => import('./dashboard/pages/DashboardHomeCustomization'))
 const DashboardSettings = lazy(() => import('./dashboard/pages/DashboardSettings'))
+const DashboardNotifications = lazy(() => import('./dashboard/pages/DashboardNotifications'))
+const DashboardFinance = lazy(() => import('./dashboard/pages/DashboardFinance'))
+const DashboardBackup = lazy(() => import('./dashboard/pages/DashboardBackup'))
+const DashboardGuide = lazy(() => import('./dashboard/pages/DashboardGuide'))
 import ScrollToTop from './components/ScrollToTop'
 
 function PublicLayout() {
@@ -46,11 +51,17 @@ export default function App() {
           <Route path="/dashboard" element={<DashboardLayout />}>
             <Route index element={<DashboardHome />} />
             <Route path="articles" element={<DashboardArticles />} />
+            <Route path="articles/new" element={<DashboardArticleEditor />} />
+            <Route path="articles/edit/:id" element={<DashboardArticleEditor />} />
             <Route path="categories" element={<DashboardCategories />} />
             <Route path="users" element={<DashboardUsers />} />
             <Route path="authors" element={<DashboardAuthors />} />
             <Route path="home-customization" element={<DashboardHomeCustomization />} />
             <Route path="settings" element={<DashboardSettings />} />
+            <Route path="notifications" element={<DashboardNotifications />} />
+            <Route path="finance" element={<DashboardFinance />} />
+            <Route path="backup" element={<DashboardBackup />} />
+            <Route path="guide" element={<DashboardGuide />} />
           </Route>
 
           <Route element={<PublicLayout />}>

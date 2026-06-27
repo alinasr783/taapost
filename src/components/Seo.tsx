@@ -86,18 +86,18 @@ export default function Seo(props: Props) {
   const title = useMemo(() => {
     const t = props.title?.trim()
     if (t) return `${t} | ${site.site_name}`
-    return site.site_name
-  }, [props.title, site.site_name])
+    return site.meta_title?.trim() || site.site_name
+  }, [props.title, site.site_name, site.meta_title])
 
   const description = useMemo(() => {
-    return (props.description?.trim() || site.site_description || '').trim()
-  }, [props.description, site.site_description])
+    return (props.description?.trim() || site.meta_description?.trim() || site.site_description || '').trim()
+  }, [props.description, site.meta_description, site.site_description])
 
   const image = useMemo(() => {
-    const fallback = site.logo_url?.trim() ? site.logo_url.trim() : '/og-default.svg'
+    const fallback = site.og_image?.trim() || (site.logo_url?.trim() ? site.logo_url.trim() : '/og-default.svg')
     const src = props.image?.trim() ? props.image.trim() : fallback
     return origin ? resolveAbsoluteUrl(origin, src) : src
-  }, [origin, props.image, site.logo_url])
+  }, [origin, props.image, site.og_image, site.logo_url])
 
   const robots = useMemo(() => {
     return (props.robots?.trim() || 'index,follow,max-image-preview:large').trim()
@@ -116,18 +116,29 @@ export default function Seo(props: Props) {
     upsertMetaByName('robots', robots)
     upsertMetaByName('viewport', 'width=device-width, initial-scale=1.0')
 
+    if (site.keywords?.trim()) {
+      upsertMetaByName('keywords', site.keywords.trim())
+    }
+
     upsertMetaByProperty('og:locale', 'ar_AR')
     upsertMetaByProperty('og:site_name', site.site_name)
     upsertMetaByProperty('og:type', ogType)
-    upsertMetaByProperty('og:title', title)
-    if (description) upsertMetaByProperty('og:description', description)
+    upsertMetaByProperty('og:title', site.og_title?.trim() || title)
+    if (site.og_description?.trim() || description) {
+      upsertMetaByProperty('og:description', site.og_description?.trim() || description)
+    }
     upsertMetaByProperty('og:url', canonicalUrl)
     if (image) upsertMetaByProperty('og:image', image)
 
     upsertMetaByName('twitter:card', 'summary_large_image')
-    upsertMetaByName('twitter:title', title)
-    if (description) upsertMetaByName('twitter:description', description)
+    upsertMetaByName('twitter:title', site.og_title?.trim() || title)
+    if (site.og_description?.trim() || description) {
+      upsertMetaByName('twitter:description', site.og_description?.trim() || description)
+    }
     if (image) upsertMetaByName('twitter:image', image)
+    if (site.twitter_handle?.trim()) {
+      upsertMetaByName('twitter:site', site.twitter_handle.trim())
+    }
 
     if (props.jsonLd) {
       const v = props.jsonLd
@@ -137,7 +148,7 @@ export default function Seo(props: Props) {
         upsertJsonLd(v)
       }
     }
-  }, [canonicalUrl, description, image, ogType, origin, props.jsonLd, robots, site.site_name, title])
+  }, [canonicalUrl, description, image, ogType, origin, props.jsonLd, robots, site, title])
 
   return null
 }

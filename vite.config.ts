@@ -83,13 +83,18 @@ export default defineConfig(({ mode }) => {
       cssCodeSplit: true,
       sourcemap: false,
       chunkSizeWarningLimit: 900,
+      minify: 'esbuild',
+      drop: mode === 'production' ? ['console', 'debugger'] : [],
       rollupOptions: {
         output: {
           manualChunks: {
+            vendor: ['react', 'react-dom'],
             router: ['react-router-dom'],
             query: ['@tanstack/react-query'],
             charts: ['recharts'],
             supabase: ['@supabase/supabase-js'],
+            share: ['react-share'],
+            dnd: ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
           },
         },
       },

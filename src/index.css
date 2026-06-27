@@ -47,6 +47,7 @@
 }
 
 @theme {
+  --font-sans: 'Amiri', serif;
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
   --color-muted: hsl(var(--muted));
@@ -96,6 +97,26 @@ body {
   max-width: 1280px;
   margin-inline: auto;
   padding-inline: 1rem;
+}
+
+/* Performance: will-change for animations */
+.carousel-slide {
+  will-change: transform;
+}
+
+/* Performance: containment for isolated components */
+.article-card {
+  contain: layout style;
+}
+
+/* Performance: image loading placeholders */
+img {
+  background-color: hsl(var(--muted));
+}
+
+/* Performance: reduce layout shifts */
+img[width][height] {
+  aspect-ratio: attr(width) / attr(height);
 }
 
 /* YouTube Video Embeds inside Quill Editor */
@@ -211,4 +232,61 @@ body {
 /* Color Picker Z-index fix */
 .ql-snow .ql-picker-options {
   z-index: 100;
+}
+
+/* Toast Animation */
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
+
+/* ConfirmDialog Animations */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Toast Animations */
+@keyframes toast-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.toast-animate {
+  animation: toast-slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }

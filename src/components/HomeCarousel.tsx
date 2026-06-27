@@ -77,177 +77,166 @@ export default function HomeCarousel({ articles }: Props) {
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         onScroll={handleScroll}
       >
-        {articles.map((activeSlide) => (
+        {articles.map((slide, index) => (
           <div 
-            key={activeSlide.id} 
+            key={slide.id} 
             className="relative w-full flex-shrink-0 snap-center h-64 sm:h-80 md:h-[380px] lg:h-[430px] cursor-pointer"
-            onClick={() => navigate(articleUrl(activeSlide))}
+            onClick={() => navigate(articleUrl(slide))}
           >
             <img
-              src={activeSlide.image}
-              alt={activeSlide.title}
+              src={slide.image}
+              alt={slide.title}
               className="h-full w-full object-cover"
+              loading={index === 0 ? 'eager' : 'lazy'}
+              decoding="async"
+              fetchPriority={index === 0 ? 'high' : 'auto'}
+              width={1200}
+              height={430}
             />
-            <div className="absolute inset-0 bg-gradient-to-l from-black/85 via-black/50 to-transparent" />
-            <div className="absolute inset-0">
-              <div className="container flex h-full flex-col justify-between py-4 md:py-8">
-                <div className="space-y-3 text-right text-white md:ml-auto md:mr-0 md:max-w-4xl">
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+
+            {/* Controls inside each slide */}
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="h-full flex flex-col justify-end pb-4 md:pb-8 px-4 md:px-8 lg:px-12">
+                {/* Desktop Controls */}
+                <div className="hidden md:flex flex-col items-start gap-3 pointer-events-auto">
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation()
-                        const categoryId = activeSlide.categoryId ?? activeSlide.category_id
+                        const categoryId = slide.categoryId ?? slide.category_id
                         navigate(`/category/${categoryId}`)
                       }}
-                      className="inline-flex rounded-[5px] border border-white/30 bg-black/30 px-3 py-1 backdrop-blur hover:bg-black/50"
+                      className="inline-flex rounded-[5px] border border-white/30 bg-black/30 px-3 py-1 text-white backdrop-blur hover:bg-black/50"
                     >
-                      {activeSlide.category}
+                      {slide.category}
                     </button>
-                    {activeSlide.is_exclusive && (
+                    {slide.is_exclusive && (
                       <span className="text-red-500 font-bold bg-white/10 px-2 py-0.5 rounded backdrop-blur-sm">حصرياً</span>
                     )}
                   </div>
-                  <h2 className="text-xs font-semibold text-white/80 sm:text-sm md:text-lg">
-                    أحدث المقالات المختارة
-                  </h2>
-                  <h3 className="text-xl font-bold leading-relaxed sm:text-2xl md:text-4xl">
-                    {activeSlide.title}
+                  <h3 className="text-xl font-bold leading-relaxed sm:text-2xl md:text-4xl text-white">
+                    {slide.title}
                   </h3>
-                  <p className="hidden text-sm leading-7 text-white/90 sm:block md:text-lg">
-                    {activeSlide.excerpt}
-                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        navigate(articleUrl(slide))
+                      }}
+                      className="rounded-[5px] border border-white/40 bg-black/40 px-8 py-2.5 text-xs font-semibold text-white shadow-sm backdrop-blur md:text-sm"
+                    >
+                      اقرأ المزيد
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handlePrev}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
+                    >
+                      ‹
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNext}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
+                    >
+                      ›
+                    </button>
+                    <div className="flex items-center gap-1">
+                      {articles.map((item, i) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            scrollToSlide(i)
+                          }}
+                          className={`h-1.5 rounded-full transition-all ${
+                            i === index
+                              ? 'w-6 bg-white'
+                              : 'w-2 bg-white/40 hover:bg-white/70'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mobile Controls */}
+                <div className="flex flex-col items-start gap-3 md:hidden pointer-events-auto">
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const categoryId = slide.categoryId ?? slide.category_id
+                        navigate(`/category/${categoryId}`)
+                      }}
+                      className="inline-flex rounded-[5px] border border-white/30 bg-black/30 px-3 py-1 text-white backdrop-blur hover:bg-black/50"
+                    >
+                      {slide.category}
+                    </button>
+                    {slide.is_exclusive && (
+                      <span className="text-red-500 font-bold bg-white/10 px-2 py-0.5 rounded backdrop-blur-sm">حصرياً</span>
+                    )}
+                  </div>
+                  <h3 className="text-lg font-bold leading-relaxed text-right text-white">
+                    {slide.title}
+                  </h3>
+                  <div className="flex flex-wrap justify-start gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        navigate(articleUrl(slide))
+                      }}
+                      className="rounded-[5px] border border-white/40 bg-black/40 px-6 py-2 text-xs font-semibold text-white shadow-sm backdrop-blur"
+                    >
+                      اقرأ المزيد
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handlePrev}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
+                    >
+                      ‹
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNext}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
+                    >
+                      ›
+                    </button>
+                    <div className="flex items-center gap-1">
+                      {articles.map((item, i) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            scrollToSlide(i)
+                          }}
+                          className={`h-1.5 rounded-full transition-all ${
+                            i === index
+                              ? 'w-6 bg-white'
+                              : 'w-2 bg-white/40 hover:bg-white/70'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         ))}
-      </div>
-
-      {/* Navigation Controls (Overlay) */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="container h-full flex flex-col justify-end pb-4 md:pb-8">
-          <div className="hidden md:flex flex-col items-end gap-3 md:ml-auto pointer-events-auto">
-              <div className="flex flex-wrap justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    navigate(articleUrl(articles[carouselIndex]))
-                  }}
-                  className="rounded-[5px] border border-white/40 bg-black/40 px-5 py-2.5 text-xs font-semibold text-white shadow-sm backdrop-blur md:text-sm"
-                >
-                  اقرأ المزيد
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    const categoryId = articles[carouselIndex].categoryId ?? articles[carouselIndex].category_id
-                    navigate(`/category/${categoryId}`)
-                  }}
-                  className="rounded-[5px] border border-white/40 bg-black/40 px-5 py-2.5 text-xs font-semibold text-white shadow-sm backdrop-blur md:text-sm"
-                >
-                  اقرأ في هذا القسم
-                </button>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handlePrev}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
-                >
-                  ‹
-                </button>
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
-                >
-                  ›
-                </button>
-                <div className="flex items-center gap-1">
-                  {articles.map((item, index) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        scrollToSlide(index)
-                      }}
-                      className={`h-1.5 rounded-full transition-all ${
-                        index === carouselIndex
-                          ? 'w-6 bg-white'
-                          : 'w-2 bg-white/40 hover:bg-white/70'
-                      }`}
-                    />
-                  ))}
-                </div>
-              </div>
-          </div>
-          
-          {/* Mobile Controls */}
-          <div className="flex flex-col items-start gap-3 md:hidden pointer-events-auto">
-            <div className="flex flex-wrap justify-start gap-2">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  navigate(articleUrl(articles[carouselIndex]))
-                }}
-                className="rounded-[5px] border border-white/40 bg-black/40 px-4 py-2 text-xs font-semibold text-white shadow-sm backdrop-blur"
-              >
-                اقرأ المزيد
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  const categoryId = articles[carouselIndex].categoryId ?? articles[carouselIndex].category_id
-                  navigate(`/category/${categoryId}`)
-                }}
-                className="rounded-[5px] border border-white/40 bg-black/40 px-4 py-2 text-xs font-semibold text-white shadow-sm backdrop-blur"
-              >
-                اقرأ في هذا القسم
-              </button>
-            </div>
-            
-            {/* Mobile Navigation Arrows */}
-            <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handlePrev}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
-                >
-                  ‹
-                </button>
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
-                >
-                  ›
-                </button>
-                <div className="flex items-center gap-1">
-                  {articles.map((item, index) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        scrollToSlide(index)
-                      }}
-                      className={`h-1.5 rounded-full transition-all ${
-                        index === carouselIndex
-                          ? 'w-6 bg-white'
-                          : 'w-2 bg-white/40 hover:bg-white/70'
-                      }`}
-                    />
-                  ))}
-                </div>
-            </div>
-          </div>
-        </div>
       </div>
     </section>
   )

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, FileText, FolderTree, Users, LogOut, Settings, PenTool, LayoutTemplate, Menu, X, Moon, Sun, type LucideIcon } from 'lucide-react'
+import { LayoutDashboard, FileText, FolderTree, Users, LogOut, Settings, PenTool, LayoutTemplate, Menu, X, Moon, Sun, Bell, Wallet, Database, BookOpen, type LucideIcon } from 'lucide-react'
 import type { User } from '../lib/supabase'
+import { ToastProvider } from './components/Toast'
 
 export default function DashboardLayout() {
   const navigate = useNavigate()
@@ -61,6 +62,10 @@ export default function DashboardLayout() {
     { label: 'الكتاب', icon: PenTool, path: '/dashboard/authors' },
     { label: 'تخصيص الرئيسية', icon: LayoutTemplate, path: '/dashboard/home-customization' },
     { label: 'الاعدادات', icon: Settings, path: '/dashboard/settings' },
+    { label: 'الاشعارات', icon: Bell, path: '/dashboard/notifications' },
+    { label: 'الماليات', icon: Wallet, path: '/dashboard/finance' },
+    { label: 'النسخ الاحتياطي', icon: Database, path: '/dashboard/backup' },
+    { label: 'دليل لوحة التحكم', icon: BookOpen, path: '/dashboard/guide' },
   ]
 
   if (user.is_superadmin) {
@@ -112,38 +117,39 @@ export default function DashboardLayout() {
   }
 
   return (
+    <ToastProvider>
     <div className="flex h-dvh bg-muted/30 rtl text-right font-sans overflow-hidden" dir="rtl">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-64 bg-card border-l border-border flex-col fixed h-full z-10 shadow-sm right-0 top-0">
         <div className="p-6 border-b border-border">
-          <h2 className="text-xl font-bold text-primary">لوحة التحكم</h2>
-          <p className="text-sm text-muted-foreground mt-1">{user.username}</p>
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <div className="text-xs text-muted-foreground">الثيم</div>
-            <button
-              type="button"
-              aria-label="تبديل الثيم"
-              onClick={toggleTheme}
-              className="inline-flex items-center justify-center rounded-[6px] border border-border bg-background/60 px-3 py-2 hover:bg-muted/40 transition"
-            >
-              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-primary">لوحة التحكم</h2>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                aria-label="تبديل الثيم"
+                onClick={toggleTheme}
+                className="inline-flex items-center justify-center rounded-[6px] border border-border bg-background/60 px-3 py-2 hover:bg-muted/40 transition"
+              >
+                {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+              <button
+                type="button"
+                aria-label="تسجيل الخروج"
+                onClick={handleLogout}
+                className="inline-flex items-center justify-center rounded-[6px] border border-border bg-background/60 px-3 py-2 text-destructive hover:bg-destructive/10 transition"
+              >
+                <LogOut size={18} />
+              </button>
+            </div>
           </div>
+          <p className="text-sm text-muted-foreground mt-1">{user.username}</p>
         </div>
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           {navItems.map((item) => (
             <NavLink key={item.path} item={item} />
           ))}
         </nav>
-        <div className="p-4 border-t border-border">
-          <button
-            onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-md px-4 py-2 text-destructive hover:bg-destructive/10 transition-colors"
-          >
-            <LogOut size={20} />
-            <span>تسجيل خروج</span>
-          </button>
-        </div>
       </aside>
 
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 border-b border-border bg-card/90 backdrop-blur-sm">
@@ -224,5 +230,6 @@ export default function DashboardLayout() {
         <Outlet />
       </main>
     </div>
+    </ToastProvider>
   )
 }

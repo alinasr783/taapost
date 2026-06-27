@@ -29,6 +29,114 @@ function resolveImageSrc(input: string) {
   return src
 }
 
+const ARTICLE_STYLE = `
+  .article-body,
+  .article-body * {
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+    white-space: normal !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .article-body {
+    overflow: hidden !important;
+    line-height: 2;
+    color: hsl(var(--foreground));
+    direction: rtl;
+    text-align: right;
+  }
+  .article-body h1, .article-body h2, .article-body h3, .article-body h4 {
+    font-weight: 700;
+    color: hsl(var(--primary));
+    margin: 1.5em 0 0.5em;
+    line-height: 1.4;
+  }
+  .article-body h2 { font-size: 1.5rem; }
+  .article-body h3 { font-size: 1.25rem; }
+  .article-body p {
+    margin: 0 0 1em;
+    color: hsl(var(--foreground));
+    opacity: 0.9;
+  }
+  .article-body a {
+    color: hsl(var(--primary));
+    text-decoration: none;
+  }
+  .article-body a:hover { text-decoration: underline; }
+  .article-body img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 5px;
+    display: block;
+    margin: 1.5em 0;
+  }
+  .article-body blockquote {
+    border-right: 4px solid hsl(var(--primary));
+    background: hsl(var(--primary) / 0.05);
+    margin: 1.5em 0;
+    padding: 0.5em 1em;
+    border-radius: 0 4px 4px 0;
+  }
+  .article-body ul, .article-body ol {
+    margin: 0 0 1em;
+    padding-right: 1.5em;
+  }
+  .article-body li { margin-bottom: 0.25em; }
+  .article-body strong { font-weight: 700; color: hsl(var(--foreground)); }
+  .article-body table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+    margin: 1em 0;
+  }
+  .article-body td, .article-body th {
+    border: 1px solid hsl(var(--border));
+    padding: 0.5em 0.75em;
+    color: hsl(var(--foreground));
+  }
+  .article-body pre {
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: pre-wrap !important;
+    background: hsl(var(--muted));
+    padding: 1em;
+    border-radius: 5px;
+    font-size: 0.875rem;
+    color: hsl(var(--foreground));
+  }
+  .article-body code {
+    word-break: break-word !important;
+    white-space: pre-wrap !important;
+    color: hsl(var(--foreground));
+  }
+  .article-body iframe { max-width: 100%; }
+  .article-body .ql-video-wrapper {
+    position: relative !important;
+    padding-bottom: 56.25% !important;
+    height: 0 !important;
+    overflow: hidden !important;
+    max-width: 100% !important;
+    margin: 1.5em 0 !important;
+  }
+  .article-body .ql-video-wrapper .ql-video {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    border: 0 !important;
+  }
+  .article-body .ql-video {
+    max-width: 100%;
+    aspect-ratio: 16 / 9;
+    width: 100%;
+    height: auto;
+  }
+  .article-body figure { max-width: 100%; margin: 1.5em 0; }
+  .article-body figcaption { font-size: 0.875rem; opacity: 0.7; margin-top: 0.5em; text-align: center; color: hsl(var(--foreground)); }
+` as const
+
 export default function ArticlePage() {
   const { id, slug } = useParams()
   const navigate = useNavigate()
@@ -98,10 +206,8 @@ export default function ArticlePage() {
         }
       })
 
-      // Normalize: replace non-breaking spaces with regular spaces for proper wrapping
       const processedHtml = doc.body.innerHTML.replace(/&nbsp;/gi, ' ').replace(/\u00A0/g, ' ')
 
-      // Replace YouTube markers with responsive iframes (after DOM processing so styles are preserved)
       const youTubeMarkerRegex = /\{\{youtube:([a-zA-Z0-9_-]{11})\}\}/g
       const contentHtml = processedHtml.replace(youTubeMarkerRegex, (_match: string, videoId: string) => {
         const embedUrl = `https://www.youtube.com/embed/${videoId}`
@@ -143,7 +249,7 @@ export default function ArticlePage() {
       }
     },
     enabled: Boolean(articleQueryKey),
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
     retry: 1,
   })
@@ -171,7 +277,6 @@ export default function ArticlePage() {
   const toc = articleQuery.data?.toc ?? []
   useTrackView(article?.id || 0)
 
-  // Font size control
   const [fontSize, setFontSize] = useState(() => {
     try {
       const saved = localStorage.getItem('article_font_size')
@@ -187,7 +292,6 @@ export default function ArticlePage() {
     } catch { /* ignore */ }
   }, [fontSize])
 
-  // Author's other articles
   const [authorArticlesShowCount, setAuthorArticlesShowCount] = useState(6)
   const authorId = article?.authors?.id
 
@@ -205,7 +309,7 @@ export default function ArticlePage() {
       return (data ?? []) as Article[]
     },
     enabled: Boolean(authorId),
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
   })
 
   const authorArticles = authorArticlesQuery.data ?? []
@@ -226,7 +330,6 @@ export default function ArticlePage() {
     }
   }
 
-  // Calculate reading time
   const calculateReadingTime = (content: string) => {
     const text = content.replace(/<[^>]*>/g, '')
     const wordsPerMinute = 200
@@ -286,7 +389,6 @@ export default function ArticlePage() {
         }}
       />
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        {/* Breadcrumb / Back button */}
         <button 
           onClick={() => navigate(-1)}
           className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -295,7 +397,6 @@ export default function ArticlePage() {
           <span>عودة</span>
         </button>
 
-        {/* Meta Info (Date, Category, Reading Time) */}
         <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
           <span className="flex items-center gap-1 rounded-[5px] bg-primary text-primary-foreground px-3 py-1 font-medium shadow-sm">
             <Folder className="h-4 w-4" />
@@ -323,6 +424,11 @@ export default function ArticlePage() {
         <h1 className="text-3xl font-bold leading-tight tracking-tight md:text-4xl lg:text-5xl text-foreground">
           {article.title}
         </h1>
+        {article.content_source && (
+          <p className="text-sm font-bold text-red-600">
+            {article.content_source}
+          </p>
+        )}
       </div>
 
       {/* Featured Image (Full Width) */}
@@ -331,11 +437,16 @@ export default function ArticlePage() {
           src={article.image} 
           alt={article.title} 
           className="w-full object-cover max-h-[600px]"
+          loading="eager"
+          decoding="async"
+          fetchPriority="high"
+          width={1200}
+          height={600}
         />
       </div>
 
       <div className="grid grid-cols-1 gap-8">
-        {/* Table of Contents (Sidebar) - مؤقتاً */}
+        {/* Table of Contents - disabled */}
         {false && toc.length > 0 && (
           <aside className="lg:col-span-3 lg:order-2">
             <div className="lg:sticky lg:top-24 space-y-4 rounded-[5px] border border-border/40 bg-card/30 p-4 backdrop-blur-sm mb-8 lg:mb-0">
@@ -360,111 +471,7 @@ export default function ArticlePage() {
         {/* Main Content */}
         <article className="space-y-8 min-w-0 overflow-hidden w-full">
           {/* Article Text */}
-          <style>{`
-            .article-body,
-            .article-body * {
-              word-break: normal !important;
-              overflow-wrap: break-word !important;
-              white-space: normal !important;
-              max-width: 100% !important;
-              box-sizing: border-box !important;
-            }
-            .article-body {
-              overflow: hidden !important;
-              line-height: 2;
-              color: inherit;
-              direction: rtl;
-              text-align: right;
-            }
-            .article-body h1, .article-body h2, .article-body h3, .article-body h4 {
-              font-weight: 700;
-              color: var(--color-primary, hsl(25 65% 30%));
-              margin: 1.5em 0 0.5em;
-              line-height: 1.4;
-            }
-            .article-body h2 { font-size: 1.5rem; }
-            .article-body h3 { font-size: 1.25rem; }
-            .article-body p {
-              margin: 0 0 1em;
-              color: inherit;
-              opacity: 0.9;
-            }
-            .article-body a {
-              color: var(--color-primary, hsl(25 65% 30%));
-              text-decoration: none;
-            }
-            .article-body a:hover { text-decoration: underline; }
-            .article-body img {
-              max-width: 100%;
-              height: auto;
-              border-radius: 5px;
-              display: block;
-              margin: 1.5em 0;
-            }
-            .article-body blockquote {
-              border-right: 4px solid var(--color-primary, hsl(25 65% 30%));
-              background: hsl(from var(--color-primary, hsl(25 65% 30%)) h s l / 0.05);
-              margin: 1.5em 0;
-              padding: 0.5em 1em;
-              border-radius: 0 4px 4px 0;
-            }
-            .article-body ul, .article-body ol {
-              margin: 0 0 1em;
-              padding-right: 1.5em;
-            }
-            .article-body li { margin-bottom: 0.25em; }
-            .article-body strong { font-weight: 700; color: inherit; }
-            .article-body table {
-              display: block;
-              max-width: 100%;
-              overflow-x: auto;
-              border-collapse: collapse;
-              margin: 1em 0;
-            }
-            .article-body td, .article-body th {
-              border: 1px solid hsl(0 0% 80%);
-              padding: 0.5em 0.75em;
-            }
-            .article-body pre {
-              max-width: 100%;
-              overflow-x: auto;
-              white-space: pre-wrap !important;
-              background: hsl(0 0% 95%);
-              padding: 1em;
-              border-radius: 5px;
-              font-size: 0.875rem;
-            }
-            .article-body code {
-              word-break: break-word !important;
-              white-space: pre-wrap !important;
-            }
-            .dark .article-body pre { background: hsl(0 0% 15%); }
-            .article-body iframe { max-width: 100%; }
-            .article-body .ql-video-wrapper {
-              position: relative !important;
-              padding-bottom: 56.25% !important;
-              height: 0 !important;
-              overflow: hidden !important;
-              max-width: 100% !important;
-              margin: 1.5em 0 !important;
-            }
-            .article-body .ql-video-wrapper .ql-video {
-              position: absolute !important;
-              top: 0 !important;
-              left: 0 !important;
-              width: 100% !important;
-              height: 100% !important;
-              border: 0 !important;
-            }
-            .article-body .ql-video {
-              max-width: 100%;
-              aspect-ratio: 16 / 9;
-              width: 100%;
-              height: auto;
-            }
-            .article-body figure { max-width: 100%; margin: 1.5em 0; }
-            .article-body figcaption { font-size: 0.875rem; opacity: 0.7; margin-top: 0.5em; text-align: center; }
-          `}</style>
+          <style dangerouslySetInnerHTML={{ __html: ARTICLE_STYLE }} />
 
           <section className="rounded-[5px] border border-border/40 bg-card/30 backdrop-blur-sm overflow-hidden relative">
             <div className="border-b border-border/40 px-4 sm:px-6 md:px-10 py-3 flex items-center justify-between">
@@ -513,7 +520,7 @@ export default function ArticlePage() {
             >
               <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-primary/20 shrink-0">
                 {article.authors.image ? (
-                  <img src={article.authors.image} alt={article.authors.name} className="w-full h-full object-cover" />
+                  <img src={article.authors.image} alt={article.authors.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                 ) : (
                   <div className="w-full h-full bg-primary/10 flex items-center justify-center text-primary text-2xl font-bold">
                     {article.authors.name.charAt(0)}
@@ -553,6 +560,9 @@ export default function ArticlePage() {
                           alt={authArticle.title}
                           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                           loading="lazy"
+                          decoding="async"
+                          width={400}
+                          height={160}
                           onError={(e) => { e.currentTarget.style.display = 'none' }}
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
@@ -624,6 +634,10 @@ export default function ArticlePage() {
                       src={resolveImageSrc(related.image ?? '')} 
                       alt={related.title} 
                       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      loading="lazy"
+                      decoding="async"
+                      width={480}
+                      height={224}
                       onError={(e) => {
                         e.currentTarget.style.display = 'none'
                       }}

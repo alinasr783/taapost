@@ -2,17 +2,22 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Save, Plus, Trash2, Loader2, Image, Check, GripHorizontal } from 'lucide-react'
 import { supabase, type LogoSetting } from '../../lib/supabase'
 import ImageUpload from '../components/ImageUpload'
+import ConfirmDialog from './ConfirmDialog'
+import { useToast } from './Toast'
 
 const PRESET_WIDTHS = ['25%', '50%', '75%', '100%']
 const PRESET_HEIGHTS = ['auto', '40px', '60px', '80px', '120px']
 const PRESET_MAX_WIDTHS = ['none', '200px', '300px', '400px', '500px']
 
 export default function LogoController() {
+  const { showToast } = useToast()
   const [logos, setLogos] = useState<LogoSetting[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [editingLogo, setEditingLogo] = useState<LogoSetting | null>(null)
   const [newLogo, setNewLogo] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
 
   useEffect(() => {
     fetchLogos()
@@ -97,23 +102,32 @@ export default function LogoController() {
       setEditingLogo(null)
       setNewLogo(false)
       await fetchLogos()
+      showToast(editingLogo ? 'تم تعديل اللوجو بنجاح' : 'تم إضافة اللوجو بنجاح', 'success')
     } catch (error) {
       console.error('Error saving logo:', error)
-      alert('حدث خطأ أثناء حفظ اللوجو')
+      showToast('حدث خطأ أثناء حفظ اللوجو', 'error')
     } finally {
       setSaving(false)
     }
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm('هل أنت متأكد من حذف هذا اللوجو؟')) return
-    const { error } = await supabase.from('logo_settings').delete().eq('id', id)
+  const openDeleteConfirm = (id: number) => {
+    setDeleteTarget(id)
+    setConfirmOpen(true)
+  }
+
+  async function handleDelete() {
+    if (deleteTarget === null) return
+    const { error } = await supabase.from('logo_settings').delete().eq('id', deleteTarget)
     if (error) {
       console.error('Error deleting logo:', error)
-      alert('حدث خطأ أثناء الحذف')
-      return
+      showToast('حدث خطأ أثناء الحذف', 'error')
+    } else {
+      showToast('تم حذف اللوجو بنجاح', 'success')
+      fetchLogos()
     }
-    fetchLogos()
+    setConfirmOpen(false)
+    setDeleteTarget(null)
   }
 
   async function toggleActive(logo: LogoSetting) {
@@ -208,7 +222,7 @@ export default function LogoController() {
                   تعديل
                 </button>
                 <button
-                  onClick={() => handleDelete(logo.id)}
+                  onClick={() => openDeleteConfirm(logo.id)}
                   className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded text-red-600 transition-colors"
                 >
                   <Trash2 size={18} />
@@ -232,6 +246,16 @@ export default function LogoController() {
           }}
         />
       )}
+
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        title="حذف اللوجو"
+        message="هل أنت متأكد من حذف هذا اللوجو؟ لن تتمكن من التراجع عن هذا الإجراء."
+        confirmLabel="حذف"
+        cancelLabel="إلغاء"
+        onConfirm={handleDelete}
+        onCancel={() => { setConfirmOpen(false); setDeleteTarget(null) }}
+      />
     </div>
   )
 }

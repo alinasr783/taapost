@@ -1,6 +1,6 @@
- import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Facebook, Twitter, Instagram, Linkedin, Youtube, MessageCircle, Send, Mail, Globe, Link as LinkIcon, FileText, type LucideIcon } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase, type LogoSetting } from '../lib/supabase'
 
 type SocialLink = {
@@ -34,49 +34,43 @@ type Props = {
 }
 
 export default function Footer({ siteSettings }: Props) {
-  const [socialLinks, setSocialLinks] = useState<SocialLink[]>([])
-  const [activeLogo, setActiveLogo] = useState<LogoSetting | null>(null)
-  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'))
+  const { data: socialLinks = [] } = useQuery<SocialLink[]>({
+    queryKey: ['social_links'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('social_links')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
+      if (error) throw error
+      return (data ?? []) as SocialLink[]
+    },
+    staleTime: 10 * 60_000,
+    gcTime: 60 * 60_000,
+  })
 
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setIsDark(document.documentElement.classList.contains('dark'))
-    })
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-    return () => observer.disconnect()
-  }, [])
+  const { data: activeLogo } = useQuery<LogoSetting | null>({
+    queryKey: ['logo_settings_active'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('logo_settings')
+        .select('*')
+        .eq('is_active', true)
+        .maybeSingle()
+      if (error && error.code !== 'PGRST116') throw error
+      return (data as LogoSetting | null) ?? null
+    },
+    staleTime: 10 * 60_000,
+    gcTime: 60 * 60_000,
+  })
+
+  const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
 
   const getLogoUrl = () => {
     if (!activeLogo) return siteSettings?.logo_url || null
     if (isDark && activeLogo.logo_url_dark?.trim()) return activeLogo.logo_url_dark.trim()
     return activeLogo.logo_url?.trim() || null
   }
-
-  useEffect(() => {
-    async function fetchSocialLinks() {
-      const { data } = await supabase
-        .from('social_links')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true })
-      
-      if (data) {
-        setSocialLinks(data)
-      }
-    }
-    async function fetchActiveLogo() {
-      const { data } = await supabase
-        .from('logo_settings')
-        .select('*')
-        .eq('is_active', true)
-        .maybeSingle()
-      if (data) {
-        setActiveLogo(data as LogoSetting)
-      }
-    }
-    fetchSocialLinks()
-    fetchActiveLogo()
-  }, [])
 
   return (
     <footer className="border-t-4 border-primary mt-16 bg-primary/5 backdrop-blur-sm">

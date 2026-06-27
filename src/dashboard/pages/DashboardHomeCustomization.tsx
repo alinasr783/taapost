@@ -5,16 +5,20 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSo
 import { SortableItem } from '../components/SortableItem'
 import { Plus, Trash2, Eye, EyeOff } from 'lucide-react'
 import Switch from '../components/Switch'
+import ConfirmDialog from '../components/ConfirmDialog'
+import { useToast } from '../components/Toast'
 
 export default function DashboardHomeCustomization() {
   type SectionType = 'carousel' | 'category_grid' | 'category_list' | 'custom' | 'latest_grid'
   type SourceType = 'latest' | 'category' | 'categories'
 
+  const { showToast } = useToast()
   const [sections, setSections] = useState<HomepageSection[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isFormOpen, setIsFormOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<HomepageSection | null>(null)
   
   // Form State
   const [formData, setFormData] = useState<{
@@ -73,7 +77,6 @@ export default function DashboardHomeCustomization() {
         const newIndex = items.findIndex((item) => item.id === over?.id)
         const newItems = arrayMove(items, oldIndex, newIndex)
         
-        // Save new order
         saveOrder(newItems)
         return newItems
       })
@@ -108,27 +111,30 @@ export default function DashboardHomeCustomization() {
       if (error) throw error
       
       setSections(sections.map(s => s.id === id ? { ...s, is_active: !currentStatus } : s))
+      showToast(!currentStatus ? 'تم تفعيل القسم' : 'تم إخفاء القسم')
     } catch (error) {
       console.error('Error toggling status:', error)
-      alert('حدث خطأ أثناء تغيير الحالة')
+      showToast('حدث خطأ أثناء تغيير الحالة', 'error')
     }
   }
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا القسم من الصفحة الرئيسية؟')) return
+  const handleDelete = async () => {
+    if (!deleteTarget) return
     
     try {
       const { error } = await supabase
         .from('homepage_sections')
         .delete()
-        .eq('id', id)
+        .eq('id', deleteTarget.id)
       
       if (error) throw error
       
-      setSections(sections.filter(s => s.id !== id))
+      setSections(sections.filter(s => s.id !== deleteTarget.id))
+      showToast('تم حذف القسم بنجاح')
+      setDeleteTarget(null)
     } catch (error) {
       console.error('Error deleting section:', error)
-      alert('حدث خطأ أثناء الحذف')
+      showToast('حدث خطأ أثناء الحذف', 'error')
     }
   }
 
@@ -181,10 +187,11 @@ export default function DashboardHomeCustomization() {
           source_type: 'latest',
           source_ids: []
         })
+        showToast('تم إضافة القسم بنجاح')
       }
     } catch (error) {
       console.error('Error adding section:', error)
-      alert('حدث خطأ أثناء الإضافة')
+      showToast('حدث خطأ أثناء الإضافة', 'error')
     } finally {
       setIsSaving(false)
     }
@@ -247,7 +254,7 @@ export default function DashboardHomeCustomization() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={(e) => {
-                          e.stopPropagation(); // Prevent drag start when clicking button
+                          e.stopPropagation();
                           handleToggleActive(section.id, section.is_active);
                         }}
                         className={`p-2 rounded transition-colors z-10 relative ${section.is_active ? 'text-green-600 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-100'}`}
@@ -257,8 +264,8 @@ export default function DashboardHomeCustomization() {
                       </button>
                       <button
                         onClick={(e) => {
-                          e.stopPropagation(); // Prevent drag start when clicking button
-                          handleDelete(section.id);
+                          e.stopPropagation();
+                          setDeleteTarget(section);
                         }}
                         className="p-2 text-destructive hover:bg-destructive/10 rounded transition-colors z-10 relative"
                         title="حذف"
@@ -445,6 +452,16 @@ export default function DashboardHomeCustomization() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        title="حذف القسم"
+        message={`هل أنت متأكد من حذف "${deleteTarget?.title}" من الصفحة الرئيسية؟`}
+        confirmLabel="حذف"
+        cancelLabel="إلغاء"
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }

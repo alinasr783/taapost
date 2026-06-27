@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, type Article, type HomepageSection } from '../lib/supabase'
 import HomeCarousel from '../components/HomeCarousel'
 import Seo from '../components/Seo'
@@ -41,7 +41,8 @@ const emptySections: HomepageSection[] = []
 export default function Home() {
   const navigate = useNavigate()
   const site = useSiteSettings()
-  const limit = 60
+  const queryClient = useQueryClient()
+  const limit = 30
 
   const homeQuery = useQuery({
     queryKey: ['home_data', { limit }],
@@ -49,7 +50,7 @@ export default function Home() {
       const [articlesRes, sectionsRes] = await Promise.all([
         supabase
           .from('articles')
-          .select('id,slug,title,excerpt,content,image,category_id,type,date,is_exclusive,categories(id,name,slug)')
+          .select('id,slug,title,excerpt,image,category_id,type,date,is_exclusive,categories(id,name,slug)')
           .order('date', { ascending: false })
           .limit(limit),
         supabase
@@ -97,14 +98,13 @@ export default function Home() {
             ...(a as unknown as Article),
             categoryId: typeof a.category_id === 'number' ? a.category_id : undefined,
             category: categoryName,
-            contentHtml: typeof a.content === 'string' ? a.content : undefined,
             categories: category ? (category as Article['categories']) : undefined,
           } as Article
         })
 
       return { articles, sections }
     },
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
   })
 
@@ -115,6 +115,94 @@ export default function Home() {
     () => [...(articlesData ?? emptyArticles)].sort((a, b) => (a.date < b.date ? 1 : -1)),
     [articlesData]
   )
+
+  const prefetchArticle = (slug: string | undefined, id: number) => {
+    queryClient.prefetchQuery({
+      queryKey: ['article_page', slug ? { type: 'slug' as const, value: slug } : { type: 'id' as const, value: id }],
+      queryFn: async () => {
+        const baseQuery = supabase
+          .from('articles')
+          .select('*, categories(name), authors(id, name, image, bio, role)')
+
+        const { data, error } = slug
+          ? await baseQuery.eq('slug', slug).single()
+          : await baseQuery.eq('id', id).single()
+
+        if (error) throw error
+        if (!data) return { article: null as Article | null, toc: [], related: [], redirectToId: null as number | null }
+
+        const parser = new DOMParser()
+        const doc = parser.parseFromString(data.content || '', 'text/html')
+        const blockedStyleProps = new Set([
+          'word-break', 'overflow-wrap', 'white-space', 'word-wrap',
+          'width', 'min-width', 'max-width',
+          'position', 'left', 'right', 'float',
+          'margin-left', 'margin-right',
+        ])
+
+        doc.body.querySelectorAll('*').forEach((el) => {
+          const style = el.getAttribute('style')
+          if (style) {
+            const cleaned = style
+              .split(';')
+              .map((s) => s.trim())
+              .filter((s) => s && !blockedStyleProps.has(s.split(':')[0]?.trim().toLowerCase()))
+              .join('; ')
+            if (cleaned) el.setAttribute('style', cleaned)
+            else el.removeAttribute('style')
+          }
+          if ((el as HTMLElement).dir) (el as HTMLElement).dir = ''
+          const tag = el.tagName
+          if (tag === 'IMG' || tag === 'TABLE' || tag === 'IFRAME') {
+            el.setAttribute('style', (el.getAttribute('style') || '') + ';max-width:100%')
+          }
+        })
+
+        const processedHtml = doc.body.innerHTML.replace(/&nbsp;/gi, ' ').replace(/\u00A0/g, ' ')
+        const youTubeMarkerRegex = /\{\{youtube:([a-zA-Z0-9_-]{11})\}\}/g
+        const contentHtml = processedHtml.replace(youTubeMarkerRegex, (_match: string, videoId: string) => {
+          const embedUrl = `https://www.youtube.com/embed/${videoId}`
+          return `<div class="ql-video-wrapper" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%;margin:1.5em 0;"><iframe class="ql-video" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" src="${embedUrl}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`
+        })
+
+        const h2s = doc.querySelectorAll('h2')
+        const toc: { id: string; text: string }[] = []
+        h2s.forEach((h2, index) => {
+          const id = `section-${index}`
+          h2.id = id
+          toc.push({ id, text: h2.textContent || '' })
+        })
+
+        const authorData = Array.isArray(data.authors)
+          ? (data.authors.length > 0 ? data.authors[0] : null)
+          : data.authors
+
+        const article: Article = {
+          ...(data as Article),
+          category: (Array.isArray(data.categories) ? data.categories[0]?.name : data.categories?.name) || '',
+          authors: authorData,
+          contentHtml: contentHtml,
+        } as Article
+
+        const { data: relatedData } = await supabase
+          .from('articles')
+          .select('id, slug, title, image, date, category_id, excerpt, is_exclusive')
+          .eq('category_id', data.category_id)
+          .neq('id', data.id)
+          .limit(5)
+          .order('date', { ascending: false })
+
+        return {
+          article,
+          toc,
+          related: (relatedData ?? []) as Article[],
+          redirectToId: null as number | null,
+        }
+      },
+      staleTime: 5 * 60_000,
+      gcTime: 30 * 60_000,
+    })
+  }
 
   if (homeQuery.isLoading) {
     return (
@@ -196,7 +284,6 @@ export default function Home() {
            const count = getSettingsCount(section.settings, 5)
            let slides = sortedArticles;
 
-           // Filter based on source type
            const sourceType = getSettingsSourceType(section.settings)
            if (sourceType === 'category' && section.category_id) {
              slides = slides.filter(a => a.categoryId === section.category_id);
@@ -213,11 +300,6 @@ export default function Home() {
 
         if (section.type === 'latest_grid') {
              const count = getSettingsCount(section.settings, 6)
-             // Exclude carousel articles if desired, or just show latest
-             // Let's show latest excluding the first 5 if carousel is present, 
-             // but simpler is just latest sorted.
-             // If we want to avoid duplicates with carousel, we might need more logic.
-             // For now, let's just show sorted articles.
              const list = sortedArticles.slice(0, count);
              if (list.length === 0) return null;
              
@@ -239,6 +321,7 @@ export default function Home() {
                                 onClick={() =>
                                   navigate(article.slug ? `/post/${encodeURIComponent(article.slug)}` : `/post/${article.id}`)
                                 }
+                                onMouseEnter={() => prefetchArticle(article.slug, article.id)}
                                 className="group cursor-pointer space-y-3"
                            >
                                 <div className="relative aspect-video overflow-hidden rounded-lg shadow-sm group-hover:shadow-md transition-all border border-border/50 group-hover:border-primary/50">
@@ -247,6 +330,9 @@ export default function Home() {
                                         alt={article.title}
                                         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                                         loading="lazy"
+                                        decoding="async"
+                                        width={640}
+                                        height={360}
                                      />
                                 </div>
                                 <div className="space-y-2">
@@ -273,7 +359,6 @@ export default function Home() {
         if (section.type === 'category_section' || section.type === 'category_grid') {
             if (!section.category_id && !section.categories) return null;
             
-            // Get category info from joined data or section settings
             const catName = section.categories?.name || section.title;
             const catId = section.category_id || section.categories?.id;
 
@@ -314,6 +399,7 @@ export default function Home() {
                       onClick={() =>
                         navigate(article.slug ? `/post/${encodeURIComponent(article.slug)}` : `/post/${article.id}`)
                       }
+                      onMouseEnter={() => prefetchArticle(article.slug, article.id)}
                       className="relative flex min-w-[360px] max-w-[480px] flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md"
                     >
                       <div className="relative h-56 w-full">
@@ -322,6 +408,9 @@ export default function Home() {
                           alt={article.title}
                           className="h-full w-full object-cover"
                           loading="lazy"
+                          decoding="async"
+                          width={480}
+                          height={224}
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
                         {article.is_exclusive && (

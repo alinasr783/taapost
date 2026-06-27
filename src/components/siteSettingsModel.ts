@@ -19,6 +19,13 @@ export type SiteSettings = {
   secondary_color?: string
   show_article_summary?: boolean
   active_logo?: ActiveLogo | null
+  meta_title?: string | null
+  meta_description?: string | null
+  og_title?: string | null
+  og_description?: string | null
+  og_image?: string | null
+  twitter_handle?: string | null
+  keywords?: string | null
 }
 
 export const defaultSiteSettings: SiteSettings = {
@@ -29,4 +36,11 @@ export const defaultSiteSettings: SiteSettings = {
   secondary_color: '#000000',
   show_article_summary: true,
   active_logo: null,
+  meta_title: null,
+  meta_description: null,
+  og_title: null,
+  og_description: null,
+  og_image: null,
+  twitter_handle: null,
+  keywords: null,
 }

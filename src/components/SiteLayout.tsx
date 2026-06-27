@@ -8,7 +8,7 @@ import {
   BookOpen, Heart, TrendingUp, FlaskConical, Palette, Trophy,
   type LucideIcon,
 } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, type Category, type LogoSetting } from '../lib/supabase'
 import Footer from './Footer'
 import { SiteSettingsProvider } from './SiteSettingsProvider'
@@ -80,6 +80,7 @@ export default function SiteLayout({ children }: Props) {
     localStorage.getItem('theme') || 'light'
   )
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [q, setQ] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const location = useLocation()
@@ -103,7 +104,8 @@ export default function SiteLayout({ children }: Props) {
       if (error) throw error
       return (data ?? []) as Category[]
     },
-    staleTime: 5 * 60_000,
+    staleTime: 10 * 60_000,
+    gcTime: 60 * 60_000,
   })
 
   const siteSettingsQuery = useQuery({
@@ -113,7 +115,8 @@ export default function SiteLayout({ children }: Props) {
       if (error) throw error
       return data as typeof defaultSiteSettings
     },
-    staleTime: 5 * 60_000,
+    staleTime: 10 * 60_000,
+    gcTime: 60 * 60_000,
   })
 
   const activeLogoQuery = useQuery({
@@ -127,7 +130,8 @@ export default function SiteLayout({ children }: Props) {
       if (error && error.code !== 'PGRST116') throw error
       return (data as LogoSetting | null) ?? null
     },
-    staleTime: 5 * 60_000,
+    staleTime: 10 * 60_000,
+    gcTime: 60 * 60_000,
   })
 
   const categories = categoriesQuery.data ?? []
@@ -192,6 +196,30 @@ export default function SiteLayout({ children }: Props) {
     apple.setAttribute('href', iconHref)
   }, [])
 
+  useEffect(() => {
+    if (categories.length > 0) {
+      queryClient.prefetchQuery({
+        queryKey: ['home_data', { limit: 30 }],
+        queryFn: async () => {
+          const [articlesRes, sectionsRes] = await Promise.all([
+            supabase
+              .from('articles')
+              .select('id,slug,title,excerpt,image,category_id,type,date,is_exclusive,categories(id,name,slug)')
+              .order('date', { ascending: false })
+              .limit(30),
+            supabase
+              .from('homepage_sections')
+              .select('*, categories(id, name, slug)')
+              .eq('is_active', true)
+              .order('display_order', { ascending: true }),
+          ])
+          return { articles: articlesRes.data ?? [], sections: sectionsRes.data ?? [] }
+        },
+        staleTime: 5 * 60_000,
+      })
+    }
+  }, [categories.length, queryClient])
+
   const toggle = () => {
     const t = theme === 'dark' ? 'light' : 'dark'
     setTheme(t)
@@ -227,6 +255,7 @@ export default function SiteLayout({ children }: Props) {
                       }}
                       className="flex-shrink-0"
                       decoding="async"
+                      fetchPriority="high"
                     />
                   )
                 }
@@ -321,6 +350,7 @@ export default function SiteLayout({ children }: Props) {
                         src={displayLogoUrl}
                         alt={siteSettings.site_name}
                         className="h-8 w-8 object-contain flex-shrink-0"
+                        decoding="async"
                       />
                     )
                   }
@@ -353,17 +383,6 @@ export default function SiteLayout({ children }: Props) {
                 <span className="text-sm">الرئيسية</span>
               </Link>
 
-              <Link
-                to="/posts"
-                onClick={() => setMenuOpen(false)}
-                className={`flex items-center gap-3 rounded-[5px] px-3 py-2.5 transition-colors ${
-                  location.pathname.includes('/posts') || location.pathname.includes('/post') || location.pathname.includes('/مقال') ? 'bg-primary/10 text-primary font-medium' : 'text-foreground/80 hover:bg-muted/50 hover:text-primary'
-                }`}
-              >
-                <FileText size={20} />
-                <span className="text-sm">اخر المقالات</span>
-              </Link>
-
               <div className="my-2 border-t border-border/60" />
 
               <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground tracking-wider">
@@ -381,7 +400,7 @@ export default function SiteLayout({ children }: Props) {
                 <span className="text-sm">جميع الأقسام</span>
               </Link>
 
-              {categories.map((cat) => {
+              {[...categories].sort((a, b) => (a.sidebar_order || 0) - (b.sidebar_order || 0)).map((cat) => {
                 const catPath = cat.slug ? `/قسم/${encodeURIComponent(cat.slug)}` : `/category/${cat.id}`
                 const isActive =
                   location.pathname.includes(`/category/${cat.id}`) ||
@@ -412,6 +431,19 @@ export default function SiteLayout({ children }: Props) {
               >
                 <PenTool size={20} />
                 <span className="text-sm">الكتاب</span>
+              </Link>
+
+              <div className="my-2 border-t border-border/60" />
+
+              <Link
+                to="/posts"
+                onClick={() => setMenuOpen(false)}
+                className={`flex items-center gap-3 rounded-[5px] px-3 py-2.5 transition-colors ${
+                  location.pathname.includes('/posts') || location.pathname.includes('/post') || location.pathname.includes('/مقال') ? 'bg-primary/10 text-primary font-medium' : 'text-foreground/80 hover:bg-muted/50 hover:text-primary'
+                }`}
+              >
+                <FileText size={20} />
+                <span className="text-sm">اخر المقالات</span>
               </Link>
             </nav>
           </aside>

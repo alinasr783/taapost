@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Save, Plus, Trash2, GripVertical, X, Facebook, Twitter, Instagram, Linkedin, Youtube, MessageCircle, Send, Mail, Globe, Link as LinkIcon, Loader2, Settings, Image } from 'lucide-react'
-import { supabase, type SocialLink } from '../../lib/supabase'
+import { Save, Plus, Trash2, GripVertical, X, Facebook, Twitter, Instagram, Linkedin, Youtube, MessageCircle, Send, Mail, Globe, Link as LinkIcon, Loader2, Settings, Image, Search, Share2 } from 'lucide-react'
+import { supabase, type SocialLink, type ShareMessage } from '../../lib/supabase'
 import Switch from '../components/Switch'
 import LogoController from '../components/LogoController'
+import ConfirmDialog from '../components/ConfirmDialog'
+import { useToast } from '../components/Toast'
+import InfoTooltip from '../components/InfoTooltip'
 
 const AVAILABLE_ICONS = [
   { name: 'Facebook', icon: Facebook },
@@ -25,22 +28,42 @@ type SiteSettings = {
   primary_color: string
   secondary_color: string
   show_article_summary: boolean
+  meta_title: string | null
+  meta_description: string | null
+  og_title: string | null
+  og_description: string | null
+  og_image: string | null
+  twitter_handle: string | null
+  keywords: string | null
 }
 
-type TabKey = 'general' | 'logo' | 'social'
+type TabKey = 'general' | 'logo' | 'social' | 'seo' | 'share'
 
 const TABS: { key: TabKey; label: string; icon: typeof Settings }[] = [
   { key: 'general', label: 'إعدادات الموقع', icon: Settings },
   { key: 'logo', label: 'التحكم باللوجو', icon: Image },
+  { key: 'seo', label: 'SEO', icon: Search },
   { key: 'social', label: 'التواصل الاجتماعي', icon: Globe },
+  { key: 'share', label: 'رسائل المشاركة', icon: Share2 },
+]
+
+const SHARE_PLATFORMS = [
+  { key: 'facebook', label: 'فيسبوك', icon: Facebook },
+  { key: 'twitter', label: 'تويتر / X', icon: Twitter },
+  { key: 'whatsapp', label: 'واتساب', icon: MessageCircle },
+  { key: 'telegram', label: 'تيليجرام', icon: Send },
+  { key: 'linkedin', label: 'لينكد إن', icon: Linkedin },
+  { key: 'reddit', label: 'ريديت', icon: Globe },
 ]
 
 export default function DashboardSettings() {
+  const { showToast } = useToast()
   const [activeTab, setActiveTab] = useState<TabKey>('general')
   const [links, setLinks] = useState<SocialLink[]>([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [newLink, setNewLink] = useState<Partial<SocialLink> | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<SocialLink | null>(null)
   
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({
     id: 1,
@@ -50,14 +73,25 @@ export default function DashboardSettings() {
     primary_color: '#8B4513',
     secondary_color: '#000000',
     show_article_summary: true,
+    meta_title: null,
+    meta_description: null,
+    og_title: null,
+    og_description: null,
+    og_image: null,
+    twitter_handle: null,
+    keywords: null,
   })
   const [savingSettings, setSavingSettings] = useState(false)
+
+  // Share Messages State
+  const [shareMessages, setShareMessages] = useState<ShareMessage[]>([])
+  const [editingShareId, setEditingShareId] = useState<number | null>(null)
 
   useEffect(() => {
     void (async () => {
       try {
         setLoading(true)
-        await Promise.all([fetchLinks(), fetchSiteSettings()])
+        await Promise.all([fetchLinks(), fetchSiteSettings(), fetchShareMessages()])
       } catch (error) {
         console.error('Error fetching data:', error)
       } finally {
@@ -94,11 +128,34 @@ export default function DashboardSettings() {
     if (data) setLinks(data)
   }
 
+  async function fetchShareMessages() {
+    const { data, error } = await supabase
+      .from('share_messages')
+      .select('*')
+      .order('platform', { ascending: true })
+
+    if (error) throw error
+    if (data) setShareMessages(data)
+  }
+
   async function handleSaveSettings() {
     try {
       setSavingSettings(true)
       const payload = {
-        ...siteSettings,
+        id: 1,
+        site_name: siteSettings.site_name,
+        site_description: siteSettings.site_description,
+        logo_url: siteSettings.logo_url,
+        primary_color: siteSettings.primary_color,
+        secondary_color: siteSettings.secondary_color,
+        show_article_summary: siteSettings.show_article_summary,
+        meta_title: siteSettings.meta_title,
+        meta_description: siteSettings.meta_description,
+        og_title: siteSettings.og_title,
+        og_description: siteSettings.og_description,
+        og_image: siteSettings.og_image,
+        twitter_handle: siteSettings.twitter_handle,
+        keywords: siteSettings.keywords,
         updated_at: new Date().toISOString(),
       }
 
@@ -110,16 +167,16 @@ export default function DashboardSettings() {
           delete rest.show_article_summary
           const retry = await supabase.from('site_settings').upsert(rest)
           if (retry.error) throw retry.error
-          alert('تم حفظ إعدادات الموقع (يلزم تحديث قاعدة البيانات لحفظ إعداد ملخص المقال)')
+          showToast('تم حفظ الإعدادات (يلزم تحديث قاعدة البيانات)')
           return
         }
         throw error
       }
 
-      alert('تم حفظ إعدادات الموقع بنجاح')
+      showToast('تم حفظ الإعدادات بنجاح')
     } catch (error) {
       console.error('Error saving settings:', error)
-      alert('حدث خطأ أثناء حفظ الإعدادات')
+      showToast('حدث خطأ أثناء حفظ الإعدادات', 'error')
     } finally {
       setSavingSettings(false)
     }
@@ -140,6 +197,7 @@ export default function DashboardSettings() {
           .eq('id', link.id)
         
         if (error) throw error
+        showToast('تم تعديل الرابط بنجاح')
       } else {
         const { error } = await supabase
           .from('social_links')
@@ -152,6 +210,7 @@ export default function DashboardSettings() {
           }])
         
         if (error) throw error
+        showToast('تم إضافة الرابط بنجاح')
       }
 
       setEditingId(null)
@@ -159,24 +218,47 @@ export default function DashboardSettings() {
       fetchLinks()
     } catch (error) {
       console.error('Error saving link:', error)
-      alert('حدث خطأ أثناء الحفظ')
+      showToast('حدث خطأ أثناء الحفظ', 'error')
     }
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('هل أنت متأكد من حذف هذا الرابط؟')) return
+  const handleDeleteSocial = async () => {
+    if (!deleteTarget) return
 
     try {
       const { error } = await supabase
         .from('social_links')
         .delete()
-        .eq('id', id)
+        .eq('id', deleteTarget.id)
 
       if (error) throw error
+      showToast('تم حذف الرابط بنجاح')
+      setDeleteTarget(null)
       fetchLinks()
     } catch (error) {
       console.error('Error deleting link:', error)
-      alert('حدث خطأ أثناء الحذف')
+      showToast('حدث خطأ أثناء الحذف', 'error')
+    }
+  }
+
+  const handleSaveShareMessage = async (msg: ShareMessage) => {
+    try {
+      const { error } = await supabase
+        .from('share_messages')
+        .update({
+          message_template: msg.message_template,
+          is_active: msg.is_active,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', msg.id)
+
+      if (error) throw error
+      setEditingShareId(null)
+      showToast('تم حفظ رسالة المشاركة بنجاح')
+      fetchShareMessages()
+    } catch (error) {
+      console.error('Error saving share message:', error)
+      showToast('حدث خطأ أثناء الحفظ', 'error')
     }
   }
 
@@ -278,7 +360,7 @@ export default function DashboardSettings() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-muted/40 p-1 rounded-lg mb-6 w-fit border border-border">
+      <div className="flex gap-1 bg-muted/40 p-1 rounded-lg mb-6 w-fit border border-border flex-wrap">
         {TABS.map((tab) => (
           <button
             key={tab.key}
@@ -378,6 +460,192 @@ export default function DashboardSettings() {
 
       {activeTab === 'logo' && <LogoController />}
 
+      {/* SEO Tab */}
+      {activeTab === 'seo' && (
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-semibold">تحسين محركات البحث (SEO)</h2>
+              <p className="text-sm text-muted-foreground mt-1">إعدادات SEO الافتراضية للموقع - تُطبق على جميع الصفحات ما لم يتم تخصيصها لكل مقال</p>
+            </div>
+            <button 
+              onClick={handleSaveSettings} 
+              disabled={savingSettings}
+              className="bg-primary text-primary-foreground px-4 py-2 rounded-md flex items-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-70"
+            >
+              {savingSettings ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+              <span>حفظ</span>
+            </button>
+          </div>
+
+          <div className="space-y-6">
+            {/* Meta Tags Section */}
+            <div>
+              <h3 className="text-sm font-semibold mb-3 text-foreground">وسوم Meta الأساسية</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium mb-1">
+                    Meta Title (عنوان SEO)
+                    <InfoTooltip content={
+                      'العنوان الذي يظهر في نتائج محركات البحث وفي تبويب المتصفح.\n\n' +
+                      'ما هو؟ نص قصير يلخص محتوى الصفحة ويرىه المستخدم في Google.\n\n' +
+                      'الأهمية: هذا أهم عنصر SEO - يؤثر بشكل مباشر على نقرات المستخدمين من نتائج البحث.\n\n' +
+                      'الطول المثالي: 50-60 حرف. أكثر من 60 حرف يتم قصه.\n\n' +
+                      'مثال: "أخبار الرياضة Latest - تاء بوست"'
+                    } />
+                  </label>
+                  <input
+                    type="text"
+                    value={siteSettings.meta_title || ''}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, meta_title: e.target.value || null })}
+                    className="w-full p-2.5 bg-background border border-input rounded-md text-sm"
+                    placeholder="عنوان افتراضي يظهر في نتائج البحث"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1.5">يُفضّل 50-60 حرف | إذا ترك فارغاً، يُستخدم اسم الموقع</p>
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium mb-1">
+                    Meta Description (وصف SEO)
+                    <InfoTooltip content={
+                      'الوصف الذي يظهر تحت العنوان في نتائج محركات البحث.\n\n' +
+                      'ما هو؟ نص توضيحي قصير يصف محتوى الصفحة للمستخدم.\n\n' +
+                      'الأهمية: يؤثر على قرار المستخدم بالضغط على رابطك أم لا. وصف جذاب = نقرات أكثر.\n\n' +
+                      'الطول المثالي: 150-160 حرف. أكثر من 160 حرف يتم قصه.\n\n' +
+                      'مثال: "تابع آخر الأخبار والمقالات الحصرية على تاء بوست - منصة إعلامية موثوقة تغطي جميع المجالات"'
+                    } />
+                  </label>
+                  <textarea
+                    value={siteSettings.meta_description || ''}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, meta_description: e.target.value || null })}
+                    className="w-full p-2.5 bg-background border border-input rounded-md text-sm min-h-[80px]"
+                    placeholder="وصف مختصر للموقع يظهر في محركات البحث"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1.5">يُفضّل 150-160 حرف | إذا ترك فارغاً، يُستخدم وصف الموقع</p>
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium mb-1">
+                    الكلمات المفتاحية (Keywords)
+                    <InfoTooltip content={
+                      'قائمة بالكلمات والمصطلحات المتعلقة بموقعك.\n\n' +
+                      'ما هي؟ كلمات مفصولة بفاصلة تساعد محركات البحث على فهم موضوع موقعك.\n\n' +
+                      'الأهمية: متوسطة - Google لا يعتمد عليها بشكل كبير اليوم لكنها تساعد في الفهم.\n\n' +
+                      'مثال: "أخبار, رياضة, تقنية, سياسة, اقتصاد, تكنولوجيا"'
+                    } />
+                  </label>
+                  <input
+                    type="text"
+                    value={siteSettings.keywords || ''}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, keywords: e.target.value || null })}
+                    className="w-full p-2.5 bg-background border border-input rounded-md text-sm"
+                    placeholder="كلمة1, كلمة2, كلمة3"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1.5">افصل بين الكلمات بفاصلة</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Open Graph Section */}
+            <div className="border-t border-border pt-5">
+              <h3 className="text-sm font-semibold mb-1 text-foreground">Open Graph (مشاركة وسائل التواصل)</h3>
+              <p className="text-xs text-muted-foreground mb-3">هذه الحقول تتحكم في شكل المقال عند مشاركته على فيسبوك ولينكد إن وغيرهما</p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium mb-1">
+                    OG Title (عنوان المشاركة)
+                    <InfoTooltip content={
+                      'العنوان الذي يظهر عند مشاركة رابط موقعك على فيسبوك أو لينكد إن.\n\n' +
+                      'ما هو؟ نص العنوان في بطاقة المشاركة (Link Preview).\n\n' +
+                      'الأهمية: إذا كان مختلفاً عن Meta Title يمكنك تخصيصه لتكون رسالة المشاركة أكثر جاذبية.\n\n' +
+                      'إذا ترك فارغاً: يُستخدم Meta Title أو اسم الموقع.\n\n' +
+                      'مثال: "اقرأ أحدث المقالات على تاء بوست"'
+                    } />
+                  </label>
+                  <input
+                    type="text"
+                    value={siteSettings.og_title || ''}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, og_title: e.target.value || null })}
+                    className="w-full p-2.5 bg-background border border-input rounded-md text-sm"
+                    placeholder="العنوان عند المشاركة على وسائل التواصل"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1.5">يظهر عند المشاركة على فيسبوك ولينكد إن</p>
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium mb-1">
+                    OG Description (وصف المشاركة)
+                    <InfoTooltip content={
+                      'الوصف الذي يظهر تحت العنوان في بطاقة المشاركة.\n\n' +
+                      'ما هو؟ النص التوضيحي في بطاقة المشاركة على وسائل التواصل.\n\n' +
+                      'الأهمية: وصف جذاب يزيد من النقرات والمشاركات.\n\n' +
+                      'إذا ترك فارغاً: يُستخدم Meta Description.\n\n' +
+                      'مثال: "منصة إعلامية رقمية تقدم آخر الأخبار والمقالات الحصرية"'
+                    } />
+                  </label>
+                  <textarea
+                    value={siteSettings.og_description || ''}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, og_description: e.target.value || null })}
+                    className="w-full p-2.5 bg-background border border-input rounded-md text-sm min-h-[60px]"
+                    placeholder="الوصف عند المشاركة على وسائل التواصل"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1.5">يظهر تحت العنوان في بطاقة المشاركة</p>
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium mb-1">
+                    OG Image (صورة المشاركة)
+                    <InfoTooltip content={
+                      'رابط الصورة التي تظهر في بطاقة المشاركة على وسائل التواصل.\n\n' +
+                      'ما هي؟ صورة مصغرة تظهر مع العنوان والوصف عند مشاركة أي رابط من موقعك.\n\n' +
+                      'الأهمية: المقالات التي بها صورة في المشاركة تحصل على نقرات أكثر بنسبة 50%+.\n\n' +
+                      'الحجم المثالي: 1200x630 بكسل (نسبة 1.91:1).\n\n' +
+                      'صيغ مدعومة: JPG, PNG. يُفضل حقل أقل من 1MB.\n\n' +
+                      'مثال: https://example.com/images/og-default.jpg'
+                    } />
+                  </label>
+                  <input
+                    type="text"
+                    value={siteSettings.og_image || ''}
+                    onChange={(e) => setSiteSettings({ ...siteSettings, og_image: e.target.value || null })}
+                    className="w-full p-2.5 bg-background border border-input rounded-md text-sm"
+                    placeholder="https://example.com/og-image.jpg"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1.5">الأبعاد المثالية: 1200x630 بكسل | الصيغ: JPG أو PNG</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Twitter Section */}
+            <div className="border-t border-border pt-5">
+              <h3 className="text-sm font-semibold mb-1 text-foreground">Twitter / X Card</h3>
+              <p className="text-xs text-muted-foreground mb-3">إعدادات بطاقة المشاركة الخاصة بمنصة Twitter / X</p>
+              
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium mb-1">
+                  Twitter Handle (حساب تويتر)
+                  <InfoTooltip content={
+                    'حساب الموقع الرسمي على Twitter / X.\n\n' +
+                    'ما هو؟ اسم المستخدم يبدأ بعلامة @ ويظهر في بطاقة المشاركة كمصدر المحتوى.\n\n' +
+                      'الأهمية: يربط المحتوى بحسابك الرسمي ويظهر للمتابعين عند المشاركة.\n\n' +
+                      'مثال: @taapost 或 @username'
+                  } />
+                </label>
+                <input
+                  type="text"
+                  value={siteSettings.twitter_handle || ''}
+                  onChange={(e) => setSiteSettings({ ...siteSettings, twitter_handle: e.target.value || null })}
+                  className="w-full p-2.5 bg-background border border-input rounded-md text-sm"
+                  placeholder="@username"
+                />
+                <p className="text-xs text-muted-foreground mt-1.5">يجب أن يبدأ بعلامة @</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeTab === 'social' && (
         <div className="bg-card rounded-lg shadow-sm border border-border p-6">
           <div className="flex items-center justify-between gap-3 mb-4">
@@ -417,7 +685,7 @@ export default function DashboardSettings() {
                     </div>
                     <div className="flex gap-2">
                       <button onClick={() => setEditingId(link.id)} className="p-2 hover:bg-muted rounded text-blue-600">تعديل</button>
-                      <button onClick={() => handleDelete(link.id)} className="p-2 hover:bg-muted rounded text-red-600">
+                      <button onClick={() => setDeleteTarget(link)} className="p-2 hover:bg-muted rounded text-red-600">
                         <Trash2 size={18} />
                       </button>
                     </div>
@@ -434,6 +702,137 @@ export default function DashboardSettings() {
           </div>
         </div>
       )}
+
+      {/* Share Messages Tab */}
+      {activeTab === 'share' && (
+        <div className="bg-card rounded-lg shadow-sm border border-border p-6">
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold">رسائل المشاركة</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              خصص الرسالة المرافقة لكل منصة عند مشاركة المقالات على وسائل التواصل الاجتماعي.
+            </p>
+          </div>
+
+          {/* Placeholders Guide */}
+          <div className="bg-muted/40 rounded-lg border border-border p-4 mb-6">
+            <h4 className="text-sm font-semibold mb-2">المتغيرات المتاحة:</h4>
+            <div className="flex flex-wrap gap-3">
+              <span className="inline-flex items-center gap-1.5 text-xs bg-background px-2.5 py-1.5 rounded-md border border-border">
+                <code className="font-mono text-primary font-bold">{`{url}`}</code>
+                <span className="text-muted-foreground">← رابط المقال</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-xs bg-background px-2.5 py-1.5 rounded-md border border-border">
+                <code className="font-mono text-primary font-bold">{`{title}`}</code>
+                <span className="text-muted-foreground">← عنوان المقال</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {SHARE_PLATFORMS.map((platform) => {
+              const msg = shareMessages.find(m => m.platform === platform.key)
+              const Icon = platform.icon
+              const isEditing = editingShareId === msg?.id
+
+              if (!msg) return null
+
+              return (
+                <div key={platform.key} className="rounded-lg border border-border overflow-hidden">
+                  {/* Platform Header */}
+                  <div className="flex items-center justify-between p-4 bg-muted/20">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-background rounded-full border border-border">
+                        <Icon size={18} />
+                      </div>
+                      <div>
+                        <span className="font-bold text-sm">{platform.label}</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <div className={`w-2 h-2 rounded-full ${msg.is_active ? 'bg-green-500' : 'bg-gray-400'}`} />
+                          <span className="text-xs text-muted-foreground">
+                            {msg.is_active ? 'نشطة - سيتم استخدام الرسالة المخصصة' : 'معطلة - سيتم مشاركة الرابط فقط بدون رسالة'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-muted-foreground">
+                        {msg.is_active ? 'مفعّلة' : 'معطّلة'}
+                      </span>
+                      <Switch
+                        checked={msg.is_active}
+                        onCheckedChange={(checked) => {
+                          setShareMessages(prev => prev.map(m => m.id === msg.id ? { ...m, is_active: checked } : m))
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Message Content */}
+                  <div className="p-4">
+                    {isEditing ? (
+                      <div className="space-y-3">
+                        <textarea
+                          value={msg.message_template}
+                          onChange={(e) => {
+                            setShareMessages(prev => prev.map(m => m.id === msg.id ? { ...m, message_template: e.target.value } : m))
+                          }}
+                          rows={3}
+                          className="w-full p-3 bg-background border border-input rounded-md text-sm leading-relaxed"
+                          placeholder="اكتب الرسالة هنا..."
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          مثال: {" "} تابعوا "{`{title}`}" على موقعنا {`{url}`}
+                        </p>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => {
+                              setShareMessages(prev => prev.map(m => m.id === msg.id ? { ...shareMessages.find(sm => sm.id === msg.id)! } : m))
+                              setEditingShareId(null)
+                            }}
+                            className="px-3 py-1.5 text-sm border border-input rounded-md hover:bg-muted transition-colors"
+                          >
+                            إلغاء
+                          </button>
+                          <button
+                            onClick={() => handleSaveShareMessage(msg)}
+                            className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+                          >
+                            حفظ
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="bg-background p-3 rounded-md border border-border mb-3">
+                          <p className="text-sm text-foreground leading-relaxed">
+                            {msg.message_template || <span className="text-muted-foreground italic">فارغ - سيتم مشاركة الرابط فقط</span>}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setEditingShareId(msg.id)}
+                          className="text-sm text-primary hover:underline font-medium"
+                        >
+                          تعديل الرسالة
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        title="حذف الرابط"
+        message={`هل أنت متأكد من حذف رابط "${deleteTarget?.platform}"؟`}
+        confirmLabel="حذف"
+        cancelLabel="إلغاء"
+        onConfirm={handleDeleteSocial}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }

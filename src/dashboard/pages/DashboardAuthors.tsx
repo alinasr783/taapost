@@ -2,14 +2,18 @@ import { useEffect, useState } from 'react'
 import { Plus, Edit, Trash2, Search, X, User } from 'lucide-react'
 import { supabase, type Author } from '../../lib/supabase'
 import ImageUpload from '../components/ImageUpload'
+import ConfirmDialog from '../components/ConfirmDialog'
+import { useToast } from '../components/Toast'
 
 export default function DashboardAuthors() {
+  const { showToast } = useToast()
   const [authors, setAuthors] = useState<Author[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [editingAuthor, setEditingAuthor] = useState<Author | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [formData, setFormData] = useState<Partial<Author>>({})
+  const [deleteTarget, setDeleteTarget] = useState<Author | null>(null)
 
   useEffect(() => {
     fetchAuthors()
@@ -47,6 +51,7 @@ export default function DashboardAuthors() {
           .eq('id', formData.id)
         
         if (error) throw error
+        showToast('تم تعديل الكاتب بنجاح')
       } else {
         const { error } = await supabase
           .from('authors')
@@ -59,6 +64,7 @@ export default function DashboardAuthors() {
           }])
         
         if (error) throw error
+        showToast('تم إضافة الكاتب بنجاح')
       }
 
       setIsFormOpen(false)
@@ -67,24 +73,26 @@ export default function DashboardAuthors() {
       fetchAuthors()
     } catch (error) {
       console.error('Error saving author:', error)
-      alert('حدث خطأ أثناء الحفظ')
+      showToast('حدث خطأ أثناء الحفظ', 'error')
     }
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('هل أنت متأكد من حذف هذا الكاتب؟ سيتم فك ارتباط مقالاته به.')) return
+  const handleDelete = async () => {
+    if (!deleteTarget) return
 
     try {
       const { error } = await supabase
         .from('authors')
         .delete()
-        .eq('id', id)
+        .eq('id', deleteTarget.id)
 
       if (error) throw error
+      showToast('تم حذف الكاتب بنجاح')
+      setDeleteTarget(null)
       fetchAuthors()
     } catch (error) {
       console.error('Error deleting author:', error)
-      alert('حدث خطأ أثناء الحذف')
+      showToast('حدث خطأ أثناء الحذف', 'error')
     }
   }
 
@@ -99,9 +107,14 @@ export default function DashboardAuthors() {
     setIsFormOpen(true)
   }
 
-  const filteredAuthors = authors.filter(author => 
-    author.name.toLowerCase().includes(search.toLowerCase())
-  )
+  const filteredAuthors = authors.filter(author => {
+    const q = search.toLowerCase()
+    return (
+      author.name.toLowerCase().includes(q) ||
+      (author.role && author.role.toLowerCase().includes(q)) ||
+      (author.bio && author.bio.toLowerCase().includes(q))
+    )
+  })
 
   if (loading) return <div className="p-8 text-center">جاري التحميل...</div>
 
@@ -124,7 +137,7 @@ export default function DashboardAuthors() {
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
             <input
               type="text"
-              placeholder="بحث في الكتاب..."
+              placeholder="بحث بالاسم أو المسمى الوظيفي أو النبذة التعريفية..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pr-10 pl-4 py-2 bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
@@ -157,7 +170,7 @@ export default function DashboardAuthors() {
                   <Edit size={16} />
                 </button>
                 <button
-                  onClick={() => handleDelete(author.id)}
+                  onClick={() => setDeleteTarget(author)}
                   className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
                 >
                   <Trash2 size={16} />
@@ -248,6 +261,16 @@ export default function DashboardAuthors() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        title="حذف الكاتب"
+        message={`هل أنت متأكد من حذف "${deleteTarget?.name}"؟ سيتم فك ارتباط مقالاته به.`}
+        confirmLabel="حذف"
+        cancelLabel="إلغاء"
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }

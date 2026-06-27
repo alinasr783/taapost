@@ -4,6 +4,7 @@ import { supabase, type Article, type Category, type User, type UserPermission, 
 import { hasPermission } from '../utils'
 import ImageUpload from './ImageUpload'
 import Switch from './Switch'
+import { useToast } from './Toast'
 import ReactQuill from 'react-quill-new'
 import 'react-quill-new/dist/quill.snow.css'
 import Quill from 'quill'
@@ -74,6 +75,7 @@ function extractYoutubeEmbedUrl(url: string): string | null {
 }
 
 export default function DashboardArticleForm({ article, categories, user, permissions, onClose, onSuccess }: Props) {
+  const { showToast } = useToast()
   const [loading, setLoading] = useState(false)
   const [authors, setAuthors] = useState<Author[]>([])
   const [videoModalOpen, setVideoModalOpen] = useState(false)
@@ -96,7 +98,8 @@ export default function DashboardArticleForm({ article, categories, user, permis
         image: article.image || '',
         type: article.type || 'article',
         is_exclusive: article.is_exclusive || false,
-        date: article.date ? article.date.split('T')[0] : new Date().toISOString().split('T')[0]
+        date: article.date ? article.date.split('T')[0] : new Date().toISOString().split('T')[0],
+        content_source: article.content_source || ''
       }
     }
     return {
@@ -108,7 +111,8 @@ export default function DashboardArticleForm({ article, categories, user, permis
       image: '',
       type: 'article',
       is_exclusive: false,
-      date: new Date().toISOString().split('T')[0]
+      date: new Date().toISOString().split('T')[0],
+      content_source: ''
     }
   })
 
@@ -167,7 +171,7 @@ export default function DashboardArticleForm({ article, categories, user, permis
   const handleVideoInsert = useCallback(() => {
     const embedUrl = extractYoutubeEmbedUrl(videoUrl)
     if (!embedUrl) {
-      alert('رابط يوتيوب غير صالح')
+      showToast('رابط يوتيوب غير صالح', 'error')
       return
     }
 
@@ -192,7 +196,7 @@ export default function DashboardArticleForm({ article, categories, user, permis
 
     const action = article ? 'edit' : 'add'
     if (!hasPermission(user, permissions, formData.category_id, action)) {
-      alert('ليس لديك صلاحية للقيام بهذا الإجراء في هذا القسم')
+      showToast('ليس لديك صلاحية للقيام بهذا الإجراء في هذا القسم', 'error')
       return
     }
 
@@ -207,6 +211,7 @@ export default function DashboardArticleForm({ article, categories, user, permis
       const dataToSave = {
         ...formData,
         author_id: formData.author_id === 0 ? null : formData.author_id,
+        content_source: formData.content_source || null,
         slug: slug.trim() || null,
       }
 
@@ -230,7 +235,7 @@ export default function DashboardArticleForm({ article, categories, user, permis
     } catch (err: unknown) {
       console.error('Error saving article:', err)
       const message = err instanceof Error ? err.message : 'حدث خطأ أثناء حفظ المقال'
-      alert(message)
+      showToast(message, 'error')
     } finally {
       setLoading(false)
     }
@@ -388,6 +393,17 @@ export default function DashboardArticleForm({ article, categories, user, permis
                 <option key={author.id} value={author.id}>{author.name}</option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">مصدر المحتوى (اختياري)</label>
+            <input
+              type="text"
+              value={formData.content_source}
+              onChange={(e) => setFormData({ ...formData, content_source: e.target.value })}
+              placeholder="مثال: المراسل: أحمد من القاهرة"
+              className="w-full p-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring outline-none text-foreground"
+            />
           </div>
 
           <div>
