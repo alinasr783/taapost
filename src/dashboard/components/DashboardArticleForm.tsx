@@ -80,6 +80,7 @@ export default function DashboardArticleForm({ article, categories, user, permis
   const [authors, setAuthors] = useState<Author[]>([])
   const [videoModalOpen, setVideoModalOpen] = useState(false)
   const [videoUrl, setVideoUrl] = useState('')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const quillRef = useRef<any>(null)
   const [slug, setSlug] = useState(article?.slug || '')
   const [slugError, setSlugError] = useState<string | null>(null)
@@ -188,7 +189,7 @@ export default function DashboardArticleForm({ article, categories, user, permis
 
     setVideoModalOpen(false)
     setVideoUrl('')
-  }, [videoUrl])
+  }, [videoUrl, showToast])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

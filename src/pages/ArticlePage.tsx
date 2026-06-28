@@ -271,7 +271,6 @@ export default function ArticlePage() {
 
   const article = articleQuery.data?.article ?? null
   const relatedArticles = articleQuery.data?.related ?? []
-  const toc = articleQuery.data?.toc ?? []
   useTrackView(article?.id || 0)
 
   const [fontSize, setFontSize] = useState(() => {
@@ -312,20 +311,6 @@ export default function ArticlePage() {
   const authorArticles = authorArticlesQuery.data ?? []
   const visibleAuthorArticles = authorArticles.filter(a => a.id !== article?.id).slice(0, authorArticlesShowCount)
   const hasMoreAuthorArticles = authorArticles.filter(a => a.id !== article?.id).length > authorArticlesShowCount
-
-  const handleScrollTo = (id: string) => {
-    const element = document.getElementById(id)
-    if (element) {
-      const headerOffset = 100
-      const elementPosition = element.getBoundingClientRect().top
-      const offsetPosition = elementPosition + window.scrollY - headerOffset
-      
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: 'smooth'
-      })
-    }
-  }
 
   const calculateReadingTime = (content: string) => {
     const text = content.replace(/<[^>]*>/g, '')
@@ -443,27 +428,6 @@ export default function ArticlePage() {
       </div>
 
       <div className="grid grid-cols-1 gap-8">
-        {/* Table of Contents - disabled */}
-        {false && toc.length > 0 && (
-          <aside className="lg:col-span-3 lg:order-2">
-            <div className="lg:sticky lg:top-24 space-y-4 rounded-[5px] border border-border/40 bg-card/30 p-4 backdrop-blur-sm mb-8 lg:mb-0">
-              <h3 className="font-bold text-lg text-foreground border-b border-border pb-2">محتويات المقال</h3>
-              <ul className="space-y-2">
-                {toc.map((item, index) => (
-                  <li key={item.id}>
-                    <button 
-                      onClick={() => handleScrollTo(item.id)}
-                      className="text-sm text-muted-foreground hover:text-primary transition-colors text-right w-full block truncate"
-                      title={item.text}
-                    >
-                      <span className="font-bold ml-1">{index + 1}.</span> {item.text}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </aside>
-        )}
 
         {/* Main Content */}
         <article className="space-y-8 min-w-0 overflow-hidden w-full">

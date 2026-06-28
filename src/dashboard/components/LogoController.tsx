@@ -278,10 +278,6 @@ function LogoEditor({
   const logoRef = useRef<HTMLDivElement>(null)
   const [dragging, setDragging] = useState(false)
 
-  useEffect(() => {
-    setForm({ ...logo })
-  }, [logo])
-
   const update = (updates: Partial<LogoSetting>) => {
     setForm((prev) => ({ ...prev, ...updates }))
   }

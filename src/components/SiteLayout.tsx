@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { createElement, useEffect, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import {
@@ -39,11 +39,8 @@ function getCategoryIcon(name: string): LucideIcon {
 }
 
 function CategoryIcon({ cat }: { cat: Category }) {
-  if (cat.icon) {
-    return <DynamicIcon name={cat.icon} size={20} />
-  }
-  const Icon = getCategoryIcon(cat.name)
-  return <Icon size={20} />
+  if (cat.icon) return <DynamicIcon name={cat.icon} size={20} />
+  return createElement(getCategoryIcon(cat.name), { size: 20 })
 }
 
 type Props = { children: ReactNode }
@@ -182,7 +179,13 @@ export default function SiteLayout({ children }: Props) {
     themeMeta.setAttribute('name', 'theme-color')
     themeMeta.setAttribute('content', siteSettings.primary_color || '#000000')
 
-    const iconHref = getActiveLogoUrl() || '/favicon.svg'
+    const getFirstLogoUrl = () => {
+      if (!activeLogo) return siteSettings.logo_url?.trim() || null
+      if (theme === 'dark' && activeLogo.logo_url_dark?.trim()) return activeLogo.logo_url_dark.trim()
+      return activeLogo.logo_url?.trim() || null
+    }
+    const iconHref = getFirstLogoUrl() || '/favicon.svg'
+
     const icon =
       (head.querySelector('link[rel="icon"]') as HTMLLinkElement | null) ??
       (head.appendChild(document.createElement('link')) as HTMLLinkElement)
@@ -194,7 +197,7 @@ export default function SiteLayout({ children }: Props) {
       (head.appendChild(document.createElement('link')) as HTMLLinkElement)
     apple.setAttribute('rel', 'apple-touch-icon')
     apple.setAttribute('href', iconHref)
-  }, [])
+  }, [siteSettings.primary_color, siteSettings.logo_url, activeLogo, theme])
 
   useEffect(() => {
     if (categories.length > 0) {

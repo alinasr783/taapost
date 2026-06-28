@@ -79,6 +79,7 @@ export default function DashboardArticleEditor() {
   const [permissions, setPermissions] = useState<UserPermission[]>([])
   const [videoModalOpen, setVideoModalOpen] = useState(false)
   const [videoUrl, setVideoUrl] = useState('')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const quillRef = useRef<any>(null)
   const [slug, setSlug] = useState('')
   const [slugError, setSlugError] = useState<string | null>(null)
@@ -224,7 +225,7 @@ export default function DashboardArticleEditor() {
 
     setVideoModalOpen(false)
     setVideoUrl('')
-  }, [videoUrl])
+  }, [videoUrl, showToast])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
