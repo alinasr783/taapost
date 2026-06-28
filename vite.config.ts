@@ -78,13 +78,15 @@ export default defineConfig(({ mode }) => {
   const groqApiKey = env.GROQ_API_KEY || process.env.GROQ_API_KEY || ''
   return {
     plugins: [react(), groqProxyDevPlugin(groqApiKey)],
+    esbuild: {
+      drop: mode === 'production' ? ['console', 'debugger'] : [],
+    },
     build: {
       target: 'es2020',
       cssCodeSplit: true,
       sourcemap: false,
       chunkSizeWarningLimit: 900,
       minify: 'esbuild',
-      drop: mode === 'production' ? ['console', 'debugger'] : [],
       rollupOptions: {
         output: {
           manualChunks: {
