@@ -1,0 +1,18 @@
+# SQL migrations (not needed for deployment)
+*.sql
+
+# Documentation
+README.md
+
+# Source maps
+*.map
+
+# Temp files
+f.txt
+p
+
+# Supabase Edge Functions (deployed separately)
+supabase/
+
+# Mock data
+src/mockup/
