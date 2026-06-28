@@ -24,3 +24,11 @@ dist-ssr
 *.sw?
 
 .env
+
+# SQL migration files
+*.sql
+
+# Temp / misc files
+f.txt
+p
+database
