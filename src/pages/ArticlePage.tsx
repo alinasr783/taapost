@@ -171,7 +171,7 @@ export default function ArticlePage() {
       }
 
       if (articleQueryKey.type === 'slug') {
-        return { article: null as Article | null, toc: [], related: [], redirectToId: Number(data.id) }
+        return { article: data as Article, toc: [], related: [], redirectToId: Number(data.id) }
       }
 
       const parser = new DOMParser()
@@ -263,13 +263,10 @@ export default function ArticlePage() {
   useEffect(() => {
     const redirectToId = articleQuery.data?.redirectToId
     const article = articleQuery.data?.article
-    if (redirectToId) {
-      if (article?.slug) {
-        navigate(`/post/${encodeURIComponent(article.slug)}`, { replace: true })
-      } else {
-        navigate(`/post/${redirectToId}`, { replace: true })
-      }
-    }
+    if (!redirectToId || !article) return
+    const target = article.slug ? `/post/${encodeURIComponent(article.slug)}` : `/post/${redirectToId}`
+    if (decodeURIComponent(window.location.pathname).replace(/\/+$/, '') === target.replace(/\/+$/, '')) return
+    navigate(target, { replace: true })
   }, [articleQuery.data?.redirectToId, articleQuery.data?.article, navigate])
 
   const article = articleQuery.data?.article ?? null
