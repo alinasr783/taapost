@@ -82,19 +82,23 @@ export default function DashboardHome() {
   const [customTo, setCustomTo] = useState('')
 
   const fetchStats = useCallback(async () => {
-    const [viewsRes, articlesRes, categoriesRes, authorsRes] = await Promise.all([
-      supabase.from('article_views').select('id', { count: 'exact', head: true }),
-      supabase.from('articles').select('id', { count: 'exact', head: true }),
-      supabase.from('categories').select('id', { count: 'exact', head: true }),
-      supabase.from('authors').select('id', { count: 'exact', head: true }),
-    ])
+    try {
+      const [viewsRes, articlesRes, categoriesRes, authorsRes] = await Promise.all([
+        supabase.from('article_views').select('id', { count: 'exact', head: true }),
+        supabase.from('articles').select('id', { count: 'exact', head: true }),
+        supabase.from('categories').select('id', { count: 'exact', head: true }),
+        supabase.from('authors').select('id', { count: 'exact', head: true }),
+      ])
 
-    setStats({
-      totalViews: viewsRes.count ?? 0,
-      totalArticles: articlesRes.count ?? 0,
-      totalCategories: categoriesRes.count ?? 0,
-      totalAuthors: authorsRes.count ?? 0,
-    })
+      setStats({
+        totalViews: viewsRes.count ?? 0,
+        totalArticles: articlesRes.count ?? 0,
+        totalCategories: categoriesRes.count ?? 0,
+        totalAuthors: authorsRes.count ?? 0,
+      })
+    } catch (err) {
+      console.error('Error fetching stats:', err)
+    }
   }, [])
 
   const fetchAnalytics = useCallback(async () => {
@@ -106,7 +110,9 @@ export default function DashboardHome() {
       let query = supabase
         .from('article_views')
         .select(`
-          *,
+          article_id,
+          viewed_at,
+          country,
           article:articles (title, category_id, categories(name))
         `)
 
@@ -114,65 +120,67 @@ export default function DashboardHome() {
         query = query.gte('viewed_at', from).lt('viewed_at', to)
       }
 
-      const { data: views } = await query
+      // Limit to most recent 5000 views for analytics (enough for charts)
+      const { data: views } = await query.order('viewed_at', { ascending: false }).limit(5000)
 
-      if (!views) return
+      if (!views || views.length === 0) {
+        setData({ topArticles: [], topLocations: [], topTimes: [], topCategories: [] })
+        return
+      }
 
-      // 1. Top 5 Articles
-      const articleCounts: Record<string, number> = {}
-      const articleTitles: Record<string, string> = {}
+      // 1. Top 5 Articles - use Map for O(n) performance
+      const articleCounts = new Map<string, number>()
+      const articleTitles = new Map<string, string>()
       
-      ;(views as ViewRow[]).forEach((view) => {
-        if (!view.article) return
+      for (const view of views as ViewRow[]) {
+        if (!view.article) continue
         const id = String(view.article_id)
-        articleCounts[id] = (articleCounts[id] || 0) + 1
-        articleTitles[id] = view.article.title
-      })
+        articleCounts.set(id, (articleCounts.get(id) || 0) + 1)
+        if (!articleTitles.has(id)) articleTitles.set(id, view.article.title)
+      }
 
-      const topArticles = Object.entries(articleCounts)
+      const topArticles = Array.from(articleCounts.entries())
         .map(([id, count]) => ({
-          name: articleTitles[id]?.substring(0, 20) + '...',
-          fullTitle: articleTitles[id],
+          name: (articleTitles.get(id) || '').substring(0, 20) + '...',
+          fullTitle: articleTitles.get(id) || '',
           count
         }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 5)
 
       // 2. Top 5 Locations
-      const locationCounts: Record<string, number> = {}
-      ;(views as ViewRow[]).forEach((view) => {
+      const locationCounts = new Map<string, number>()
+      for (const view of views as ViewRow[]) {
         const loc = view.country || 'Unknown'
-        locationCounts[loc] = (locationCounts[loc] || 0) + 1
-      })
+        locationCounts.set(loc, (locationCounts.get(loc) || 0) + 1)
+      }
 
-      const topLocations = Object.entries(locationCounts)
+      const topLocations = Array.from(locationCounts.entries())
         .map(([name, value]) => ({ name, value }))
         .sort((a, b) => b.value - a.value)
         .slice(0, 5)
 
-      // 3. Top 5 Times
-      const timeCounts: Record<string, number> = {}
-      ;(views as ViewRow[]).forEach((view) => {
+      // 3. Top 5 Times (hours)
+      const timeCounts = new Map<string, number>()
+      for (const view of views as ViewRow[]) {
         const hour = new Date(view.viewed_at).getHours()
         const timeLabel = `${hour}:00`
-        timeCounts[timeLabel] = (timeCounts[timeLabel] || 0) + 1
-      })
+        timeCounts.set(timeLabel, (timeCounts.get(timeLabel) || 0) + 1)
+      }
 
-      const topTimes = Object.entries(timeCounts)
-        .map(([name, views]) => ({ name, views }))
-        .sort((a, b) => b.views - a.views)
-        .slice(0, 5)
+      const topTimes = Array.from(timeCounts.entries())
+        .map(([name, count]) => ({ name, views: count }))
         .sort((a, b) => parseInt(a.name) - parseInt(b.name))
 
       // 4. Top 5 Categories
-      const categoryCounts: Record<string, number> = {}
-      ;(views as ViewRow[]).forEach((view) => {
-        if (!view.article?.categories) return
-        const catName = view.article.categories.name
-        categoryCounts[catName] = (categoryCounts[catName] || 0) + 1
-      })
+      const categoryCounts = new Map<string, number>()
+      for (const view of views as ViewRow[]) {
+        const catName = view.article?.categories?.name
+        if (!catName) continue
+        categoryCounts.set(catName, (categoryCounts.get(catName) || 0) + 1)
+      }
 
-      const topCategories = Object.entries(categoryCounts)
+      const topCategories = Array.from(categoryCounts.entries())
         .map(([name, count]) => ({ name, count }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 5)
@@ -181,6 +189,7 @@ export default function DashboardHome() {
 
     } catch (err) {
       console.error('Error fetching analytics:', err)
+      setData({ topArticles: [], topLocations: [], topTimes: [], topCategories: [] })
     } finally {
       setLoading(false)
     }

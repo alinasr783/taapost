@@ -117,12 +117,17 @@ export default function Home() {
   )
 
   const prefetchArticle = (slug: string | undefined, id: number) => {
+    const queryType = slug ? { type: 'slug' as const, value: slug } : { type: 'id' as const, value: id }
+    if (queryClient.getQueryData(['article_page', queryType])) return
+
+    // Minimal prefetch: only get basic article data without processing
+    // ArticlePage will re-fetch with full processing when navigated to
     queryClient.prefetchQuery({
-      queryKey: ['article_page', slug ? { type: 'slug' as const, value: slug } : { type: 'id' as const, value: id }],
+      queryKey: ['article_page', queryType],
       queryFn: async () => {
         const baseQuery = supabase
           .from('articles')
-          .select('*, categories(name), authors(id, name, image, bio, role)')
+          .select('id, slug, title, excerpt, image, category_id, date, is_exclusive, content_source, categories(name), authors(id, name, image, bio, role)')
 
         const { data, error } = slug
           ? await baseQuery.eq('slug', slug).single()
@@ -130,48 +135,6 @@ export default function Home() {
 
         if (error) throw error
         if (!data) return { article: null as Article | null, toc: [], related: [], redirectToId: null as number | null }
-
-        const parser = new DOMParser()
-        const doc = parser.parseFromString(data.content || '', 'text/html')
-        const blockedStyleProps = new Set([
-          'word-break', 'overflow-wrap', 'white-space', 'word-wrap',
-          'width', 'min-width', 'max-width',
-          'position', 'left', 'right', 'float',
-          'margin-left', 'margin-right',
-        ])
-
-        doc.body.querySelectorAll('*').forEach((el) => {
-          const style = el.getAttribute('style')
-          if (style) {
-            const cleaned = style
-              .split(';')
-              .map((s) => s.trim())
-              .filter((s) => s && !blockedStyleProps.has(s.split(':')[0]?.trim().toLowerCase()))
-              .join('; ')
-            if (cleaned) el.setAttribute('style', cleaned)
-            else el.removeAttribute('style')
-          }
-          if ((el as HTMLElement).dir) (el as HTMLElement).dir = ''
-          const tag = el.tagName
-          if (tag === 'IMG' || tag === 'TABLE' || tag === 'IFRAME') {
-            el.setAttribute('style', (el.getAttribute('style') || '') + ';max-width:100%')
-          }
-        })
-
-        const processedHtml = doc.body.innerHTML.replace(/&nbsp;/gi, ' ').replace(/\u00A0/g, ' ')
-        const youTubeMarkerRegex = /\{\{youtube:([a-zA-Z0-9_-]{11})\}\}/g
-        const contentHtml = processedHtml.replace(youTubeMarkerRegex, (_match: string, videoId: string) => {
-          const embedUrl = `https://www.youtube.com/embed/${videoId}`
-          return `<div class="ql-video-wrapper" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%;margin:1.5em 0;"><iframe class="ql-video" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" src="${embedUrl}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`
-        })
-
-        const h2s = doc.querySelectorAll('h2')
-        const toc: { id: string; text: string }[] = []
-        h2s.forEach((h2, index) => {
-          const id = `section-${index}`
-          h2.id = id
-          toc.push({ id, text: h2.textContent || '' })
-        })
 
         const authorData = Array.isArray(data.authors)
           ? (data.authors.length > 0 ? data.authors[0] : null)
@@ -181,26 +144,18 @@ export default function Home() {
           ...(data as Article),
           category: (Array.isArray(data.categories) ? data.categories[0]?.name : data.categories?.name) || '',
           authors: authorData,
-          contentHtml: contentHtml,
+          contentHtml: data.content || '',
         } as Article
-
-        const { data: relatedData } = await supabase
-          .from('articles')
-          .select('id, slug, title, image, date, category_id, excerpt, is_exclusive')
-          .eq('category_id', data.category_id)
-          .neq('id', data.id)
-          .limit(5)
-          .order('date', { ascending: false })
 
         return {
           article,
-          toc,
-          related: (relatedData ?? []) as Article[],
+          toc: [],
+          related: [],
           redirectToId: null as number | null,
         }
       },
-      staleTime: 5 * 60_000,
-      gcTime: 30 * 60_000,
+      staleTime: 30_000, // Short stale time so ArticlePage will re-fetch with full processing
+      gcTime: 5 * 60_000,
     })
   }
 

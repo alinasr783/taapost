@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Edit, Trash2, Search, Eye, Calendar, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Edit, Trash2, Search, Eye, Calendar, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
 import { supabase, type Article, type Category, type Author, type User, type UserPermission } from '../../lib/supabase'
 import { hasPermission } from '../utils'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
 
-const ITEMS_PER_PAGE = 10
+const ITEMS_PER_PAGE = 15
 
 export default function DashboardArticles() {
   const navigate = useNavigate()
@@ -15,6 +15,9 @@ export default function DashboardArticles() {
   const [categories, setCategories] = useState<Category[]>([])
   const [authors, setAuthors] = useState<Author[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [totalCount, setTotalCount] = useState(0)
   const [search, setSearch] = useState('')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
@@ -35,41 +38,113 @@ export default function DashboardArticles() {
     }
   })
   const [permissions, setPermissions] = useState<UserPermission[]>([])
+  const loadedIdsRef = useRef<Set<number>>(new Set())
+  const abortRef = useRef<AbortController | null>(null)
 
   // Filters
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [filterCategory, setFilterCategory] = useState<number | ''>('')
   const [filterAuthor, setFilterAuthor] = useState<number | ''>('')
-  const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE)
 
-  const fetchPermissions = async (userId: number) => {
+  const userCategoryIds = !user?.is_superadmin
+    ? permissions.map(p => p.category_id)
+    : []
+
+  const fetchPermissions = useCallback(async (userId: number) => {
     const { data } = await supabase.from('user_permissions').select('*').eq('user_id', userId)
     if (data) setPermissions(data)
-  }
+  }, [])
 
-  const fetchData = async () => {
-    setLoading(true)
-    const [articlesRes, categoriesRes, authorsRes] = await Promise.all([
-      supabase.from('articles').select('*, categories(*), authors(*)').order('created_at', { ascending: false }),
-      supabase.from('categories').select('*'),
-      supabase.from('authors').select('*'),
+  const buildFetchQuery = useCallback((fromIdx: number, count: number) => {
+    let query = supabase
+      .from('articles')
+      .select('*, categories(*), authors(*)', { count: 'exact' })
+
+    if (search) {
+      query = query.ilike('title', `%${search}%`)
+    }
+
+    if (!user?.is_superadmin && userCategoryIds.length > 0) {
+      query = query.in('category_id', userCategoryIds)
+    }
+
+    if (filterCategory !== '') {
+      query = query.eq('category_id', filterCategory)
+    }
+
+    if (filterAuthor !== '') {
+      query = query.eq('author_id', filterAuthor)
+    }
+
+    if (dateFrom) {
+      query = query.gte('created_at', dateFrom)
+    }
+    if (dateTo) {
+      const toDate = new Date(dateTo)
+      toDate.setDate(toDate.getDate() + 1)
+      query = query.lt('created_at', toDate.toISOString())
+    }
+
+    return query
+      .order('created_at', { ascending: false })
+      .range(fromIdx, fromIdx + count - 1)
+  }, [search, user?.is_superadmin, userCategoryIds, filterCategory, filterAuthor, dateFrom, dateTo])
+
+  const fetchArticles = useCallback(async (append = false) => {
+    if (abortRef.current) abortRef.current.abort()
+    abortRef.current = new AbortController()
+
+    if (!append) {
+      setLoading(true)
+      loadedIdsRef.current = new Set()
+    } else {
+      setLoadingMore(true)
+    }
+
+    try {
+      const fromIdx = append ? articles.length : 0
+      const { data, error, count } = await buildFetchQuery(fromIdx, ITEMS_PER_PAGE)
+
+      if (error) throw error
+
+      if (count !== null) setTotalCount(count)
+
+      if (data) {
+        const unique = data.filter(a => !loadedIdsRef.current.has(a.id))
+        unique.forEach(a => loadedIdsRef.current.add(a.id))
+        setArticles(prev => append ? [...prev, ...unique] : unique)
+        setHasMore((count ?? 0) > fromIdx + ITEMS_PER_PAGE)
+      } else {
+        if (!append) setArticles([])
+        setHasMore(false)
+      }
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return
+      console.error('Error fetching articles:', err)
+      showToast('حدث خطأ أثناء تحميل المقالات', 'error')
+    } finally {
+      setLoading(false)
+      setLoadingMore(false)
+    }
+  }, [buildFetchQuery, articles.length, showToast])
+
+  const fetchCategoriesAndAuthors = useCallback(async () => {
+    const [categoriesRes, authorsRes] = await Promise.all([
+      supabase.from('categories').select('*').order('name'),
+      supabase.from('authors').select('*').order('name'),
     ])
-
-    if (articlesRes.data) setArticles(articlesRes.data)
     if (categoriesRes.data) setCategories(categoriesRes.data)
     if (authorsRes.data) setAuthors(authorsRes.data)
-    setLoading(false)
-  }
+  }, [])
 
   useEffect(() => {
-    queueMicrotask(() => {
-      if (user) {
-        void fetchPermissions(user.id)
-      }
-      void fetchData()
-    })
-  }, [user])
+    if (user) {
+      void fetchPermissions(user.id)
+    }
+    void fetchCategoriesAndAuthors()
+    void fetchArticles(false)
+  }, [user, fetchPermissions, fetchCategoriesAndAuthors, fetchArticles])
 
   const openDeleteConfirm = (id: number) => {
     setDeleteTarget(id)
@@ -84,6 +159,7 @@ export default function DashboardArticles() {
       showToast('حدث خطأ أثناء الحذف', 'error')
     } else {
       setArticles(articles.filter(a => a.id !== deleteTarget))
+      setTotalCount(prev => Math.max(0, prev - 1))
       showToast('تم حذف المقال بنجاح', 'success')
     }
     setConfirmOpen(false)
@@ -92,52 +168,22 @@ export default function DashboardArticles() {
 
   const canAdd = user?.is_superadmin || permissions.some(p => p.can_add)
   
-  const filteredArticles = articles.filter(article => {
-    const matchesSearch = article.title.toLowerCase().includes(search.toLowerCase())
-    
-    if (!user?.is_superadmin) {
-      const userCategoryIds = permissions.map(p => p.category_id)
-      if (!userCategoryIds.includes(article.category_id)) return false
-    }
-
-    // Date filter
-    if (dateFrom || dateTo) {
-      const articleDate = new Date(article.created_at || article.date)
-      if (dateFrom) {
-        const from = new Date(dateFrom)
-        if (articleDate < from) return false
-      }
-      if (dateTo) {
-        const to = new Date(dateTo)
-        to.setDate(to.getDate() + 1)
-        if (articleDate >= to) return false
-      }
-    }
-
-    // Category filter
-    if (filterCategory !== '' && article.category_id !== filterCategory) return false
-
-    // Author filter
-    if (filterAuthor !== '' && article.author_id !== filterAuthor) return false
-
-    return matchesSearch
-  })
-
-  const visibleArticles = filteredArticles.slice(0, visibleCount)
-  const hasMore = visibleCount < filteredArticles.length
-
   const clearFilters = () => {
     setSearch('')
     setDateFrom('')
     setDateTo('')
     setFilterCategory('')
     setFilterAuthor('')
-    setVisibleCount(ITEMS_PER_PAGE)
   }
 
   const hasActiveFilters = search || dateFrom || dateTo || filterCategory !== '' || filterAuthor !== ''
 
-  if (loading) return <div className="p-8 text-center text-muted-foreground">جاري التحميل...</div>
+  if (loading) return (
+    <div className="p-8 text-center text-muted-foreground flex items-center justify-center gap-3">
+      <Loader2 className="h-5 w-5 animate-spin" />
+      <span>جاري التحميل...</span>
+    </div>
+  )
 
   return (
     <div>
@@ -237,65 +283,65 @@ export default function DashboardArticles() {
 
             return (
               <div key={article.id} className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium text-foreground line-clamp-2">
-                      {article.title}
-                      {article.is_exclusive && (
-                        <span className="mr-2 inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/10">
-                          حصري
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-foreground line-clamp-2">
+                        {article.title}
+                        {article.is_exclusive && (
+                          <span className="mr-2 inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/10">
+                            حصري
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                        {article.authors && (
+                          <span className="bg-purple-500/10 text-purple-600 px-2 py-1 rounded">
+                            {article.authors.name}
+                          </span>
+                        )}
+                        <span className="bg-primary/10 text-primary px-2 py-1 rounded">
+                          {categories.find(c => c.id === article.category_id)?.name || article.category_id}
                         </span>
-                      )}
-                    </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                      {article.authors && (
-                        <span className="bg-purple-500/10 text-purple-600 px-2 py-1 rounded">
-                          {article.authors.name}
+                        <span className="text-muted-foreground">
+                          {new Date(article.created_at || article.date).toLocaleDateString('ar-EG')}
                         </span>
-                      )}
-                      <span className="bg-primary/10 text-primary px-2 py-1 rounded">
-                        {categories.find(c => c.id === article.category_id)?.name || article.category_id}
-                      </span>
-                      <span className="text-muted-foreground">
-                        {new Date(article.created_at || article.date).toLocaleDateString('ar-EG')}
-                      </span>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="flex shrink-0 items-center gap-1">
-                      <a
-                        href={article.slug ? `/post/${encodeURIComponent(article.slug)}` : `/post/${article.id}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded transition-colors"
-                        title="عرض"
-                      >
-                        <Eye size={18} />
-                      </a>
-                      {canEdit && (
-                        <button
-                          onClick={() => navigate(`/dashboard/articles/edit/${article.id}`)}
-                          className="p-2 text-muted-foreground hover:text-green-600 hover:bg-green-50 rounded transition-colors"
-                          title="تعديل"
+                    <div className="flex shrink-0 items-center gap-1">
+                        <a
+                          href={article.slug ? `/post/${encodeURIComponent(article.slug)}` : `/post/${article.id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded transition-colors"
+                          title="عرض"
                         >
-                          <Edit size={18} />
-                        </button>
-                      )}
-                      {canDelete && (
+                          <Eye size={18} />
+                        </a>
+                        {canEdit && (
                           <button
-                          onClick={() => openDeleteConfirm(article.id)}
-                          className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
-                          title="حذف"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      )}
-                    </div>
+                            onClick={() => navigate(`/dashboard/articles/edit/${article.id}`)}
+                            className="p-2 text-muted-foreground hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                            title="تعديل"
+                          >
+                            <Edit size={18} />
+                          </button>
+                        )}
+                        {canDelete && (
+                            <button
+                            onClick={() => openDeleteConfirm(article.id)}
+                            className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
+                            title="حذف"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
+                      </div>
                   </div>
                 </div>
               )
             })}
-            {filteredArticles.length === 0 && (
+            {articles.length === 0 && (
               <div className="p-8 text-center text-muted-foreground">لا توجد مقالات لعرضها</div>
             )}
           </div>
@@ -313,7 +359,7 @@ export default function DashboardArticles() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {visibleArticles.map((article) => {
+                {articles.map((article) => {
                   const canEdit = user && hasPermission(user, permissions, article.category_id, 'edit')
                   const canDelete = user && hasPermission(user, permissions, article.category_id, 'delete')
 
@@ -374,7 +420,7 @@ export default function DashboardArticles() {
                     </tr>
                   )
                 })}
-                {filteredArticles.length === 0 && (
+                {articles.length === 0 && (
                   <tr>
                     <td colSpan={5} className="p-8 text-center text-muted-foreground">
                       لا توجد مقالات لعرضها
@@ -385,28 +431,20 @@ export default function DashboardArticles() {
             </table>
           </div>
 
-          {/* Load More Button */}
-          {hasMore && (
+          {/* Server-side Load More */}
+          {hasMore && !loading && (
             <div className="p-4 border-t border-border flex justify-center">
               <button
-                onClick={() => setVisibleCount(prev => prev + ITEMS_PER_PAGE)}
-                className="flex items-center gap-2 px-6 py-2.5 bg-muted hover:bg-muted/80 text-foreground rounded-lg transition-colors font-medium"
+                onClick={() => fetchArticles(true)}
+                disabled={loadingMore}
+                className="flex items-center gap-2 px-6 py-2.5 bg-muted hover:bg-muted/80 text-foreground rounded-lg transition-colors font-medium disabled:opacity-50"
               >
-                <ChevronDown size={18} />
-                عرض المزيد ({filteredArticles.length - visibleCount} متبقي)
-              </button>
-            </div>
-          )}
-
-          {/* Show Less Button */}
-          {visibleCount > ITEMS_PER_PAGE && (
-            <div className="p-4 border-t border-border flex justify-center">
-              <button
-                onClick={() => setVisibleCount(ITEMS_PER_PAGE)}
-                className="flex items-center gap-2 px-6 py-2.5 bg-muted hover:bg-muted/80 text-foreground rounded-lg transition-colors font-medium"
-              >
-                <ChevronUp size={18} />
-                عرض أقل
+                {loadingMore ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ChevronDown size={18} />
+                )}
+                {loadingMore ? 'جاري التحميل...' : `عرض المزيد (${totalCount - articles.length} متبقي)`}
               </button>
             </div>
           )}

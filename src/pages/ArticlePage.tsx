@@ -30,20 +30,22 @@ function resolveImageSrc(input: string) {
 }
 
 const ARTICLE_STYLE = `
-  .article-body,
+  .article-body {
+    --article-font-size: 1.125rem;
+    font-size: var(--article-font-size);
+    overflow: hidden !important;
+    line-height: 2;
+    color: hsl(var(--foreground));
+    direction: rtl;
+    text-align: right;
+  }
   .article-body * {
     word-break: normal !important;
     overflow-wrap: break-word !important;
     white-space: normal !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
-  }
-  .article-body {
-    overflow: hidden !important;
-    line-height: 2;
-    color: hsl(var(--foreground));
-    direction: rtl;
-    text-align: right;
+    font-size: inherit !important;
   }
   .article-body h1, .article-body h2, .article-body h3, .article-body h4 {
     font-weight: 700;
@@ -51,8 +53,10 @@ const ARTICLE_STYLE = `
     margin: 1.5em 0 0.5em;
     line-height: 1.4;
   }
-  .article-body h2 { font-size: 1.5rem; }
-  .article-body h3 { font-size: 1.25rem; }
+  .article-body h1 { font-size: 2em !important; }
+  .article-body h2 { font-size: 1.5em !important; }
+  .article-body h3 { font-size: 1.25em !important; }
+  .article-body h4 { font-size: 1.125em !important; }
   .article-body p {
     margin: 0 0 1em;
     color: hsl(var(--foreground));
@@ -164,9 +168,13 @@ export default function ArticlePage() {
           ? await baseQuery.eq('id', articleQueryKey.value).single()
           : await baseQuery.eq('slug', articleQueryKey.value).single()
 
-      if (error) throw error
+      if (error) {
+        console.error('[ArticlePage] Supabase error:', error)
+        throw error
+      }
 
       if (!data) {
+        console.warn('[ArticlePage] No article data found for:', articleQueryKey)
         return { article: null as Article | null, toc: [], related: [], redirectToId: null as number | null }
       }
 
@@ -174,47 +182,66 @@ export default function ArticlePage() {
         return { article: data as Article, toc: [], related: [], redirectToId: Number(data.id) }
       }
 
-      const parser = new DOMParser()
-      const doc = parser.parseFromString(data.content || '', 'text/html')
+      if (!data.content) {
+        console.warn('[ArticlePage] Article content is empty/null for article ID:', data.id, 'title:', data.title)
+      }
 
-      const blockedStyleProps = new Set([
-        'word-break', 'overflow-wrap', 'white-space', 'word-wrap',
-        'width', 'min-width', 'max-width',
-        'position', 'left', 'right', 'float',
-        'margin-left', 'margin-right',
-      ])
+      let contentHtml = ''
 
-      doc.body.querySelectorAll('*').forEach((el) => {
-        const style = el.getAttribute('style')
-        if (style) {
-          const cleaned = style
-            .split(';')
-            .map((s) => s.trim())
-            .filter((s) => s && !blockedStyleProps.has(s.split(':')[0]?.trim().toLowerCase()))
-            .join('; ')
-          if (cleaned) {
-            el.setAttribute('style', cleaned)
-          } else {
-            el.removeAttribute('style')
+      try {
+        const parser = new DOMParser()
+        const doc = parser.parseFromString(data.content || '', 'text/html')
+
+        const blockedStyleProps = new Set([
+          'word-break', 'overflow-wrap', 'white-space', 'word-wrap',
+          'width', 'min-width', 'max-width',
+          'position', 'left', 'right', 'float',
+          'margin-left', 'margin-right',
+        ])
+
+        doc.body.querySelectorAll('*').forEach((el) => {
+          const style = el.getAttribute('style')
+          if (style) {
+            const cleaned = style
+              .split(';')
+              .map((s) => s.trim())
+              .filter((s) => s && !blockedStyleProps.has(s.split(':')[0]?.trim().toLowerCase()))
+              .join('; ')
+            if (cleaned) {
+              el.setAttribute('style', cleaned)
+            } else {
+              el.removeAttribute('style')
+            }
           }
+          if ((el as HTMLElement).dir) (el as HTMLElement).dir = ''
+
+          const tag = el.tagName
+          if (tag === 'IMG' || tag === 'TABLE' || tag === 'IFRAME') {
+            el.setAttribute('style', (el.getAttribute('style') || '') + ';max-width:100%')
+          }
+        })
+
+        const processedHtml = doc.body.innerHTML.replace(/&nbsp;/gi, ' ').replace(/\u00A0/g, ' ')
+
+        const youTubeMarkerRegex = /\{\{youtube:([a-zA-Z0-9_-]{11})\}\}/g
+        contentHtml = processedHtml.replace(youTubeMarkerRegex, (_match: string, videoId: string) => {
+          const embedUrl = `https://www.youtube.com/embed/${videoId}`
+          return `<div class="ql-video-wrapper" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%;margin:1.5em 0;"><iframe class="ql-video" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" src="${embedUrl}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`
+        })
+      } catch (err) {
+        console.error('[ArticlePage] Error processing article content HTML:', err)
+        contentHtml = data.content || ''
+      }
+
+      const h2s = (() => {
+        try {
+          const parser = new DOMParser()
+          const doc = parser.parseFromString(data.content || '', 'text/html')
+          return doc.querySelectorAll('h2')
+        } catch {
+          return [] as NodeListOf<HTMLHeadingElement>
         }
-        if ((el as HTMLElement).dir) (el as HTMLElement).dir = ''
-
-        const tag = el.tagName
-        if (tag === 'IMG' || tag === 'TABLE' || tag === 'IFRAME') {
-          el.setAttribute('style', (el.getAttribute('style') || '') + ';max-width:100%')
-        }
-      })
-
-      const processedHtml = doc.body.innerHTML.replace(/&nbsp;/gi, ' ').replace(/\u00A0/g, ' ')
-
-      const youTubeMarkerRegex = /\{\{youtube:([a-zA-Z0-9_-]{11})\}\}/g
-      const contentHtml = processedHtml.replace(youTubeMarkerRegex, (_match: string, videoId: string) => {
-        const embedUrl = `https://www.youtube.com/embed/${videoId}`
-        return `<div class="ql-video-wrapper" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%;margin:1.5em 0;"><iframe class="ql-video" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" src="${embedUrl}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`
-      })
-
-      const h2s = doc.querySelectorAll('h2')
+      })()
       const toc: { id: string; text: string }[] = []
       h2s.forEach((h2, index) => {
         const id = `section-${index}`
@@ -226,6 +253,10 @@ export default function ArticlePage() {
         ? (data.authors.length > 0 ? data.authors[0] : null)
         : data.authors
 
+      if (!authorData) {
+        console.warn('[ArticlePage] No author data found for article ID:', data.id)
+      }
+
       const article: Article = {
         ...(data as Article),
         category: (Array.isArray(data.categories) ? data.categories[0]?.name : data.categories?.name) || '',
@@ -233,18 +264,24 @@ export default function ArticlePage() {
         contentHtml: contentHtml,
       } as Article
 
-      const { data: relatedData } = await supabase
-        .from('articles')
-        .select('id, slug, title, image, date, category_id, excerpt, is_exclusive')
-        .eq('category_id', data.category_id)
-        .neq('id', data.id)
-        .limit(5)
-        .order('date', { ascending: false })
+      let related: Article[] = []
+      try {
+        const { data: relatedData } = await supabase
+          .from('articles')
+          .select('id, slug, title, image, date, category_id, excerpt, is_exclusive')
+          .eq('category_id', data.category_id)
+          .neq('id', data.id)
+          .limit(5)
+          .order('date', { ascending: false })
+        related = (relatedData ?? []) as Article[]
+      } catch (err) {
+        console.error('[ArticlePage] Error fetching related articles:', err)
+      }
 
       return {
         article,
         toc,
-        related: (relatedData ?? []) as Article[],
+        related,
         redirectToId: null as number | null,
       }
     },
@@ -300,8 +337,11 @@ export default function ArticlePage() {
         .select('id, slug, title, image, date, excerpt, is_exclusive')
         .eq('author_id', authorId)
         .order('date', { ascending: false })
-        .limit(100)
-      if (error) throw error
+        .limit(6)
+      if (error) {
+        console.error('[ArticlePage] Error fetching author articles:', error)
+        throw error
+      }
       return (data ?? []) as Article[]
     },
     enabled: Boolean(authorId),
@@ -322,7 +362,7 @@ export default function ArticlePage() {
 
   if (articleQuery.isLoading) {
     return (
-      <div className="container max-w-7xl py-8 md:py-12">
+    <div className="container max-w-7xl py-4 md:py-8 lg:py-12">
         <div className="space-y-6">
           <div className="h-8 w-40 rounded bg-muted/40 animate-pulse" />
           <div className="h-[280px] w-full rounded-lg bg-muted/40 animate-pulse" />
@@ -330,6 +370,36 @@ export default function ArticlePage() {
             <div className="h-6 w-5/6 rounded bg-muted/50 animate-pulse" />
             <div className="h-4 w-4/6 rounded bg-muted/40 animate-pulse" />
             <div className="h-4 w-3/6 rounded bg-muted/40 animate-pulse" />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (articleQuery.error) {
+    const errorMessage = articleQuery.error instanceof Error ? articleQuery.error.message : 'حدث خطأ غير معروف'
+    return (
+      <div className="container flex flex-col items-center justify-center py-20 text-center">
+        <Seo title="خطأ في تحميل المقال" description="حدث خطأ أثناء تحميل المقال" robots="noindex,follow" />
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 max-w-lg">
+          <h2 className="mb-2 text-xl font-bold text-destructive">حدث خطأ أثناء تحميل المقال</h2>
+          <p className="mb-4 text-sm text-muted-foreground">يرجى المحاولة مرة أخرى أو العودة للصفحة الرئيسية</p>
+          <div className="mb-4 rounded bg-background/80 p-3 text-left text-xs text-muted-foreground font-mono overflow-auto max-h-24">
+            {errorMessage}
+          </div>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={() => articleQuery.refetch()}
+              className="rounded-[5px] bg-primary px-5 py-2 text-sm text-primary-foreground hover:bg-primary/90"
+            >
+              إعادة المحاولة
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              className="rounded-[5px] border border-border px-5 py-2 text-sm text-muted-foreground hover:bg-muted/50"
+            >
+              العودة للرئيسية
+            </button>
           </div>
         </div>
       </div>
@@ -352,7 +422,7 @@ export default function ArticlePage() {
   }
 
   return (
-    <div className="container max-w-7xl py-8 md:py-12">
+    <div className="container max-w-7xl py-4 md:py-8 lg:py-12">
       <Seo
         title={article.title}
         description={article.excerpt || article.title}
@@ -370,40 +440,40 @@ export default function ArticlePage() {
           inLanguage: 'ar',
         }}
       />
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+      <div className="flex items-center justify-between gap-2 sm:gap-4 mb-4 md:mb-6">
         <button 
           onClick={() => navigate(-1)}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1.5 text-[13px] sm:text-sm text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap shrink-0"
         >
-          <ArrowRight className="h-4 w-4" />
+          <ArrowRight className="h-3.5 w-3.5" />
           <span>عودة</span>
         </button>
 
-        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-          <span className="flex items-center gap-1 rounded-[5px] bg-primary text-primary-foreground px-3 py-1 font-medium shadow-sm">
-            <Folder className="h-4 w-4" />
+        <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+          <span className="flex items-center gap-1 rounded-[5px] bg-primary text-primary-foreground px-2 sm:px-3 py-0.5 sm:py-1 font-medium shadow-sm whitespace-nowrap">
+            <Folder className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             {article.category}
           </span>
           {article.is_exclusive ? (
-            <span className="flex items-center gap-1 rounded-[5px] bg-red-600/10 px-3 py-1 text-red-600 font-bold border border-red-600/20">
+            <span className="flex items-center gap-1 rounded-[5px] bg-red-600/10 px-2 sm:px-3 py-0.5 sm:py-1 text-red-600 font-bold border border-red-600/20 whitespace-nowrap">
               حصرياً
             </span>
           ) : (
-            <span className="flex items-center gap-1">
-              <Calendar className="h-4 w-4" />
-              {new Date(article.date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}
+            <span className="flex items-center gap-1.5 whitespace-nowrap">
+              <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+              {new Date(article.date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })}
             </span>
           )}
-          <span className="flex items-center gap-1">
-            <span className="i-lucide-clock h-4 w-4" />
+          <span className="flex items-center gap-1.5 whitespace-nowrap">
+            <span className="i-lucide-clock h-3 w-3 sm:h-3.5 sm:w-3.5" />
             {calculateReadingTime(article.content || '')}
           </span>
         </div>
       </div>
 
       {/* Title */}
-      <div className="space-y-4 text-center md:text-right mb-8">
-        <h1 className="text-3xl font-bold leading-tight tracking-tight md:text-4xl lg:text-5xl text-foreground">
+      <div className="space-y-3 md:space-y-4 text-center md:text-right mb-6 md:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold leading-tight tracking-tight md:text-4xl lg:text-5xl text-foreground">
           {article.title}
         </h1>
         {article.content_source && (
@@ -414,11 +484,11 @@ export default function ArticlePage() {
       </div>
 
       {/* Featured Image (Full Width) */}
-      <div className="relative overflow-hidden rounded-[5px] shadow-lg mb-8">
+      <div className="relative overflow-hidden rounded-[5px] shadow-lg mb-4 md:mb-8">
         <img 
           src={article.image} 
           alt={article.title} 
-          className="w-full object-cover max-h-[600px]"
+          className="w-full object-cover max-h-[300px] sm:max-h-[400px] md:max-h-[600px]"
           loading="eager"
           decoding="async"
           fetchPriority="high"
@@ -435,41 +505,41 @@ export default function ArticlePage() {
           <style dangerouslySetInnerHTML={{ __html: ARTICLE_STYLE }} />
 
           <section className="rounded-[5px] border border-border/40 bg-card/30 backdrop-blur-sm overflow-hidden relative">
-            <div className="border-b border-border/40 px-4 sm:px-6 md:px-10 py-3 flex items-center justify-between">
-              <div />
-              <div className="flex items-center gap-2">
+            <div className="border-b border-border/40 px-4 sm:px-6 md:px-10 py-3 flex items-center">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-nowrap">
                 <button
-                  onClick={() => setFontSize(prev => Math.min(prev + 0.125, 2.5))}
-                  className="inline-flex items-center gap-1 rounded-[5px] border border-border/60 bg-background/60 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all"
+                  onClick={() => setFontSize(prev => Math.min(prev + 0.125, 2))}
+                  disabled={fontSize >= 2}
+                  className="inline-flex items-center gap-1 rounded-[5px] border px-2.5 sm:px-3 py-1.5 text-xs font-medium transition-all shrink-0 disabled:opacity-40 disabled:cursor-not-allowed border-border/60 bg-background/60 text-muted-foreground hover:text-primary hover:border-primary/40 hover:bg-primary/5"
                   title="تكبير الخط"
                 >
                   <ZoomIn className="h-3.5 w-3.5" />
-                  <span>تكبير</span>
+                  <span className="hidden sm:inline">تكبير</span>
                 </button>
                 <button
-                  onClick={() => setFontSize(prev => Math.max(prev - 0.125, 0.75))}
-                  className="inline-flex items-center gap-1 rounded-[5px] border border-border/60 bg-background/60 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all"
+                  onClick={() => setFontSize(prev => Math.max(prev - 0.125, 1))}
+                  disabled={fontSize <= 1}
+                  className="inline-flex items-center gap-1 rounded-[5px] border px-2.5 sm:px-3 py-1.5 text-xs font-medium transition-all shrink-0 disabled:opacity-40 disabled:cursor-not-allowed border-border/60 bg-background/60 text-muted-foreground hover:text-primary hover:border-primary/40 hover:bg-primary/5"
                   title="تصغير الخط"
                 >
                   <ZoomOut className="h-3.5 w-3.5" />
-                  <span>تصغير</span>
+                  <span className="hidden sm:inline">تصغير</span>
                 </button>
-                {fontSize !== 1.125 && (
-                  <button
-                    onClick={() => setFontSize(1.125)}
-                    className="inline-flex items-center gap-1 rounded-[5px] border border-border/60 bg-background/60 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all"
-                    title="إعادة ضبط الخط"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                    <span>إعادة ضبط</span>
-                  </button>
-                )}
+                <button
+                  onClick={() => setFontSize(1.125)}
+                  disabled={fontSize === 1.125}
+                  className="inline-flex items-center gap-1 rounded-[5px] border px-2.5 sm:px-3 py-1.5 text-xs font-medium transition-all shrink-0 disabled:opacity-40 disabled:cursor-not-allowed border-border/60 bg-background/60 text-muted-foreground hover:text-primary hover:border-primary/40 hover:bg-primary/5"
+                  title="إعادة ضبط الخط"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">إعادة ضبط</span>
+                </button>
               </div>
             </div>
             <div
               className="article-body w-full p-4 sm:p-6 md:p-10"
               lang="ar"
-              style={{ fontSize: `${fontSize}rem` }}
+              style={{ '--article-font-size': `${fontSize}rem` } as React.CSSProperties}
               dangerouslySetInnerHTML={{ __html: article.contentHtml || '' }}
             />
           </section>

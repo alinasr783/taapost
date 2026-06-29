@@ -97,10 +97,10 @@ export default function HomeCarousel({ articles }: Props) {
 
             {/* Controls inside each slide */}
             <div className="absolute inset-0 pointer-events-none">
-              <div className="h-full flex flex-col justify-end pb-4 md:pb-8 px-4 md:px-8 lg:px-12">
-                {/* Desktop Controls */}
-                <div className="hidden md:flex flex-col items-start gap-3 pointer-events-auto">
-                  <div className="flex flex-wrap items-center gap-2 text-xs">
+              <div className="h-full flex flex-col pb-4 md:pb-8 px-4 md:px-8 lg:px-12">
+                {/* Tags at top-right */}
+                <div className="flex justify-start pt-4 md:pt-6">
+                  <div className="pointer-events-auto flex flex-wrap items-center gap-2 text-xs">
                     <button
                       type="button"
                       onClick={(e) => {
@@ -116,10 +116,50 @@ export default function HomeCarousel({ articles }: Props) {
                       <span className="text-red-500 font-bold bg-white/10 px-2 py-0.5 rounded backdrop-blur-sm">حصرياً</span>
                     )}
                   </div>
+                </div>
+
+                {/* Spacer */}
+                <div className="flex-1" />
+
+                {/* Desktop Bottom Section: Title + Controls */}
+                <div className="hidden md:flex flex-col gap-3 pointer-events-auto">
                   <h3 className="text-xl font-bold leading-relaxed sm:text-2xl md:text-4xl text-white">
                     {slide.title}
                   </h3>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handlePrev}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
+                      >
+                        ‹
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleNext}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
+                      >
+                        ›
+                      </button>
+                      <div className="flex items-center gap-1">
+                        {articles.map((item, i) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              scrollToSlide(i)
+                            }}
+                            className={`h-1.5 rounded-full transition-all ${
+                              i === index
+                                ? 'w-6 bg-white'
+                                : 'w-2 bg-white/40 hover:bg-white/70'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
                     <button
                       type="button"
                       onClick={(e) => {
@@ -131,63 +171,47 @@ export default function HomeCarousel({ articles }: Props) {
                       اقرأ المزيد
                     </button>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={handlePrev}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
-                    >
-                      ‹
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleNext}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
-                    >
-                      ›
-                    </button>
-                    <div className="flex items-center gap-1">
-                      {articles.map((item, i) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            scrollToSlide(i)
-                          }}
-                          className={`h-1.5 rounded-full transition-all ${
-                            i === index
-                              ? 'w-6 bg-white'
-                              : 'w-2 bg-white/40 hover:bg-white/70'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </div>
                 </div>
 
-                {/* Mobile Controls */}
-                <div className="flex flex-col items-start gap-3 md:hidden pointer-events-auto">
-                  <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        const categoryId = slide.categoryId ?? slide.category_id
-                        navigate(`/category/${categoryId}`)
-                      }}
-                      className="inline-flex rounded-[5px] border border-white/30 bg-black/30 px-3 py-1 text-white backdrop-blur hover:bg-black/50"
-                    >
-                      {slide.category}
-                    </button>
-                    {slide.is_exclusive && (
-                      <span className="text-red-500 font-bold bg-white/10 px-2 py-0.5 rounded backdrop-blur-sm">حصرياً</span>
-                    )}
-                  </div>
+                {/* Mobile Bottom Section: Title + Controls */}
+                <div className="flex flex-col gap-3 md:hidden pointer-events-auto">
                   <h3 className="text-lg font-bold leading-relaxed text-right text-white">
                     {slide.title}
                   </h3>
-                  <div className="flex flex-wrap justify-start gap-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handlePrev}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
+                      >
+                        ‹
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleNext}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
+                      >
+                        ›
+                      </button>
+                      <div className="flex items-center gap-1">
+                        {articles.map((item, i) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              scrollToSlide(i)
+                            }}
+                            className={`h-1.5 rounded-full transition-all ${
+                              i === index
+                                ? 'w-6 bg-white'
+                                : 'w-2 bg-white/40 hover:bg-white/70'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
                     <button
                       type="button"
                       onClick={(e) => {
@@ -198,39 +222,6 @@ export default function HomeCarousel({ articles }: Props) {
                     >
                       اقرأ المزيد
                     </button>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={handlePrev}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
-                    >
-                      ‹
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleNext}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-[5px] border border-white/70 bg-black/40 text-sm text-white shadow-sm backdrop-blur hover:bg-black/60"
-                    >
-                      ›
-                    </button>
-                    <div className="flex items-center gap-1">
-                      {articles.map((item, i) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            scrollToSlide(i)
-                          }}
-                          className={`h-1.5 rounded-full transition-all ${
-                            i === index
-                              ? 'w-6 bg-white'
-                              : 'w-2 bg-white/40 hover:bg-white/70'
-                          }`}
-                        />
-                      ))}
-                    </div>
                   </div>
                 </div>
               </div>
