@@ -40,6 +40,7 @@ export default function AuthorPage() {
         .from('articles')
         .select('id,slug,title,excerpt,image,date,is_exclusive,category_id,categories(id,name,slug)')
         .eq('author_id', authorData.id)
+        .eq('type', 'article')
         .order('date', { ascending: false })
         .limit(60)
 
@@ -178,7 +179,7 @@ export default function AuthorPage() {
                       <button
                         key={article.id}
                         type="button"
-                        onClick={() => navigate(article.slug ? `/post/${encodeURIComponent(article.slug)}` : `/post/${article.id}`)}
+                        onClick={() => navigate(article.slug ? `/article/${encodeURIComponent(article.slug)}` : `/article/${article.id}`)}
                         className="relative flex min-w-[360px] max-w-[480px] flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md"
                       >
                         <div className="relative h-56 w-full">

@@ -23,7 +23,7 @@ export default async function handler(req, res) {
     let categories = []
     if (client) {
       const [artRes, catRes] = await Promise.all([
-        client.from('articles').select('id, slug, date, updated_at').limit(1000),
+        client.from('articles').select('id, slug, date, updated_at, type').limit(1000),
         client.from('categories').select('id, slug, updated_at').limit(1000),
       ])
       if (!artRes.error && Array.isArray(artRes.data)) articles = artRes.data
@@ -41,7 +41,8 @@ export default async function handler(req, res) {
 
     push(`${base}/`, now, 'daily', '1.0')
     push(`${base}/categories`, now, 'weekly', '0.8')
-    push(`${base}/posts`, now, 'daily', '0.8')
+    push(`${base}/articles`, now, 'daily', '0.8')
+    push(`${base}/content`, now, 'weekly', '0.6')
 
     for (const c of categories) {
       const loc = c.slug ? `${base}/قسم/${encodeURIComponent(c.slug)}` : `${base}/category/${c.id}`
@@ -49,8 +50,10 @@ export default async function handler(req, res) {
     }
 
     for (const a of articles) {
-      const loc = a.slug ? `${base}/post/${encodeURIComponent(a.slug)}` : `${base}/post/${a.id}`
-      push(loc, a.updated_at || a.date || now, 'daily', '0.9')
+      const isArticle = a.type === 'article'
+      const basePath = isArticle ? 'article' : 'post'
+      const loc = a.slug ? `${base}/${basePath}/${encodeURIComponent(a.slug)}` : `${base}/${basePath}/${a.id}`
+      push(loc, a.updated_at || a.date || now, 'daily', isArticle ? '0.9' : '0.7')
     }
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>

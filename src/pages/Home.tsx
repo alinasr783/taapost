@@ -35,6 +35,17 @@ function getSettingsSourceIds(settings: unknown) {
   return settings.source_ids.filter((x): x is number => typeof x === 'number' && Number.isFinite(x))
 }
 
+function getSettingsContentType(settings: unknown): string {
+  if (!isRecord(settings)) return 'all'
+  const v = settings.content_type
+  return (v === 'article' || v === 'other') ? v : 'all'
+}
+
+function filterByContentType(articles: Article[], contentType: string): Article[] {
+  if (contentType === 'all') return articles
+  return articles.filter(a => a.type === contentType)
+}
+
 const emptyArticles: Article[] = []
 const emptySections: HomepageSection[] = []
 
@@ -238,6 +249,8 @@ export default function Home() {
         if (section.type === 'carousel') {
            const count = getSettingsCount(section.settings, 5)
            let slides = sortedArticles;
+           const contentType = getSettingsContentType(section.settings)
+           slides = filterByContentType(slides, contentType)
 
            const sourceType = getSettingsSourceType(section.settings)
            if (sourceType === 'category' && section.category_id) {
@@ -255,7 +268,10 @@ export default function Home() {
 
         if (section.type === 'latest_grid') {
              const count = getSettingsCount(section.settings, 6)
-             const list = sortedArticles.slice(0, count);
+             const contentType = getSettingsContentType(section.settings)
+             let list = sortedArticles;
+             list = filterByContentType(list, contentType)
+             list = list.slice(0, count);
              if (list.length === 0) return null;
              
              return (
@@ -263,8 +279,8 @@ export default function Home() {
                     <div className="flex items-center justify-between border-b border-primary/10 pb-4">
                         <h2 className="text-2xl font-bold border-r-4 border-primary pr-3">{section.title || 'أحدث المقالات'}</h2>
                          <button
-                          type="button"
-                          onClick={() => navigate('/posts')} 
+                           type="button"
+                           onClick={() => navigate('/articles')} 
                           className="text-xs font-medium bg-primary/10 text-primary px-4 py-1.5 rounded-full hover:bg-primary hover:text-primary-foreground transition-all"
                         >
                           المزيد
@@ -273,13 +289,13 @@ export default function Home() {
                      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                         {list.map((article) => (
                            <div key={article.id} 
-                                onClick={() =>
-                                  navigate(article.slug ? `/post/${encodeURIComponent(article.slug)}` : `/post/${article.id}`)
-                                }
-                                onMouseEnter={() => prefetchArticle(article.slug, article.id)}
-                                className="group cursor-pointer space-y-3"
-                           >
-                                <div className="relative aspect-video overflow-hidden rounded-lg shadow-sm group-hover:shadow-md transition-all border border-border/50 group-hover:border-primary/50">
+                                 onClick={() =>
+                                   navigate(article.slug ? `/article/${encodeURIComponent(article.slug)}` : `/article/${article.id}`)
+                                 }
+                                 onMouseEnter={() => prefetchArticle(article.slug, article.id)}
+                                 className="group cursor-pointer space-y-3"
+                            >
+                                 <div className="relative aspect-video overflow-hidden rounded-lg shadow-sm group-hover:shadow-md transition-all border border-border/50 group-hover:border-primary/50">
                                      <img 
                                         src={article.image} 
                                         alt={article.title}
@@ -317,7 +333,9 @@ export default function Home() {
             const catName = section.categories?.name || section.title;
             const catId = section.category_id || section.categories?.id;
 
-            const list = sortedArticles
+            const contentType = getSettingsContentType(section.settings)
+            let list = filterByContentType(sortedArticles, contentType)
+            list = list
               .filter((a) => a.categoryId === catId)
               .slice(0, getSettingsCount(section.settings, 4))
             
@@ -352,7 +370,7 @@ export default function Home() {
                       key={article.id}
                       type="button"
                       onClick={() =>
-                        navigate(article.slug ? `/post/${encodeURIComponent(article.slug)}` : `/post/${article.id}`)
+                        navigate(article.slug ? `/article/${encodeURIComponent(article.slug)}` : `/article/${article.id}`)
                       }
                       onMouseEnter={() => prefetchArticle(article.slug, article.id)}
                       className="relative flex min-w-[360px] max-w-[480px] flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md"

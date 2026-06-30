@@ -46,6 +46,7 @@ export default function DashboardArticles() {
   const [dateTo, setDateTo] = useState('')
   const [filterCategory, setFilterCategory] = useState<number | ''>('')
   const [filterAuthor, setFilterAuthor] = useState<number | ''>('')
+  const [filterType, setFilterType] = useState<string>('')
 
   const userCategoryIds = !user?.is_superadmin
     ? permissions.map(p => p.category_id)
@@ -77,6 +78,10 @@ export default function DashboardArticles() {
       query = query.eq('author_id', filterAuthor)
     }
 
+    if (filterType) {
+      query = query.eq('type', filterType)
+    }
+
     if (dateFrom) {
       query = query.gte('created_at', dateFrom)
     }
@@ -89,7 +94,7 @@ export default function DashboardArticles() {
     return query
       .order('created_at', { ascending: false })
       .range(fromIdx, fromIdx + count - 1)
-  }, [search, user?.is_superadmin, userCategoryIds, filterCategory, filterAuthor, dateFrom, dateTo])
+  }, [search, user?.is_superadmin, userCategoryIds, filterCategory, filterAuthor, filterType, dateFrom, dateTo])
 
   const fetchArticles = useCallback(async (append = false) => {
     if (abortRef.current) abortRef.current.abort()
@@ -174,9 +179,10 @@ export default function DashboardArticles() {
     setDateTo('')
     setFilterCategory('')
     setFilterAuthor('')
+    setFilterType('')
   }
 
-  const hasActiveFilters = search || dateFrom || dateTo || filterCategory !== '' || filterAuthor !== ''
+  const hasActiveFilters = search || dateFrom || dateTo || filterCategory !== '' || filterAuthor !== '' || filterType !== ''
 
   if (loading) return (
     <div className="p-8 text-center text-muted-foreground flex items-center justify-center gap-3">
@@ -209,7 +215,7 @@ export default function DashboardArticles() {
               type="text"
               placeholder="بحث في المقالات..."
               value={search}
-              onChange={(e) => { setSearch(e.target.value); setVisibleCount(ITEMS_PER_PAGE) }}
+              onChange={(e) => { setSearch(e.target.value) }}
               className="w-full pr-10 pl-4 py-2 bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
@@ -223,7 +229,7 @@ export default function DashboardArticles() {
               <input
                 type="date"
                 value={dateFrom}
-                onChange={(e) => { setDateFrom(e.target.value); setVisibleCount(ITEMS_PER_PAGE) }}
+                onChange={(e) => { setDateFrom(e.target.value) }}
                 className="px-2 py-1.5 text-sm border border-input rounded-md bg-background focus:ring-2 focus:ring-ring outline-none"
               />
             </div>
@@ -234,7 +240,7 @@ export default function DashboardArticles() {
               <input
                 type="date"
                 value={dateTo}
-                onChange={(e) => { setDateTo(e.target.value); setVisibleCount(ITEMS_PER_PAGE) }}
+                onChange={(e) => { setDateTo(e.target.value) }}
                 className="px-2 py-1.5 text-sm border border-input rounded-md bg-background focus:ring-2 focus:ring-ring outline-none"
               />
             </div>
@@ -242,7 +248,7 @@ export default function DashboardArticles() {
             {/* Category Filter */}
             <select
               value={filterCategory}
-              onChange={(e) => { setFilterCategory(e.target.value ? Number(e.target.value) : ''); setVisibleCount(ITEMS_PER_PAGE) }}
+              onChange={(e) => { setFilterCategory(e.target.value ? Number(e.target.value) : '') }}
               className="px-3 py-1.5 text-sm border border-input rounded-md bg-background focus:ring-2 focus:ring-ring outline-none"
             >
               <option value="">كل الأقسام</option>
@@ -254,13 +260,24 @@ export default function DashboardArticles() {
             {/* Author Filter */}
             <select
               value={filterAuthor}
-              onChange={(e) => { setFilterAuthor(e.target.value ? Number(e.target.value) : ''); setVisibleCount(ITEMS_PER_PAGE) }}
+              onChange={(e) => { setFilterAuthor(e.target.value ? Number(e.target.value) : '') }}
               className="px-3 py-1.5 text-sm border border-input rounded-md bg-background focus:ring-2 focus:ring-ring outline-none"
             >
               <option value="">كل الكتّاب</option>
               {authors.map(author => (
                 <option key={author.id} value={author.id}>{author.name}</option>
               ))}
+            </select>
+
+            {/* Type Filter */}
+            <select
+              value={filterType}
+              onChange={(e) => { setFilterType(e.target.value) }}
+              className="px-3 py-1.5 text-sm border border-input rounded-md bg-background focus:ring-2 focus:ring-ring outline-none"
+            >
+              <option value="">كل الأنواع</option>
+              <option value="article">مقالات</option>
+              <option value="other">محتوى آخر</option>
             </select>
 
             {/* Clear Filters */}
@@ -277,7 +294,7 @@ export default function DashboardArticles() {
         
         {/* Mobile Cards */}
         <div className="md:hidden divide-y divide-border">
-          {visibleArticles.map((article) => {
+          {articles.map((article) => {
             const canEdit = user && hasPermission(user, permissions, article.category_id, 'edit')
             const canDelete = user && hasPermission(user, permissions, article.category_id, 'delete')
 
@@ -310,7 +327,7 @@ export default function DashboardArticles() {
 
                     <div className="flex shrink-0 items-center gap-1">
                         <a
-                          href={article.slug ? `/post/${encodeURIComponent(article.slug)}` : `/post/${article.id}`}
+                          href={article.slug ? `${article.type === 'article' ? '/article/' : '/post/'}${encodeURIComponent(article.slug)}` : `${article.type === 'article' ? '/article/' : '/post/'}${article.id}`}
                           target="_blank"
                           rel="noreferrer"
                           className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded transition-colors"
@@ -352,6 +369,7 @@ export default function DashboardArticles() {
               <thead className="bg-muted/50 text-muted-foreground font-medium">
                 <tr>
                   <th className="p-4">العنوان</th>
+                  <th className="p-4">النوع</th>
                   <th className="p-4">الكاتب</th>
                   <th className="p-4">القسم</th>
                   <th className="p-4">التاريخ</th>
@@ -374,6 +392,15 @@ export default function DashboardArticles() {
                         )}
                       </td>
                       <td className="p-4">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          article.type === 'article'
+                            ? 'bg-blue-500/10 text-blue-600'
+                            : 'bg-amber-500/10 text-amber-600'
+                        }`}>
+                          {article.type === 'article' ? 'مقال' : 'آخر'}
+                        </span>
+                      </td>
+                      <td className="p-4">
                         {article.authors ? (
                           <span className="bg-purple-500/10 text-purple-600 px-2 py-1 rounded text-sm">
                             {article.authors.name}
@@ -390,7 +417,7 @@ export default function DashboardArticles() {
                       <td className="p-4 text-muted-foreground">{new Date(article.created_at || article.date).toLocaleDateString('ar-EG')}</td>
                       <td className="p-4 flex gap-2">
                         <a
-                          href={`/post/${article.id}`}
+                          href={article.slug ? `${article.type === 'article' ? '/article/' : '/post/'}${encodeURIComponent(article.slug)}` : `${article.type === 'article' ? '/article/' : '/post/'}${article.id}`}
                           target="_blank"
                           rel="noreferrer"
                           className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded transition-colors"
@@ -422,7 +449,7 @@ export default function DashboardArticles() {
                 })}
                 {articles.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                    <td colSpan={6} className="p-8 text-center text-muted-foreground">
                       لا توجد مقالات لعرضها
                     </td>
                   </tr>

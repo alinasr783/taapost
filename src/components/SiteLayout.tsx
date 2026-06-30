@@ -277,7 +277,7 @@ export default function SiteLayout({ children }: Props) {
                   e.preventDefault()
                   const qp = new URLSearchParams()
                   if (q) qp.set('q', q)
-                  navigate(`/posts?${qp.toString()}`)
+                  navigate(`/articles?${qp.toString()}`)
                 }}
                 className="flex flex-1 items-center justify-end gap-2 max-w-[380px]"
               >
@@ -439,10 +439,10 @@ export default function SiteLayout({ children }: Props) {
               <div className="my-2 border-t border-border/60" />
 
               <Link
-                to="/posts"
+                to="/articles"
                 onClick={() => setMenuOpen(false)}
                 className={`flex items-center gap-3 rounded-[5px] px-3 py-2.5 transition-colors ${
-                  location.pathname.includes('/posts') || location.pathname.includes('/post') || location.pathname.includes('/مقال') ? 'bg-primary/10 text-primary font-medium' : 'text-foreground/80 hover:bg-muted/50 hover:text-primary'
+                  location.pathname.includes('/articles') || location.pathname.includes('/article') || location.pathname.includes('/المقالات') || location.pathname.includes('/مقال') ? 'bg-primary/10 text-primary font-medium' : 'text-foreground/80 hover:bg-muted/50 hover:text-primary'
                 }`}
               >
                 <FileText size={20} />

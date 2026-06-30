@@ -4,6 +4,9 @@ const Home = lazy(() => import('./pages/Home'))
 const Categories = lazy(() => import('./pages/Categories'))
 const CategoryPage = lazy(() => import('./pages/CategoryPage'))
 const Articles = lazy(() => import('./pages/Articles'))
+const ArticlesPage = lazy(() => import('./pages/ArticlesPage'))
+const ArticleViewPage = lazy(() => import('./pages/ArticleViewPage'))
+const ContentListPage = lazy(() => import('./pages/ContentListPage'))
 const ArticlePage = lazy(() => import('./pages/ArticlePage'))
 const AuthorPage = lazy(() => import('./pages/AuthorPage'))
 const AuthorsList = lazy(() => import('./pages/AuthorsList'))
@@ -68,15 +71,20 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/categories" element={<Categories />} />
             <Route path="/category/:id" element={<CategoryPage />} />
-            <Route path="/posts" element={<Articles />} />
+            <Route path="/posts" element={<Navigate to="/articles" replace />} />
+            <Route path="/articles" element={<ArticlesPage />} />
+            <Route path="/article/:slug" element={<ArticleViewPage />} />
+            <Route path="/content" element={<ContentListPage />} />
             <Route path="/post/:id" element={<ArticlePage />} />
             <Route path="/author/:id" element={<AuthorPage />} />
             <Route path="/authors" element={<AuthorsList />} />
 
             <Route path="/الأقسام" element={<Navigate to="/categories" replace />} />
             <Route path="/قسم/:slug" element={<CategoryPage />} />
-            <Route path="/المقالات" element={<Navigate to="/posts" replace />} />
-            <Route path="/مقال/:slug" element={<ArticlePage />} />
+            <Route path="/المقالات" element={<Navigate to="/articles" replace />} />
+            <Route path="/مقال/:slug" element={<ArticleViewPage />} />
+            <Route path="/محتوى" element={<Navigate to="/content" replace />} />
+            <Route path="/محتوى/:slug" element={<ArticlePage />} />
             <Route path="/كاتب/:slug" element={<AuthorPage />} />
             <Route path="/الكتاب" element={<AuthorsList />} />
 

@@ -28,13 +28,15 @@ export default function DashboardHomeCustomization() {
     count: number;
     source_type: SourceType;
     source_ids: number[];
+    content_type: string;
   }>({
     type: 'category_grid',
     title: '',
     category_id: '',
     count: 4,
     source_type: 'latest',
-    source_ids: []
+    source_ids: [],
+    content_type: 'all'
   })
 
   const sensors = useSensors(
@@ -143,7 +145,7 @@ export default function DashboardHomeCustomization() {
     setIsSaving(true)
     
     try {
-      const settings: Record<string, unknown> = { count: formData.count }
+      const settings: Record<string, unknown> = { count: formData.count, content_type: formData.content_type }
       let categoryId = formData.category_id || null
 
       if (formData.type === 'carousel') {
@@ -185,7 +187,8 @@ export default function DashboardHomeCustomization() {
           category_id: '',
           count: 4,
           source_type: 'latest',
-          source_ids: []
+          source_ids: [],
+          content_type: 'all'
         })
         showToast('تم إضافة القسم بنجاح')
       }
@@ -348,6 +351,20 @@ export default function DashboardHomeCustomization() {
                       />
                       <span>أقسام متعددة (Multiple Categories)</span>
                     </label>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">نوع المحتوى</label>
+                    <select
+                      value={formData.content_type}
+                      onChange={(e) => setFormData({ ...formData, content_type: e.target.value })}
+                      className="w-full p-2 bg-background border border-input rounded-md"
+                    >
+                      <option value="all">الكل</option>
+                      <option value="article">مقالات فقط</option>
+                      <option value="other">محتوى آخر فقط</option>
+                    </select>
+                    <p className="text-xs text-muted-foreground mt-1">اختيار "الكل" يعرض كلا النوعين معاً</p>
                   </div>
 
                   {formData.source_type === 'category' && (

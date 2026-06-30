@@ -24,6 +24,8 @@ export type Category = {
   sidebar_order?: number
 }
 
+export type ContentType = 'article' | 'other'
+
 export type Article = {
   id: number
   slug?: string
@@ -32,7 +34,7 @@ export type Article = {
   content: string
   image: string
   category_id: number
-  type: string
+  type: ContentType
   date: string
   categories?: Category
   author_id?: number
@@ -93,6 +95,13 @@ export type Author = {
   slug?: string
 }
 
+export type SectionSettings = {
+  count?: number
+  source_type?: 'latest' | 'category' | 'categories'
+  source_ids?: number[]
+  content_type?: ContentType | 'all'
+}
+
 export type HomepageSection = {
   id: number
   type: 'carousel' | 'category_grid' | 'category_list' | 'custom' | 'latest_grid' | 'category_section'
@@ -100,7 +109,7 @@ export type HomepageSection = {
   category_id?: number
   display_order: number
   is_active: boolean
-  settings?: Record<string, unknown>
+  settings?: SectionSettings
   categories?: Category // For joined data
 }
 

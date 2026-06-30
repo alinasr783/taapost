@@ -175,11 +175,16 @@ export default function ArticlePage() {
 
       if (!data) {
         console.warn('[ArticlePage] No article data found for:', articleQueryKey)
-        return { article: null as Article | null, toc: [], related: [], redirectToId: null as number | null }
+        return { article: null as Article | null, toc: [], related: [], redirectToId: null as number | null, redirectToArticle: null as string | null }
+      }
+
+      if (data.type === 'article') {
+        const target = data.slug ? `/article/${encodeURIComponent(data.slug)}` : `/article/${data.id}`
+        return { article: null as Article | null, toc: [], related: [], redirectToId: null as number | null, redirectToArticle: target }
       }
 
       if (articleQueryKey.type === 'slug') {
-        return { article: data as Article, toc: [], related: [], redirectToId: Number(data.id) }
+        return { article: data as Article, toc: [], related: [], redirectToId: Number(data.id), redirectToArticle: null }
       }
 
       if (!data.content) {
@@ -283,6 +288,7 @@ export default function ArticlePage() {
         toc,
         related,
         redirectToId: null as number | null,
+        redirectToArticle: null as string | null,
       }
     },
     enabled: Boolean(articleQueryKey),
@@ -297,14 +303,25 @@ export default function ArticlePage() {
     return `/post/${article.id}`
   }
 
+  const buildContentUrl = (a: Article) => {
+    const p = a.slug ? `/post/${encodeURIComponent(a.slug)}` : `/post/${a.id}`
+    return p
+  }
+
   useEffect(() => {
+    const redirectToArticle = articleQuery.data?.redirectToArticle
+    if (redirectToArticle) {
+      if (decodeURIComponent(window.location.pathname).replace(/\/+$/, '') === redirectToArticle.replace(/\/+$/, '')) return
+      navigate(redirectToArticle, { replace: true })
+      return
+    }
     const redirectToId = articleQuery.data?.redirectToId
     const article = articleQuery.data?.article
     if (!redirectToId || !article) return
     const target = article.slug ? `/post/${encodeURIComponent(article.slug)}` : `/post/${redirectToId}`
     if (decodeURIComponent(window.location.pathname).replace(/\/+$/, '') === target.replace(/\/+$/, '')) return
     navigate(target, { replace: true })
-  }, [articleQuery.data?.redirectToId, articleQuery.data?.article, navigate])
+  }, [articleQuery.data?.redirectToArticle, articleQuery.data?.redirectToId, articleQuery.data?.article, navigate])
 
   const article = articleQuery.data?.article ?? null
   const relatedArticles = articleQuery.data?.related ?? []
@@ -427,16 +444,15 @@ export default function ArticlePage() {
         title={article.title}
         description={article.excerpt || article.title}
         canonicalPath={article.slug ? `/post/${encodeURIComponent(article.slug)}` : `/post/${article.id}`}
-        ogType="article"
+        ogType="website"
         image={article.image}
         jsonLd={{
           '@context': 'https://schema.org',
-          '@type': 'Article',
-          headline: article.title,
+          '@type': 'WebPage',
+          name: article.title,
           description: article.excerpt || '',
           datePublished: article.date || '',
           image: article.image ? [{ '@type': 'ImageObject', url: article.image }] : undefined,
-          author: article.authors?.name ? { '@type': 'Person', name: article.authors.name } : undefined,
           inLanguage: 'ar',
         }}
       />
@@ -582,7 +598,7 @@ export default function ArticlePage() {
                   {visibleAuthorArticles.map((authArticle) => (
                     <Link
                       key={authArticle.id}
-                      to={authArticle.slug ? `/post/${encodeURIComponent(authArticle.slug)}` : `/post/${authArticle.id}`}
+                      to={buildContentUrl(authArticle)}
                       className="group rounded-[5px] border border-border/40 bg-background/50 overflow-hidden hover:border-primary/30 hover:shadow-md transition-all"
                     >
                       <div className="relative h-40 w-full overflow-hidden">
@@ -657,7 +673,7 @@ export default function ArticlePage() {
               {relatedArticles.map((related) => (
                 <Link 
                   key={related.id} 
-                  to={related.slug ? `/post/${encodeURIComponent(related.slug)}` : `/post/${related.id}`}
+                  to={buildContentUrl(related)}
                   className="relative flex min-w-[360px] max-w-[480px] flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md group"
                 >
                   <div className="relative h-56 w-full">

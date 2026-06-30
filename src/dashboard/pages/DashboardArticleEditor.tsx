@@ -366,7 +366,7 @@ export default function DashboardArticleEditor() {
           )}
           {!slugError && slug.trim() && (
             <p className="mt-2 text-xs text-muted-foreground" dir="ltr">
-              رابط المقال: /post/<span className="font-mono text-primary">{slug.trim()}</span>
+              رابط {formData.type === 'article' ? 'المقال' : 'المحتوى'}: /{formData.type === 'article' ? 'article' : 'post'}/<span className="font-mono text-primary">{slug.trim()}</span>
             </p>
           )}
         </div>
@@ -432,27 +432,25 @@ export default function DashboardArticleEditor() {
         {/* Author & Content Source */}
         <div className="bg-card rounded-lg border border-border p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
-                الكاتب (اختياري)
-                {isOtherType && (
-                  <span className="text-xs text-muted-foreground mr-2">- غير متاح لنوع "آخر"</span>
-                )}
-              </label>
-              <select
-                value={formData.author_id}
-                onChange={(e) => setFormData({ ...formData, author_id: Number(e.target.value) })}
-                disabled={isOtherType}
-                className="w-full p-3 bg-background border border-input rounded-lg focus:ring-2 focus:ring-ring outline-none text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <option value={0}>بدون كاتب</option>
-                {authors.map(author => (
-                  <option key={author.id} value={author.id}>{author.name}</option>
-                ))}
-              </select>
-            </div>
+            {!isOtherType && (
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  الكاتب (اختياري)
+                </label>
+                <select
+                  value={formData.author_id}
+                  onChange={(e) => setFormData({ ...formData, author_id: Number(e.target.value) })}
+                  className="w-full p-3 bg-background border border-input rounded-lg focus:ring-2 focus:ring-ring outline-none text-foreground"
+                >
+                  <option value={0}>بدون كاتب</option>
+                  {authors.map(author => (
+                    <option key={author.id} value={author.id}>{author.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
-            <div>
+            <div className={isOtherType ? 'md:col-span-2' : ''}>
               <label className="block text-sm font-medium text-foreground mb-2">مصدر المحتوى (اختياري)</label>
               <input
                 type="text"

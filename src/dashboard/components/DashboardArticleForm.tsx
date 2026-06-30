@@ -321,7 +321,7 @@ export default function DashboardArticleForm({ article, categories, user, permis
             )}
             {!slugError && slug.trim() && (
               <p className="text-xs text-muted-foreground" dir="ltr">
-                رابط المقال: /post/<span className="font-mono text-primary">{slug.trim()}</span>
+                رابط المحتوى: /post/<span className="font-mono text-primary">{slug.trim()}</span>
               </p>
             )}
             <div className="rounded-md bg-muted/30 border border-border/40 p-3 text-xs text-muted-foreground space-y-1">

@@ -7,7 +7,8 @@ type Props = {
 }
 
 function articleUrl(article: Article) {
-  return article.slug ? `/post/${encodeURIComponent(article.slug)}` : `/post/${article.id}`
+  const base = article.type === 'article' ? '/article/' : '/post/'
+  return article.slug ? `${base}${encodeURIComponent(article.slug)}` : `${base}${article.id}`
 }
 
 export default function HomeCarousel({ articles }: Props) {
