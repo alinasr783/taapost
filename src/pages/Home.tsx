@@ -377,8 +377,11 @@ export default function Home() {
 
              return (
                <section key={section.id} className="container space-y-6">
-                 <h2 className="text-2xl font-bold border-r-4 border-primary pr-3">{section.title || 'مقالات الكتّاب'}</h2>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                 <div className="flex items-center gap-3 border-b border-primary/10 pb-4">
+                   <div className="w-1 h-6 rounded-full bg-primary/60" />
+                   <h2 className="text-2xl font-bold text-foreground">{section.title || 'مقالات الكتّاب'}</h2>
+                 </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                    {list.map((article) => (
                      <button
                        key={article.id}
@@ -387,28 +390,30 @@ export default function Home() {
                          navigate(article.slug ? `/article/${encodeURIComponent(article.slug)}` : `/article/${article.id}`)
                        }
                        onMouseEnter={() => prefetchArticle(article.slug, article.id)}
-                       className="group flex items-center gap-5 p-4 rounded-xl border border-border/40 bg-card hover:shadow-lg hover:border-primary/30 transition-all w-full text-right"
+                       className="group relative flex items-center gap-4 p-3 rounded-2xl border border-border/30 bg-gradient-to-l from-primary/[0.02] to-transparent hover:shadow-md hover:border-primary/25 transition-all duration-300 w-full text-right overflow-hidden"
                      >
-                       <div className="w-16 h-16 md:w-20 md:h-20 rounded-full overflow-hidden border-2 border-primary/20 shrink-0 bg-primary/5">
+                       <div className="absolute right-0 top-3 bottom-3 w-0.5 bg-primary/0 group-hover:bg-primary/30 rounded-full transition-all duration-300" />
+                       <div className="relative w-16 h-16 md:w-[72px] md:h-[72px] rounded-2xl overflow-hidden border-2 border-primary/10 shrink-0 bg-gradient-to-br from-primary/10 to-primary/5 shadow-sm group-hover:shadow-md group-hover:border-primary/30 transition-all duration-300">
                          {article.authors?.image ? (
                            <img src={article.authors.image} alt={article.authors.name} className="w-full h-full object-cover" />
                          ) : (
-                           <div className="w-full h-full flex items-center justify-center text-lg font-bold text-primary">
+                           <div className="w-full h-full flex items-center justify-center text-xl font-bold text-primary">
                              {article.authors?.name?.charAt(0) || '?'}
                            </div>
                          )}
                        </div>
-                       <div className="flex-1 min-w-0 text-right">
-                         <h3 className="font-bold text-foreground group-hover:text-primary transition-colors leading-snug text-base md:text-lg">
+                       <div className="flex-1 min-w-0 py-1">
+                         <h3 className="font-bold text-foreground group-hover:text-primary transition-colors leading-snug text-base md:text-lg line-clamp-2">
                            {article.title}
                          </h3>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {article.authors?.name}
-                          </p>
-                          <p className="text-[11px] text-muted-foreground/60 mt-0.5">
-                            {new Date(article.date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}
-                          </p>
-                        </div>
+                         <div className="flex items-center gap-2 mt-2">
+                           <span className="text-xs text-muted-foreground/80">{article.authors?.name}</span>
+                           <span className="text-[10px] text-muted-foreground/30">•</span>
+                           <span className="text-[11px] text-muted-foreground/50">
+                             {new Date(article.date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}
+                           </span>
+                         </div>
+                       </div>
                      </button>
                    ))}
                  </div>
