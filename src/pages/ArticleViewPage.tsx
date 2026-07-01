@@ -160,7 +160,21 @@ export default function ArticleViewPage() {
         .limit(5)
         .order('date', { ascending: false })
 
-      return { article, related: (relatedData ?? []) as Article[], error: null }
+      const authorId = article.author_id
+      let authorArticles: Article[] = []
+      if (authorId) {
+        const { data: authorArtData } = await supabase
+          .from('articles')
+          .select('id, slug, title, image, date, excerpt, is_exclusive')
+          .eq('author_id', authorId)
+          .eq('type', 'article')
+          .neq('id', article.id)
+          .limit(4)
+          .order('date', { ascending: false })
+        authorArticles = (authorArtData ?? []) as Article[]
+      }
+
+      return { article, related: (relatedData ?? []) as Article[], authorArticles, error: null }
     },
     enabled: Boolean(decodedSlug),
     staleTime: 5 * 60_000,
@@ -170,6 +184,7 @@ export default function ArticleViewPage() {
 
   const article = articleQuery.data?.article ?? null
   const relatedArticles = articleQuery.data?.related ?? []
+  const authorArticles = articleQuery.data?.authorArticles ?? []
 
   const [fontSize, setFontSize] = useState(() => {
     try { const saved = localStorage.getItem('article_font_size'); return saved ? Number(saved) : 1.125 }
@@ -409,6 +424,52 @@ export default function ArticleViewPage() {
             description={article.excerpt}
           />
         </div>
+
+        {article.authors && authorArticles.length > 0 && (
+          <section className="mt-10">
+            <h2 className="text-lg font-bold mb-5 flex items-center gap-2">
+              <span className="w-1 h-5 bg-primary rounded-full" />
+              اقرأ أيضاً لـ {article.authors.name}
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {authorArticles.map((item) => (
+                <Link
+                  key={item.id}
+                  to={`/article/${encodeURIComponent(item.slug || String(item.id))}`}
+                  className="group rounded-xl border border-border/30 bg-card overflow-hidden hover:shadow-md hover:border-primary/25 transition-all"
+                >
+                  <div className="relative aspect-[16/9] overflow-hidden bg-muted/30">
+                    {item.image ? (
+                      <img
+                        src={item.image}
+                        alt={item.title}
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center text-muted-foreground/30">
+                        <BookOpen size={24} />
+                      </div>
+                    )}
+                    {item.is_exclusive && (
+                      <div className="absolute right-1.5 top-1.5 rounded-md bg-red-600/80 px-1.5 py-0.5 text-[9px] text-white font-bold">
+                        حصرياً
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-2.5">
+                    <h3 className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-2 leading-snug">
+                      {item.title}
+                    </h3>
+                    <p className="text-[10px] text-muted-foreground/60 mt-1.5">
+                      {new Date(item.date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
       </article>
 
       {/* Related Articles */}

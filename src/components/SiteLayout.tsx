@@ -209,7 +209,7 @@ export default function SiteLayout({ children }: Props) {
   return (
     <SiteSettingsProvider value={mergedSettings}>
       <div className="min-h-dvh bg-background text-foreground flex flex-col">
-        <header className="border-b border-border/60 bg-background/80 backdrop-blur">
+        <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur">
           <div className="container flex items-center justify-between gap-3 py-4">
             <Link
               to="/"
@@ -281,24 +281,6 @@ export default function SiteLayout({ children }: Props) {
               >
                 <Menu size={18} />
               </button>
-            </div>
-          </div>
-          <div className="border-t border-border/70 bg-background/90">
-            <div className="container overflow-x-auto">
-              <div className="flex gap-6 py-3 text-sm font-medium text-foreground/90">
-                {categories.map((cat) => (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() =>
-                      navigate(cat.slug ? `/قسم/${encodeURIComponent(cat.slug)}` : `/category/${cat.id}`)
-                    }
-                    className="whitespace-nowrap rounded-[5px] px-2 py-1 hover:bg-muted/40 hover:text-primary"
-                  >
-                    {cat.name}
-                  </button>
-                ))}
-              </div>
             </div>
           </div>
         </header>
