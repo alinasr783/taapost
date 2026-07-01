@@ -20,11 +20,11 @@ export default function AuthorPage() {
 
       let authorData: Author | null = null
       if (authorId) {
-        const { data, error } = await supabase.from('authors').select('*').eq('id', authorId).maybeSingle()
+        const { data, error } = await supabase.from('authors').select('id, name, image, bio, role, slug, banner, social_links, website').eq('id', authorId).maybeSingle()
         if (error) throw error
         authorData = (data as Author | null) ?? null
       } else if (authorSlug) {
-        const { data, error } = await supabase.from('authors').select('*').eq('slug', authorSlug).maybeSingle()
+        const { data, error } = await supabase.from('authors').select('id, name, image, bio, role, slug, banner, social_links, website').eq('slug', authorSlug).maybeSingle()
         if (error) throw error
         authorData = (data as Author | null) ?? null
         if (authorData) return { author: null, articles: [], redirectToId: authorData.id }

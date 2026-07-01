@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
 import { Facebook, Twitter, Instagram, Linkedin, Youtube, MessageCircle, Send, Mail, Globe, Link as LinkIcon, FileText, type LucideIcon } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
-import { supabase, type LogoSetting } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
+import { useSiteSettings } from './useSiteSettings'
 
 type SocialLink = {
   id: number
@@ -34,12 +35,14 @@ type Props = {
 }
 
 export default function Footer({ siteSettings }: Props) {
+  const site = useSiteSettings()
+
   const { data: socialLinks = [] } = useQuery<SocialLink[]>({
     queryKey: ['social_links'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('social_links')
-        .select('*')
+        .select('id, platform, url, icon, sort_order')
         .eq('is_active', true)
         .order('sort_order', { ascending: true })
       if (error) throw error
@@ -49,27 +52,14 @@ export default function Footer({ siteSettings }: Props) {
     gcTime: 60 * 60_000,
   })
 
-  const { data: activeLogo } = useQuery<LogoSetting | null>({
-    queryKey: ['logo_settings_active'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('logo_settings')
-        .select('*')
-        .eq('is_active', true)
-        .maybeSingle()
-      if (error && error.code !== 'PGRST116') throw error
-      return (data as LogoSetting | null) ?? null
-    },
-    staleTime: 10 * 60_000,
-    gcTime: 60 * 60_000,
-  })
+  const activeLogo = site.active_logo
 
   const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
 
   const getLogoUrl = () => {
-    if (!activeLogo) return siteSettings?.logo_url || null
+    if (!activeLogo) return siteSettings?.logo_url || site.logo_url || null
     if (isDark && activeLogo.logo_url_dark?.trim()) return activeLogo.logo_url_dark.trim()
-    return activeLogo.logo_url?.trim() || null
+    return activeLogo.logo_url?.trim() || site.logo_url || null
   }
 
   return (

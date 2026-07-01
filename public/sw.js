@@ -1,102 +1,78 @@
-const CACHE_NAME = 'taapost-v1'
-const STATIC_CACHE = 'taapost-static-v1'
-const DYNAMIC_CACHE = 'taapost-dynamic-v1'
+const CACHE = 'taapost-v1'
 
-const STATIC_ASSETS = [
+const PRECACHE_URLS = [
   '/',
-  '/index.html',
-  '/favicon.svg',
-  '/og-default.svg',
+  '/articles',
+  '/categories',
 ]
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => {
-      return cache.addAll(STATIC_ASSETS)
-    })
+    caches.open(CACHE).then((cache) => cache.addAll(PRECACHE_URLS))
   )
-  self.skipWaiting()
 })
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter((name) => name !== STATIC_CACHE && name !== DYNAMIC_CACHE)
-          .map((name) => caches.delete(name))
-      )
-    })
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+    )
   )
-  self.clients.claim()
 })
 
 self.addEventListener('fetch', (event) => {
-  const { request } = event
-  const url = new URL(request.url)
+  if (event.request.method !== 'GET') return
 
-  if (request.method !== 'GET') return
+  const url = new URL(event.request.url)
 
-  if (url.pathname.startsWith('/api/') || url.pathname.includes('supabase')) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response.ok) {
-            const responseClone = response.clone()
-            caches.open(DYNAMIC_CACHE).then((cache) => {
-              cache.put(request, responseClone)
-            })
-          }
-          return response
-        })
-        .catch(() => {
-          return caches.match(request)
-        })
-    )
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(networkFirst(event.request))
     return
   }
 
-  if (url.pathname.match(/\.(js|css|woff|woff2|ttf|eot|svg|png|jpg|jpeg|gif|webp|avif)$/)) {
-    event.respondWith(
-      caches.open(STATIC_CACHE).then((cache) => {
-        return cache.match(request).then((cachedResponse) => {
-          if (cachedResponse) {
-            return cachedResponse
-          }
-          return fetch(request).then((response) => {
-            if (response.ok) {
-              cache.put(request, response.clone())
-            }
-            return response
-          })
-        })
-      })
-    )
+  if (url.pathname.startsWith('/dashboard')) {
+    event.respondWith(networkOnly(event.request))
     return
   }
 
-  event.respondWith(
-    caches.match(request).then((cachedResponse) => {
-      if (cachedResponse) {
-        fetch(request).then((response) => {
-          if (response.ok) {
-            caches.open(DYNAMIC_CACHE).then((cache) => {
-              cache.put(request, response)
-            })
-          }
-        }).catch(() => {})
-        return cachedResponse
-      }
+  if (url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff2?|ttf|eot)$/)) {
+    event.respondWith(cacheFirst(event.request))
+    return
+  }
 
-      return fetch(request).then((response) => {
-        if (response.ok && url.origin === self.location.origin) {
-          const responseClone = response.clone()
-          caches.open(DYNAMIC_CACHE).then((cache) => {
-            cache.put(request, responseClone)
-          })
-        }
-        return response
-      })
-    })
-  )
+  event.respondWith(networkFirst(event.request))
 })
+
+async function cacheFirst(request) {
+  const cached = await caches.match(request)
+  if (cached) return cached
+  try {
+    const response = await fetch(request)
+    if (response.ok) {
+      const cache = await caches.open(CACHE)
+      cache.put(request, response.clone())
+    }
+    return response
+  } catch {
+    return new Response('Offline', { status: 503 })
+  }
+}
+
+async function networkFirst(request) {
+  try {
+    const response = await fetch(request)
+    if (response.ok) {
+      const cache = await caches.open(CACHE)
+      cache.put(request, response.clone())
+    }
+    return response
+  } catch (error) {
+    const cached = await caches.match(request)
+    if (cached) return cached
+    throw error
+  }
+}
+
+async function networkOnly(request) {
+  return fetch(request)
+}

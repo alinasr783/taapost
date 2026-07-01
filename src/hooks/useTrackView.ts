@@ -5,27 +5,30 @@ export function useTrackView(articleId: number) {
   const trackedRef = useRef(false)
 
   useEffect(() => {
+    if (!articleId || trackedRef.current) return
+    trackedRef.current = true
+
+    const viewedKey = `viewed_article_${articleId}`
+    if (sessionStorage.getItem(viewedKey)) return
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 3000)
+
     const trackView = async () => {
-      if (trackedRef.current) return
-      trackedRef.current = true
-
-      const viewedKey = `viewed_article_${articleId}`
-      if (sessionStorage.getItem(viewedKey)) {
-        return
-      }
-
       let country = 'Unknown'
       let city = 'Unknown'
 
       try {
-        const res = await fetch('https://ipapi.co/json/')
+        const res = await fetch('https://ipapi.co/json/', { signal: controller.signal })
         if (res.ok) {
           const data = await res.json()
           country = data.country_name || 'Unknown'
           city = data.city || 'Unknown'
         }
-      } catch (e) {
-        console.error('Failed to fetch location', e)
+      } catch {
+        // Location fetch failed silently - continue with Unknown
+      } finally {
+        clearTimeout(timeoutId)
       }
 
       try {
@@ -35,15 +38,12 @@ export function useTrackView(articleId: number) {
           city,
           viewed_at: new Date().toISOString()
         })
-
         sessionStorage.setItem(viewedKey, 'true')
-      } catch (err) {
-        console.error('Error tracking view:', err)
+      } catch {
+        // View tracking failed silently
       }
     }
 
-    if (articleId) {
-      trackView()
-    }
+    trackView()
   }, [articleId])
 }

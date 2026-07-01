@@ -12,30 +12,29 @@ export default function AuthorsList() {
   const authorsQuery = useQuery({
     queryKey: ['authors_list'],
     queryFn: async () => {
-      const { data: authorsData, error } = await supabase
-        .from('authors')
-        .select('*')
-        .order('name', { ascending: true })
+      const [authorsRes, countsRes] = await Promise.all([
+        supabase
+          .from('authors')
+          .select('id, name, image, bio, role, slug')
+          .order('name', { ascending: true }),
+        supabase
+          .rpc('get_article_counts_by_author'),
+      ])
 
-      if (error) throw error
+      if (authorsRes.error) throw authorsRes.error
 
-      const authors = (authorsData ?? []) as Author[]
+      const authors = (authorsRes.data ?? []) as Author[]
 
-      const { data: articles } = await supabase
-        .from('articles')
-        .select('author_id')
-        .not('author_id', 'is', null)
-
-      const counts: Record<number, number> = {}
-      if (articles) {
-        for (const a of articles as { author_id: number }[]) {
-          counts[a.author_id] = (counts[a.author_id] || 0) + 1
+      const countMap: Record<number, number> = {}
+      if (countsRes.data) {
+        for (const row of countsRes.data as { author_id: number; count: number }[]) {
+          countMap[row.author_id] = row.count
         }
       }
 
       return authors.map((author) => ({
         ...author,
-        article_count: counts[author.id] || 0,
+        article_count: countMap[author.id] || 0,
       })) as (Author & { article_count: number })[]
     },
     staleTime: 5 * 60_000,

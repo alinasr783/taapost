@@ -1,7 +1,7 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase, type Article, type HomepageSection } from '../lib/supabase'
+import { supabase, type Article, type Author, type HomepageSection } from '../lib/supabase'
 import HomeCarousel from '../components/HomeCarousel'
 import Seo from '../components/Seo'
 import { useSiteSettings } from '../components/useSiteSettings'
@@ -48,6 +48,7 @@ function filterByContentType(articles: Article[], contentType: string): Article[
 
 const emptyArticles: Article[] = []
 const emptySections: HomepageSection[] = []
+const emptyAuthors: Author[] = []
 
 export default function Home() {
   const navigate = useNavigate()
@@ -56,12 +57,12 @@ export default function Home() {
   const limit = 30
 
   const homeQuery = useQuery({
-    queryKey: ['home_data', { limit }],
+    queryKey: ['home_data', 30],
     queryFn: async () => {
-      const [articlesRes, sectionsRes] = await Promise.all([
+      const [articlesRes, sectionsRes, authorsRes] = await Promise.all([
         supabase
           .from('articles')
-          .select('id,slug,title,excerpt,image,category_id,type,date,is_exclusive,categories(id,name,slug)')
+          .select('id,slug,title,excerpt,image,category_id,type,date,is_exclusive,categories(id,name,slug),authors(id,name,image)')
           .order('date', { ascending: false })
           .limit(limit),
         supabase
@@ -78,6 +79,10 @@ export default function Home() {
           )
           .eq('is_active', true)
           .order('display_order', { ascending: true }),
+        supabase
+          .from('authors')
+          .select('id, name, image, bio, role, slug')
+          .order('name'),
       ])
 
       let sections: HomepageSection[] = []
@@ -100,32 +105,43 @@ export default function Home() {
       const rawArticles = articlesRes.data ?? []
       const articles = rawArticles
         .filter(isRecord)
-        .map((a) => {
-          const joined = a.categories
-          const categoryRow = Array.isArray(joined) ? (joined[0] as unknown) : joined
-          const categoryName = isRecord(categoryRow) ? getString(categoryRow.name, '') : ''
-          const category = isRecord(categoryRow) ? (categoryRow as unknown) : null
-          return {
-            ...(a as unknown as Article),
-            categoryId: typeof a.category_id === 'number' ? a.category_id : undefined,
-            category: categoryName,
-            categories: category ? (category as Article['categories']) : undefined,
-          } as Article
-        })
+    .map((a) => {
+      const joined = a.categories
+      const categoryRow = Array.isArray(joined) ? (joined[0] as unknown) : joined
+      const categoryName = isRecord(categoryRow) ? getString(categoryRow.name, '') : ''
+      const category = isRecord(categoryRow) ? (categoryRow as unknown) : null
+      const joinedAuthors = a.authors
+      const authorRow = Array.isArray(joinedAuthors) ? (joinedAuthors[0] as unknown) : joinedAuthors
+      return {
+        ...(a as unknown as Article),
+        categoryId: typeof a.category_id === 'number' ? a.category_id : undefined,
+        category: categoryName,
+        categories: category ? (category as Article['categories']) : undefined,
+        authors: isRecord(authorRow) ? (authorRow as Article['authors']) : undefined,
+      } as Article
+    })
 
-      return { articles, sections }
+      return { articles, sections, authors: (authorsRes.data ?? []) as Author[] }
     },
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
+    refetchOnWindowFocus: false,
   })
 
   const articlesData = homeQuery.data?.articles
   const sections = homeQuery.data?.sections ?? emptySections
+  const authorsData = homeQuery.data?.authors ?? emptyAuthors
+  const hadData = useRef(false)
+  if (homeQuery.data) hadData.current = true
 
   const sortedArticles = useMemo(
     () => [...(articlesData ?? emptyArticles)].sort((a, b) => (a.date < b.date ? 1 : -1)),
     [articlesData]
   )
+
+  if (homeQuery.isError) {
+    console.error('Home query error:', homeQuery.error)
+  }
 
   const prefetchArticle = (slug: string | undefined, id: number) => {
     const queryType = slug ? { type: 'slug' as const, value: slug } : { type: 'id' as const, value: id }
@@ -170,8 +186,10 @@ export default function Home() {
     })
   }
 
-  if (homeQuery.isLoading) {
-    return (
+  if (!homeQuery.data && !hadData.current) {
+    if (homeQuery.isPending) {
+      // Show loading only on very first load (never again after data exists)
+      return (
       <div className="container py-8 space-y-6">
         <Seo
           title=""
@@ -214,6 +232,15 @@ export default function Home() {
         </div>
       </div>
     )
+  }
+
+    if (homeQuery.isError) {
+      return (
+        <div className="container py-8 text-center text-muted-foreground">
+          <p>تعذر تحميل الصفحة. حاول مرة أخرى.</p>
+        </div>
+      )
+    }
   }
 
   return (
@@ -319,11 +346,73 @@ export default function Home() {
                                     <h3 className="line-clamp-2 text-lg font-bold group-hover:text-primary transition-colors leading-normal">
                                         {article.title}
                                     </h3>
+                                    {article.authors && (
+                                      <div className="flex items-center gap-1.5 pt-1">
+                                        <div className="w-5 h-5 rounded-full overflow-hidden bg-primary/10 shrink-0">
+                                          {article.authors.image ? (
+                                            <img src={article.authors.image} alt={article.authors.name} className="w-full h-full object-cover" />
+                                          ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-[8px] font-bold text-primary">
+                                              {article.authors.name.charAt(0)}
+                                            </div>
+                                          )}
+                                        </div>
+                                        <span className="text-xs text-muted-foreground">{article.authors.name}</span>
+                                      </div>
+                                    )}
                                 </div>
                            </div>
                         ))}
                      </div>
                 </section>
+             )
+        }
+
+        if (section.type === 'author_focus') {
+             const count = getSettingsCount(section.settings, 6)
+             let list = sortedArticles
+               .filter(a => a.type === 'article' && a.authors && a.authors.name)
+               .slice(0, count)
+             if (list.length === 0) return null
+
+             return (
+               <section key={section.id} className="container space-y-6">
+                 <h2 className="text-2xl font-bold border-r-4 border-primary pr-3">{section.title || 'مقالات الكتّاب'}</h2>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                   {list.map((article) => (
+                     <button
+                       key={article.id}
+                       type="button"
+                       onClick={() =>
+                         navigate(article.slug ? `/article/${encodeURIComponent(article.slug)}` : `/article/${article.id}`)
+                       }
+                       onMouseEnter={() => prefetchArticle(article.slug, article.id)}
+                       className="group flex items-center gap-5 p-4 rounded-xl border border-border/40 bg-card hover:shadow-lg hover:border-primary/30 transition-all w-full text-right"
+                     >
+                       <div className="w-16 h-16 md:w-20 md:h-20 rounded-full overflow-hidden border-2 border-primary/20 shrink-0 bg-primary/5">
+                         {article.authors?.image ? (
+                           <img src={article.authors.image} alt={article.authors.name} className="w-full h-full object-cover" />
+                         ) : (
+                           <div className="w-full h-full flex items-center justify-center text-lg font-bold text-primary">
+                             {article.authors?.name?.charAt(0) || '?'}
+                           </div>
+                         )}
+                       </div>
+                       <div className="flex-1 min-w-0 text-right">
+                         <h3 className="font-bold text-foreground group-hover:text-primary transition-colors leading-snug text-base md:text-lg">
+                           {article.title}
+                         </h3>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {article.authors?.name}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground/60 mt-0.5">
+                            {new Date(article.date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}
+                          </p>
+                        </div>
+                     </button>
+                   ))}
+                 </div>
+               </section>
              )
         }
 
@@ -413,6 +502,134 @@ export default function Home() {
               </div>
             </div>
           )
+        }
+
+        if (section.type === 'category_list') {
+            if (!section.category_id && !section.categories) return null;
+
+            const catName = section.categories?.name || section.title;
+            const catId = section.category_id || section.categories?.id;
+
+            const contentType = getSettingsContentType(section.settings)
+            let list = filterByContentType(sortedArticles, contentType)
+            list = list
+              .filter((a) => a.categoryId === catId)
+              .slice(0, getSettingsCount(section.settings, 5))
+
+            if (!list.length) return null;
+
+            return (
+              <section key={section.id} className="container space-y-6">
+                <div className="flex items-center justify-between border-b border-primary/10 pb-4">
+                  <button
+                    type="button"
+                    onClick={() => { if (catId) navigate(`/category/${catId}`) }}
+                    className="text-2xl font-bold border-r-4 border-primary pr-3 hover:text-primary transition-colors"
+                  >
+                    {catName}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { if (catId) navigate(`/category/${catId}`) }}
+                    className="text-xs font-medium bg-primary/10 text-primary px-4 py-1.5 rounded-full hover:bg-primary hover:text-primary-foreground transition-all"
+                  >
+                    المزيد
+                  </button>
+                </div>
+                <div className="divide-y divide-border/50">
+                  {list.map((article) => (
+                    <button
+                      key={article.id}
+                      type="button"
+                      onClick={() =>
+                        navigate(article.slug ? `/article/${encodeURIComponent(article.slug)}` : `/article/${article.id}`)
+                      }
+                      onMouseEnter={() => prefetchArticle(article.slug, article.id)}
+                      className="group flex gap-5 py-5 w-full text-right hover:bg-muted/30 px-3 -mx-3 rounded-lg transition-colors"
+                    >
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>{new Date(article.date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                          {article.is_exclusive && (
+                            <span className="text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded text-[10px]">حصرياً</span>
+                          )}
+                        </div>
+                        <h3 className="font-bold text-foreground group-hover:text-primary transition-colors leading-snug">
+                          {article.title}
+                        </h3>
+                        <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+                          {article.excerpt}
+                        </p>
+                      </div>
+                      <div className="w-32 h-24 shrink-0 rounded-lg overflow-hidden">
+                        <img
+                          src={article.image}
+                          alt={article.title}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )
+        }
+
+        if (section.type === 'custom') {
+            const count = getSettingsCount(section.settings, 6)
+            const contentType = getSettingsContentType(section.settings)
+            let list = filterByContentType(sortedArticles, contentType)
+            list = list.slice(0, count)
+            if (list.length === 0 && !section.title) return null;
+
+            return (
+              <section key={section.id} className="container space-y-6">
+                {section.title && (
+                  <div className="border-b border-primary/10 pb-4">
+                    <h2 className="text-2xl font-bold border-r-4 border-primary pr-3">{section.title}</h2>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {list.map((article) => (
+                    <div
+                      key={article.id}
+                      onClick={() =>
+                        navigate(article.slug ? `/article/${encodeURIComponent(article.slug)}` : `/article/${article.id}`)
+                      }
+                      onMouseEnter={() => prefetchArticle(article.slug, article.id)}
+                      className="group cursor-pointer space-y-3"
+                    >
+                      <div className="relative aspect-video overflow-hidden rounded-lg shadow-sm group-hover:shadow-md transition-all border border-border/50 group-hover:border-primary/50">
+                        <img
+                          src={article.image}
+                          alt={article.title}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          loading="lazy"
+                          decoding="async"
+                          width={640}
+                          height={360}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-[10px] font-medium">{article.category}</span>
+                          <span>•</span>
+                          {article.is_exclusive ? (
+                            <span className="text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded text-[10px]">حصرياً</span>
+                          ) : (
+                            <span>{new Date(article.date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                          )}
+                        </div>
+                        <h3 className="line-clamp-2 text-lg font-bold group-hover:text-primary transition-colors leading-normal">
+                          {article.title}
+                        </h3>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )
         }
 
         return null;

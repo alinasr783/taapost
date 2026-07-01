@@ -20,7 +20,7 @@ export default function ArticlesPage() {
     queryFn: async () => {
       let query = supabase
         .from('articles')
-        .select('id,slug,title,excerpt,image,date,is_exclusive,type,category_id,authors(name,id),categories(name)')
+        .select('id,slug,title,excerpt,image,date,is_exclusive,type,category_id,authors(name,id,image),categories(name)')
         .eq('type', 'article')
         .order('date', { ascending: false })
 
@@ -151,7 +151,13 @@ export default function ArticlesPage() {
                 </span>
                 {featured.authors && (
                   <span className="flex items-center gap-1.5 text-white/80 text-sm">
-                    <User size={14} />
+                    <div className="w-5 h-5 rounded-full overflow-hidden bg-white/20">
+                      {featured.authors.image ? (
+                        <img src={featured.authors.image} alt={featured.authors.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <User size={14} className="text-white/80 w-full h-full p-0.5" />
+                      )}
+                    </div>
                     {featured.authors.name}
                   </span>
                 )}
@@ -212,8 +218,14 @@ export default function ArticlesPage() {
                 )}
                 {article.authors && (
                   <div className="flex items-center gap-2 pt-2 border-t border-border/40">
-                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
-                      {article.authors.name.charAt(0)}
+                    <div className="w-7 h-7 rounded-full overflow-hidden bg-primary/10 shrink-0">
+                      {article.authors.image ? (
+                        <img src={article.authors.image} alt={article.authors.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-primary">
+                          {article.authors.name.charAt(0)}
+                        </div>
+                      )}
                     </div>
                     <span className="text-xs text-muted-foreground">{article.authors.name}</span>
                   </div>

@@ -275,6 +275,7 @@ export default function ArticlePage() {
           .from('articles')
           .select('id, slug, title, image, date, category_id, excerpt, is_exclusive')
           .eq('category_id', data.category_id)
+          .eq('type', data.type)
           .neq('id', data.id)
           .limit(5)
           .order('date', { ascending: false })

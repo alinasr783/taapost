@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { X, Save, Video, Check, AlertCircle, Loader2 } from 'lucide-react'
 import { supabase, type Article, type Category, type User, type UserPermission, type Author } from '../../lib/supabase'
 import { hasPermission } from '../utils'
@@ -75,6 +76,7 @@ function extractYoutubeEmbedUrl(url: string): string | null {
 }
 
 export default function DashboardArticleForm({ article, categories, user, permissions, onClose, onSuccess }: Props) {
+  const queryClient = useQueryClient()
   const { showToast } = useToast()
   const [loading, setLoading] = useState(false)
   const [authors, setAuthors] = useState<Author[]>([])
@@ -149,7 +151,6 @@ export default function DashboardArticleForm({ article, categories, user, permis
   }, [checkSlugUnique])
 
   useEffect(() => {
-    // Fetch authors
     supabase.from('authors').select('*').order('name').then(({ data }) => {
       if (data) setAuthors(data)
     })
@@ -232,6 +233,7 @@ export default function DashboardArticleForm({ article, categories, user, permis
 
       if (error) throw error
 
+      queryClient.invalidateQueries({ queryKey: ['home_data'] })
       onSuccess()
     } catch (err: unknown) {
       console.error('Error saving article:', err)

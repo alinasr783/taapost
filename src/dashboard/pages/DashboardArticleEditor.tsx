@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, Save, Video, Check, AlertCircle, Loader2 } from 'lucide-react'
 import { supabase, type Category, type User, type UserPermission, type Author } from '../../lib/supabase'
 import { hasPermission } from '../utils'
@@ -69,6 +70,7 @@ function extractYoutubeEmbedUrl(url: string): string | null {
 export default function DashboardArticleEditor() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { showToast } = useToast()
   const isEditing = Boolean(id)
 
@@ -166,7 +168,7 @@ export default function DashboardArticleEditor() {
         setFetchingArticle(true)
         const { data: article } = await supabase
           .from('articles')
-          .select('*')
+          .select('id, slug, title, excerpt, content, image, category_id, type, date, is_exclusive, content_source, author_id')
           .eq('id', Number(id))
           .single()
 
@@ -267,6 +269,7 @@ export default function DashboardArticleEditor() {
       }
 
       if (error) throw error
+      queryClient.invalidateQueries({ queryKey: ['home_data'] })
       navigate('/dashboard/articles')
     } catch (err: unknown) {
       console.error('Error saving article:', err)

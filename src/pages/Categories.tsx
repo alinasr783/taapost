@@ -9,7 +9,7 @@ export default function Categories() {
   const categoriesQuery = useQuery({
     queryKey: ['categories'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('categories').select('*').order('order_index', { ascending: true })
+      const { data, error } = await supabase.from('categories').select('id, name, slug, description, image, order_index').order('order_index', { ascending: true })
       if (error) throw error
       return (data ?? []) as Category[]
     },

@@ -3,13 +3,11 @@ import { BrowserRouter, Route, Routes, Outlet, Navigate } from 'react-router-dom
 const Home = lazy(() => import('./pages/Home'))
 const Categories = lazy(() => import('./pages/Categories'))
 const CategoryPage = lazy(() => import('./pages/CategoryPage'))
-const Articles = lazy(() => import('./pages/Articles'))
 const ArticlesPage = lazy(() => import('./pages/ArticlesPage'))
 const ArticleViewPage = lazy(() => import('./pages/ArticleViewPage'))
 const ContentListPage = lazy(() => import('./pages/ContentListPage'))
 const ArticlePage = lazy(() => import('./pages/ArticlePage'))
 const AuthorPage = lazy(() => import('./pages/AuthorPage'))
-const AuthorsList = lazy(() => import('./pages/AuthorsList'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 import SiteLayout from './components/SiteLayout'
 const DashboardLogin = lazy(() => import('./dashboard/pages/DashboardLogin'))
@@ -77,7 +75,6 @@ export default function App() {
             <Route path="/content" element={<ContentListPage />} />
             <Route path="/post/:id" element={<ArticlePage />} />
             <Route path="/author/:id" element={<AuthorPage />} />
-            <Route path="/authors" element={<AuthorsList />} />
 
             <Route path="/الأقسام" element={<Navigate to="/categories" replace />} />
             <Route path="/قسم/:slug" element={<CategoryPage />} />
@@ -86,7 +83,6 @@ export default function App() {
             <Route path="/محتوى" element={<Navigate to="/content" replace />} />
             <Route path="/محتوى/:slug" element={<ArticlePage />} />
             <Route path="/كاتب/:slug" element={<AuthorPage />} />
-            <Route path="/الكتاب" element={<AuthorsList />} />
 
             <Route path="*" element={<NotFound />} />
           </Route>

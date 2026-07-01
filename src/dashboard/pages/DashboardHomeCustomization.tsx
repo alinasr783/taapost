@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { supabase, type HomepageSection, type Category } from '../../lib/supabase'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -9,10 +10,11 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
 
 export default function DashboardHomeCustomization() {
-  type SectionType = 'carousel' | 'category_grid' | 'category_list' | 'custom' | 'latest_grid'
+  type SectionType = 'carousel' | 'category_grid' | 'category_list' | 'custom' | 'latest_grid' | 'author_focus'
   type SourceType = 'latest' | 'category' | 'categories'
 
   const { showToast } = useToast()
+  const queryClient = useQueryClient()
   const [sections, setSections] = useState<HomepageSection[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -73,31 +75,33 @@ export default function DashboardHomeCustomization() {
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
-    if (active.id !== over?.id) {
-      setSections((items) => {
-        const oldIndex = items.findIndex((item) => item.id === active.id)
-        const newIndex = items.findIndex((item) => item.id === over?.id)
-        const newItems = arrayMove(items, oldIndex, newIndex)
-        
-        saveOrder(newItems)
-        return newItems
-      })
-    }
+    if (active.id === over?.id) return
+    
+    const oldIndex = sections.findIndex((item) => item.id === active.id)
+    const newIndex = sections.findIndex((item) => item.id === over?.id)
+    const newItems = arrayMove([...sections], oldIndex, newIndex)
+    
+    setSections(newItems)
+    saveOrder(newItems)
   }
 
   const saveOrder = async (items: HomepageSection[]) => {
+    const prevSections = [...sections]
     try {
       setIsSaving(true)
-      const updates = items.map((item, index) => ({
-        id: item.id,
-        display_order: index
-      }))
-      
-      await Promise.all(updates.map(u => 
-        supabase.from('homepage_sections').update({ display_order: u.display_order }).eq('id', u.id)
-      ))
+      for (let i = 0; i < items.length; i++) {
+        const { error } = await supabase
+          .from('homepage_sections')
+          .update({ display_order: i })
+          .eq('id', items[i].id)
+        if (error) throw error
+      }
+      queryClient.invalidateQueries({ queryKey: ['home_data'] })
+      showToast('تم حفظ الترتيب بنجاح')
     } catch (err) {
       console.error('Error saving order:', err)
+      setSections(prevSections)
+      showToast('حدث خطأ أثناء حفظ الترتيب، تم التراجع', 'error')
     } finally {
       setIsSaving(false)
     }
@@ -113,6 +117,7 @@ export default function DashboardHomeCustomization() {
       if (error) throw error
       
       setSections(sections.map(s => s.id === id ? { ...s, is_active: !currentStatus } : s))
+      queryClient.invalidateQueries({ queryKey: ['home_data'] })
       showToast(!currentStatus ? 'تم تفعيل القسم' : 'تم إخفاء القسم')
     } catch (error) {
       console.error('Error toggling status:', error)
@@ -132,6 +137,7 @@ export default function DashboardHomeCustomization() {
       if (error) throw error
       
       setSections(sections.filter(s => s.id !== deleteTarget.id))
+      queryClient.invalidateQueries({ queryKey: ['home_data'] })
       showToast('تم حذف القسم بنجاح')
       setDeleteTarget(null)
     } catch (error) {
@@ -166,7 +172,7 @@ export default function DashboardHomeCustomization() {
         type: formData.type,
         title: formData.title || (categoryId ? categories.find(c => c.id === categoryId)?.name : 'قسم جديد'),
         category_id: categoryId,
-        display_order: sections.length + 1,
+        display_order: sections.length,
         is_active: true,
         settings: settings
       }
@@ -181,6 +187,7 @@ export default function DashboardHomeCustomization() {
       if (data) {
         setSections([...sections, data[0]])
         setIsFormOpen(false)
+        queryClient.invalidateQueries({ queryKey: ['home_data'] })
         setFormData({
           type: 'category_grid',
           title: '',
@@ -205,7 +212,8 @@ export default function DashboardHomeCustomization() {
       'carousel': 'شريط متحرك (Carousel)',
       'category_grid': 'شبكة مقالات (Grid)',
       'category_list': 'قائمة مقالات (List)',
-      'latest_grid': 'آخر المقالات'
+      'latest_grid': 'آخر المقالات',
+      'author_focus': 'بطاقات الكتّاب (Author Focus)'
     }
     
     let label = typeLabels[section.type] || section.type
@@ -303,9 +311,10 @@ export default function DashboardHomeCustomization() {
                       next === 'category_grid' ||
                       next === 'category_list' ||
                       next === 'custom' ||
-                      next === 'latest_grid'
+                      next === 'latest_grid' ||
+                      next === 'author_focus'
                     ) {
-                      setFormData({ ...formData, type: next })
+                      setFormData({ ...formData, type: next, content_type: next === 'author_focus' ? 'article' : formData.content_type })
                     }
                   }}
                   className="w-full p-2 bg-background border border-input rounded-md"
@@ -314,6 +323,7 @@ export default function DashboardHomeCustomization() {
                   <option value="category_list">قائمة مقالات من قسم (List)</option>
                   <option value="carousel">شريط متحرك (Carousel)</option>
                   <option value="latest_grid">شبكة آخر المقالات</option>
+                  <option value="author_focus">بطاقات الكتّاب (Author Focus)</option>
                 </select>
               </div>
 

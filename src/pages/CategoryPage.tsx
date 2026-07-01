@@ -19,11 +19,11 @@ export default function CategoryPage() {
 
       let catData: Category | null = null
       if (categoryId) {
-        const { data, error } = await supabase.from('categories').select('*').eq('id', categoryId).maybeSingle()
+        const { data, error } = await supabase.from('categories').select('id, name, slug, description, image').eq('id', categoryId).maybeSingle()
         if (error) throw error
         catData = (data as Category | null) ?? null
       } else if (categorySlug) {
-        const { data, error } = await supabase.from('categories').select('*').eq('slug', categorySlug).maybeSingle()
+        const { data, error } = await supabase.from('categories').select('id, name, slug, description, image').eq('slug', categorySlug).maybeSingle()
         if (error) throw error
         catData = (data as Category | null) ?? null
         if (catData) {
@@ -35,10 +35,10 @@ export default function CategoryPage() {
         return { category: null, articles: [], redirectToId: null as number | null }
       }
 
-      type CategoryArticle = Pick<Article, 'id' | 'slug' | 'title' | 'excerpt' | 'image' | 'date' | 'is_exclusive'>
+      type CategoryArticle = Pick<Article, 'id' | 'slug' | 'title' | 'excerpt' | 'image' | 'date' | 'is_exclusive'> & { authors?: { name: string; image?: string } | null }
       const { data: artData, error: artError } = await supabase
         .from('articles')
-        .select('id,slug,title,excerpt,image,date,is_exclusive')
+        .select('id,slug,title,excerpt,image,date,is_exclusive,authors(name,image)')
         .eq('category_id', catData.id)
         .eq('type', 'article')
         .order('date', { ascending: false })
@@ -46,7 +46,13 @@ export default function CategoryPage() {
 
       if (artError) throw artError
 
-      return { category: catData, articles: (artData ?? []) as CategoryArticle[], redirectToId: null as number | null }
+      const normalized = ((artData ?? []) as unknown[]).map((a: Record<string, unknown>) => {
+        const joinedAuthors = a.authors
+        const authorRow = Array.isArray(joinedAuthors) ? (joinedAuthors[0] as Record<string, unknown>) : joinedAuthors
+        return { ...a, authors: authorRow || null } as unknown as CategoryArticle
+      })
+
+      return { category: catData, articles: normalized, redirectToId: null as number | null }
     },
     enabled: Boolean(categoryId || categorySlug),
     staleTime: 60_000,
@@ -182,6 +188,20 @@ export default function CategoryPage() {
                       <div className="line-clamp-2 text-sm font-semibold">
                         {i.title}
                       </div>
+                      {i.authors && (
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <div className="w-4 h-4 rounded-full overflow-hidden bg-white/20 shrink-0">
+                            {i.authors.image ? (
+                              <img src={i.authors.image} alt={i.authors.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-[6px] font-bold text-white">
+                                {i.authors.name.charAt(0)}
+                              </div>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-white/70">{i.authors.name}</span>
+                        </div>
+                      )}
                       <div className="line-clamp-2 text-[11px] text-white/85">
                         {i.excerpt}
                       </div>

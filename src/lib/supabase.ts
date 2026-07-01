@@ -104,7 +104,7 @@ export type SectionSettings = {
 
 export type HomepageSection = {
   id: number
-  type: 'carousel' | 'category_grid' | 'category_list' | 'custom' | 'latest_grid' | 'category_section'
+  type: 'carousel' | 'category_grid' | 'category_list' | 'custom' | 'latest_grid' | 'category_section' | 'author_focus'
   title: string
   category_id?: number
   display_order: number

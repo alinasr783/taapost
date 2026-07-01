@@ -3,12 +3,12 @@ import type { FormEvent, ReactNode } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   BrainCircuit, Home, LayoutGrid, Moon, Sun, FileText,
-  Menu, X, PenTool,
+  Menu, X,
   BarChart3, Cpu, Languages, Landmark, FolderOpen,
   BookOpen, Heart, TrendingUp, FlaskConical, Palette, Trophy,
   type LucideIcon,
 } from 'lucide-react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { supabase, type Category, type LogoSetting } from '../lib/supabase'
 import Footer from './Footer'
 import { SiteSettingsProvider } from './SiteSettingsProvider'
@@ -77,7 +77,6 @@ export default function SiteLayout({ children }: Props) {
     localStorage.getItem('theme') || 'light'
   )
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const [q, setQ] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const location = useLocation()
@@ -95,7 +94,7 @@ export default function SiteLayout({ children }: Props) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('categories')
-        .select('*')
+        .select('id, name, slug, icon, sidebar_order, order_index')
         .order('order_index', { ascending: true })
 
       if (error) throw error
@@ -108,7 +107,7 @@ export default function SiteLayout({ children }: Props) {
   const siteSettingsQuery = useQuery({
     queryKey: ['site_settings'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('site_settings').select('*').single()
+      const { data, error } = await supabase.from('site_settings').select('site_name, site_description, logo_url, primary_color, secondary_color, show_article_summary, meta_title, meta_description, og_title, og_description, og_image, twitter_handle, keywords').single()
       if (error) throw error
       return data as typeof defaultSiteSettings
     },
@@ -121,7 +120,7 @@ export default function SiteLayout({ children }: Props) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('logo_settings')
-        .select('*')
+        .select('id, logo_url, logo_url_dark, logo_name, logo_width, logo_max_width, logo_height, position_x, position_y, alignment')
         .eq('is_active', true)
         .maybeSingle()
       if (error && error.code !== 'PGRST116') throw error
@@ -198,30 +197,6 @@ export default function SiteLayout({ children }: Props) {
     apple.setAttribute('rel', 'apple-touch-icon')
     apple.setAttribute('href', iconHref)
   }, [siteSettings.primary_color, siteSettings.logo_url, activeLogo, theme])
-
-  useEffect(() => {
-    if (categories.length > 0) {
-      queryClient.prefetchQuery({
-        queryKey: ['home_data', { limit: 30 }],
-        queryFn: async () => {
-          const [articlesRes, sectionsRes] = await Promise.all([
-            supabase
-              .from('articles')
-              .select('id,slug,title,excerpt,image,category_id,type,date,is_exclusive,categories(id,name,slug)')
-              .order('date', { ascending: false })
-              .limit(30),
-            supabase
-              .from('homepage_sections')
-              .select('*, categories(id, name, slug)')
-              .eq('is_active', true)
-              .order('display_order', { ascending: true }),
-          ])
-          return { articles: articlesRes.data ?? [], sections: sectionsRes.data ?? [] }
-        },
-        staleTime: 5 * 60_000,
-      })
-    }
-  }, [categories.length, queryClient])
 
   const toggle = () => {
     const t = theme === 'dark' ? 'light' : 'dark'
@@ -422,19 +397,6 @@ export default function SiteLayout({ children }: Props) {
                   </Link>
                 )
               })}
-
-              <div className="my-2 border-t border-border/60" />
-
-              <Link
-                to="/authors"
-                onClick={() => setMenuOpen(false)}
-                className={`flex items-center gap-3 rounded-[5px] px-3 py-2.5 transition-colors ${
-                  location.pathname.includes('/authors') || location.pathname.includes('/author') || location.pathname.includes('/الكتاب') || location.pathname.includes('/كاتب') ? 'bg-primary/10 text-primary font-medium' : 'text-foreground/80 hover:bg-muted/50 hover:text-primary'
-                }`}
-              >
-                <PenTool size={20} />
-                <span className="text-sm">الكتاب</span>
-              </Link>
 
               <div className="my-2 border-t border-border/60" />
 

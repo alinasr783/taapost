@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowRight, Calendar, User, ZoomIn, ZoomOut, RotateCcw, Clock, BookOpen } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'

@@ -1,6 +1,7 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Edit, Trash2, Search, Eye, Calendar, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { Plus, Edit, Trash2, Search, Eye, Calendar, ChevronDown, Loader2 } from 'lucide-react'
 import { supabase, type Article, type Category, type Author, type User, type UserPermission } from '../../lib/supabase'
 import { hasPermission } from '../utils'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -10,6 +11,7 @@ const ITEMS_PER_PAGE = 15
 
 export default function DashboardArticles() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { showToast } = useToast()
   const [articles, setArticles] = useState<Article[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -18,6 +20,7 @@ export default function DashboardArticles() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [totalCount, setTotalCount] = useState(0)
+  const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
@@ -48,19 +51,29 @@ export default function DashboardArticles() {
   const [filterAuthor, setFilterAuthor] = useState<number | ''>('')
   const [filterType, setFilterType] = useState<string>('')
 
-  const userCategoryIds = !user?.is_superadmin
-    ? permissions.map(p => p.category_id)
-    : []
+  const userCategoryIds = useMemo(() =>
+    !user?.is_superadmin ? permissions.map(p => p.category_id) : [],
+    [user?.is_superadmin, permissions]
+  )
 
-  const fetchPermissions = useCallback(async (userId: number) => {
-    const { data } = await supabase.from('user_permissions').select('*').eq('user_id', userId)
-    if (data) setPermissions(data)
-  }, [])
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput), 300)
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
+  const categoriesMap = useMemo(() => {
+    const map = new Map<number, string>()
+    categories.forEach(c => map.set(c.id, c.name))
+    return map
+  }, [categories])
+
+  const articlesLenRef = useRef(0)
+  const articleSelect = 'id,slug,title,excerpt,image,category_id,author_id,type,date,is_exclusive,created_at'
 
   const buildFetchQuery = useCallback((fromIdx: number, count: number) => {
     let query = supabase
       .from('articles')
-      .select('*, categories(*), authors(*)', { count: 'exact' })
+      .select(`${articleSelect},categories(id,name),authors(id,name,image)`, { count: 'exact' })
 
     if (search) {
       query = query.ilike('title', `%${search}%`)
@@ -96,7 +109,8 @@ export default function DashboardArticles() {
       .range(fromIdx, fromIdx + count - 1)
   }, [search, user?.is_superadmin, userCategoryIds, filterCategory, filterAuthor, filterType, dateFrom, dateTo])
 
-  const fetchArticles = useCallback(async (append = false) => {
+  const fetchArticles = useCallback(async (append = false, attempt = 0) => {
+    console.log(`[DashboardArticles] fetchArticles(append=${append}) called, articlesLenRef=${articlesLenRef.current}`)
     if (abortRef.current) abortRef.current.abort()
     abortRef.current = new AbortController()
 
@@ -108,48 +122,137 @@ export default function DashboardArticles() {
     }
 
     try {
-      const fromIdx = append ? articles.length : 0
+      const fromIdx = append ? articlesLenRef.current : 0
+      console.log(`[DashboardArticles] Query params: fromIdx=${fromIdx}, limit=${ITEMS_PER_PAGE}`)
       const { data, error, count } = await buildFetchQuery(fromIdx, ITEMS_PER_PAGE)
+
+      console.log('[DashboardArticles] fetch result:', { dataCount: data?.length, error, count, fromIdx })
 
       if (error) throw error
 
       if (count !== null) setTotalCount(count)
 
-      if (data) {
-        const unique = data.filter(a => !loadedIdsRef.current.has(a.id))
+      if (data && data.length > 0) {
+        const normalized = (data as unknown[]).map((a: Record<string, unknown>) => {
+          const joinedCats = a.categories
+          const cat = Array.isArray(joinedCats) ? (joinedCats[0] as Record<string, unknown> ?? null) : (joinedCats ?? null)
+          const joinedAuthors = a.authors
+          const auth = Array.isArray(joinedAuthors) ? (joinedAuthors[0] as Record<string, unknown> ?? null) : (joinedAuthors ?? null)
+          return { ...a, categories: cat, authors: auth } as unknown as Article
+        })
+        const unique = normalized.filter(a => !loadedIdsRef.current.has(a.id))
         unique.forEach(a => loadedIdsRef.current.add(a.id))
-        setArticles(prev => append ? [...prev, ...unique] : unique)
+        setArticles(prev => {
+          const next = append ? [...prev, ...unique] : unique
+          articlesLenRef.current = next.length
+          return next
+        })
         setHasMore((count ?? 0) > fromIdx + ITEMS_PER_PAGE)
       } else {
+        console.log('[DashboardArticles] no data returned, count:', count)
         if (!append) setArticles([])
-        setHasMore(false)
+        if (!append) articlesLenRef.current = 0
+        setHasMore(data !== null && data !== undefined ? (count ?? 0) > fromIdx + ITEMS_PER_PAGE : false)
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return
+      const isNetworkError = err instanceof TypeError && err.message === 'Failed to fetch'
+      if (isNetworkError && attempt < 2) {
+        await new Promise(r => setTimeout(r, 1000))
+        return fetchArticles(append, attempt + 1)
+      }
       console.error('Error fetching articles:', err)
-      showToast('حدث خطأ أثناء تحميل المقالات', 'error')
+      const msg = isNetworkError
+        ? 'فشل الاتصال بالسيرفر - تأكد من تعطيل VPN أو الإضافات'
+        : 'حدث خطأ أثناء تحميل المقالات'
+      showToast(msg, 'error')
     } finally {
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [buildFetchQuery, articles.length, showToast])
+  }, [buildFetchQuery, showToast])
 
   const fetchCategoriesAndAuthors = useCallback(async () => {
+    console.log('[DashboardArticles] Fetching categories and authors')
     const [categoriesRes, authorsRes] = await Promise.all([
       supabase.from('categories').select('*').order('name'),
       supabase.from('authors').select('*').order('name'),
     ])
+    console.log('[DashboardArticles] Categories loaded:', categoriesRes.data?.length)
+    console.log('[DashboardArticles] Authors loaded:', authorsRes.data?.length)
     if (categoriesRes.data) setCategories(categoriesRes.data)
     if (authorsRes.data) setAuthors(authorsRes.data)
   }, [])
 
-  useEffect(() => {
-    if (user) {
-      void fetchPermissions(user.id)
+  const fetchPermissions = useCallback(async (userId: number) => {
+    console.log('[DashboardArticles] fetchPermissions started for user:', userId)
+    const { data, error } = await supabase
+      .from('user_permissions')
+      .select('*')
+      .eq('user_id', userId)
+    if (error) {
+      console.error('Error fetching permissions:', error)
+      return
     }
-    void fetchCategoriesAndAuthors()
-    void fetchArticles(false)
-  }, [user, fetchPermissions, fetchCategoriesAndAuthors, fetchArticles])
+    console.log('[DashboardArticles] fetchPermissions completed, permissions count:', data?.length)
+    setPermissions(data || [])
+  }, [])
+
+  // Stable refs to break the infinite dependency chain
+  const fetchArticlesRef = useRef(fetchArticles)
+  fetchArticlesRef.current = fetchArticles
+  const fetchPermissionsRef = useRef(fetchPermissions)
+  fetchPermissionsRef.current = fetchPermissions
+  const fetchCatsRef = useRef(fetchCategoriesAndAuthors)
+  fetchCatsRef.current = fetchCategoriesAndAuthors
+
+  // Track initial load to avoid re-fetching on dependency changes
+  const initialLoadRef = useRef(false)
+
+  // Main effect: runs once on mount
+  useEffect(() => {
+    if (initialLoadRef.current) return
+    initialLoadRef.current = true
+
+    const loadData = async () => {
+      console.log('[DashboardArticles] === Starting initial load ===')
+
+      // 1. Fetch categories & authors (independent, no await needed for articles)
+      const catsPromise = fetchCatsRef.current()
+      console.log('[DashboardArticles] Categories/authors fetch started')
+
+      if (user) {
+        if (user.is_superadmin) {
+          // Superadmins: no category filter, fetch permissions in parallel
+          console.log('[DashboardArticles] User is superadmin, fetching permissions in parallel')
+          const permPromise = fetchPermissionsRef.current(user.id)
+          await Promise.all([catsPromise, permPromise])
+          console.log('[DashboardArticles] Permissions loaded (superadmin)')
+        } else {
+          // Non-superadmins: AWAIT permissions before fetching articles
+          // so the category filter is applied correctly from the start
+          console.log('[DashboardArticles] User is NOT superadmin, awaiting permissions first')
+          await catsPromise
+          await fetchPermissionsRef.current(user.id)
+          console.log('[DashboardArticles] Permissions loaded, now fetching articles with filters')
+        }
+      } else {
+        // No user (shouldn't happen on dashboard), just wait for cats
+        await catsPromise
+      }
+
+      // 2. Fetch articles (with correct filters already applied)
+      console.log('[DashboardArticles] Fetching articles (final)')
+      fetchArticlesRef.current(false)
+    }
+
+    loadData()
+
+    return () => {
+      if (abortRef.current) abortRef.current.abort()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user])
 
   const openDeleteConfirm = (id: number) => {
     setDeleteTarget(id)
@@ -164,7 +267,9 @@ export default function DashboardArticles() {
       showToast('حدث خطأ أثناء الحذف', 'error')
     } else {
       setArticles(articles.filter(a => a.id !== deleteTarget))
+      articlesLenRef.current = articles.length - 1
       setTotalCount(prev => Math.max(0, prev - 1))
+      queryClient.invalidateQueries({ queryKey: ['home_data'] })
       showToast('تم حذف المقال بنجاح', 'success')
     }
     setConfirmOpen(false)
@@ -174,6 +279,7 @@ export default function DashboardArticles() {
   const canAdd = user?.is_superadmin || permissions.some(p => p.can_add)
   
   const clearFilters = () => {
+    setSearchInput('')
     setSearch('')
     setDateFrom('')
     setDateTo('')
@@ -214,8 +320,8 @@ export default function DashboardArticles() {
             <input
               type="text"
               placeholder="بحث في المقالات..."
-              value={search}
-              onChange={(e) => { setSearch(e.target.value) }}
+              value={searchInput}
+              onChange={(e) => { setSearchInput(e.target.value) }}
               className="w-full pr-10 pl-4 py-2 bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
@@ -317,7 +423,7 @@ export default function DashboardArticles() {
                           </span>
                         )}
                         <span className="bg-primary/10 text-primary px-2 py-1 rounded">
-                          {categories.find(c => c.id === article.category_id)?.name || article.category_id}
+                          {categoriesMap.get(article.category_id) || article.category_id}
                         </span>
                         <span className="text-muted-foreground">
                           {new Date(article.created_at || article.date).toLocaleDateString('ar-EG')}
@@ -411,7 +517,7 @@ export default function DashboardArticles() {
                       </td>
                       <td className="p-4">
                         <span className="bg-primary/10 text-primary px-2 py-1 rounded text-sm">
-                          {categories.find(c => c.id === article.category_id)?.name || article.category_id}
+                          {categoriesMap.get(article.category_id) || article.category_id}
                         </span>
                       </td>
                       <td className="p-4 text-muted-foreground">{new Date(article.created_at || article.date).toLocaleDateString('ar-EG')}</td>
