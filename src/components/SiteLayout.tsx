@@ -94,10 +94,14 @@ export default function SiteLayout({ children }: Props) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('categories')
-        .select('id, name, slug, icon, sidebar_order, order_index')
-        .order('order_index', { ascending: true })
+        .select('id, name, slug, sidebar_order')
+        .order('sidebar_order', { ascending: true, nullsFirst: false })
 
-      if (error) throw error
+      if (error) {
+        console.error('[SiteLayout] Categories query failed:', error)
+        throw error
+      }
+      console.log('[SiteLayout] Categories loaded:', data?.length)
       return (data ?? []) as Category[]
     },
     staleTime: 10 * 60_000,
@@ -360,25 +364,36 @@ export default function SiteLayout({ children }: Props) {
                 <span className="text-sm">جميع الأقسام</span>
               </Link>
 
-              {[...categories].sort((a, b) => (a.sidebar_order || 0) - (b.sidebar_order || 0)).map((cat) => {
-                const catPath = cat.slug ? `/قسم/${encodeURIComponent(cat.slug)}` : `/category/${cat.id}`
-                const isActive =
-                  location.pathname.includes(`/category/${cat.id}`) ||
-                  (cat.slug && location.pathname.includes(`/قسم/${encodeURIComponent(cat.slug)}`))
-                return (
-                  <Link
-                    key={cat.id}
-                    to={catPath}
-                    onClick={() => setMenuOpen(false)}
-                    className={`flex items-center gap-3 rounded-[5px] px-3 py-2.5 transition-colors ${
-                      isActive ? 'bg-primary/10 text-primary font-medium' : 'text-foreground/80 hover:bg-muted/50 hover:text-primary'
-                    }`}
-                  >
-                    <CategoryIcon cat={cat} />
-                    <span className="text-sm">{cat.name}</span>
-                  </Link>
-                )
-              })}
+              {categoriesQuery.isLoading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={`skel-${i}`} className="flex items-center gap-3 px-3 py-2.5 animate-pulse">
+                    <div className="h-5 w-5 rounded bg-muted-foreground/20" />
+                    <div className="h-4 w-24 rounded bg-muted-foreground/20" />
+                  </div>
+                ))
+              ) : categoriesQuery.isError ? (
+                <div className="px-3 py-2 text-xs text-muted-foreground">فشل تحميل الأقسام</div>
+              ) : (
+                [...categories].sort((a, b) => (a.sidebar_order || 0) - (b.sidebar_order || 0)).map((cat) => {
+                  const catPath = cat.slug ? `/قسم/${encodeURIComponent(cat.slug)}` : `/category/${cat.id}`
+                  const isActive =
+                    location.pathname.includes(`/category/${cat.id}`) ||
+                    (cat.slug && location.pathname.includes(`/قسم/${encodeURIComponent(cat.slug)}`))
+                  return (
+                    <Link
+                      key={cat.id}
+                      to={catPath}
+                      onClick={() => setMenuOpen(false)}
+                      className={`flex items-center gap-3 rounded-[5px] px-3 py-2.5 transition-colors ${
+                        isActive ? 'bg-primary/10 text-primary font-medium' : 'text-foreground/80 hover:bg-muted/50 hover:text-primary'
+                      }`}
+                    >
+                      <CategoryIcon cat={cat} />
+                      <span className="text-sm">{cat.name}</span>
+                    </Link>
+                  )
+                })
+              )}
 
               <div className="my-2 border-t border-border/60" />
 
