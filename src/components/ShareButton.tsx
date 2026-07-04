@@ -95,9 +95,10 @@ export default function ShareButton({ url, title }: Props) {
   const getShareMessage = (platform: string) => {
     const template = shareMessages[platform]
     if (template) {
-      return applyTemplate(template, url, title)
+      const textOnly = template.replace(/\{url\}/g, '').replace(/\s+/g, ' ').trim()
+      return applyTemplate(textOnly, url, title)
     }
-    return url
+    return ''
   }
 
   const shareButtons = [
