@@ -123,18 +123,18 @@ export default function Seo(props: Props) {
     upsertMetaByProperty('og:locale', 'ar_AR')
     upsertMetaByProperty('og:site_name', site.site_name)
     upsertMetaByProperty('og:type', ogType)
-    upsertMetaByProperty('og:title', site.og_title?.trim() || title)
-    if (site.og_description?.trim() || description) {
-      upsertMetaByProperty('og:description', site.og_description?.trim() || description)
-    }
+    upsertMetaByProperty('og:title', title)
+    if (description) upsertMetaByProperty('og:description', description)
     upsertMetaByProperty('og:url', canonicalUrl)
-    if (image) upsertMetaByProperty('og:image', image)
+    if (image) {
+      upsertMetaByProperty('og:image', image)
+      upsertMetaByProperty('og:image:width', '1200')
+      upsertMetaByProperty('og:image:height', '630')
+    }
 
     upsertMetaByName('twitter:card', 'summary_large_image')
-    upsertMetaByName('twitter:title', site.og_title?.trim() || title)
-    if (site.og_description?.trim() || description) {
-      upsertMetaByName('twitter:description', site.og_description?.trim() || description)
-    }
+    upsertMetaByName('twitter:title', title)
+    if (description) upsertMetaByName('twitter:description', description)
     if (image) upsertMetaByName('twitter:image', image)
     if (site.twitter_handle?.trim()) {
       upsertMetaByName('twitter:site', site.twitter_handle.trim())

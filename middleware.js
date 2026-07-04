@@ -113,6 +113,8 @@ function getOrigin(request) {
 function getArticleParam(pathname) {
   const postMatch = pathname.match(/^\/post\/([^/]+)/)
   if (postMatch) return { param: decodeURIComponent(postMatch[1]), type: 'post' }
+  const articleMatch = pathname.match(/^\/article\/([^/]+)/)
+  if (articleMatch) return { param: decodeURIComponent(articleMatch[1]), type: 'article' }
   const arabicMatch = pathname.match(/^\/\u0645\u0642\u0627\u0644\/([^/]+)/)
   if (arabicMatch) return { param: decodeURIComponent(arabicMatch[1]), type: 'arabic' }
   return null
@@ -141,5 +143,5 @@ export default async function middleware(request) {
 }
 
 export const config = {
-  matcher: ['/post/:path*', '/مقال/:path*'],
+  matcher: ['/article/:path*', '/post/:path*', '/مقال/:path*'],
 }
