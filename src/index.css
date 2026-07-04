@@ -290,3 +290,12 @@ img[width][height] {
 .toast-animate {
   animation: toast-slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+/* Hide scrollbar for horizontal category bar */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

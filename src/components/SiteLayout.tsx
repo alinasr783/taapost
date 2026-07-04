@@ -213,11 +213,11 @@ export default function SiteLayout({ children }: Props) {
   return (
     <SiteSettingsProvider value={mergedSettings}>
       <div className="min-h-dvh bg-background text-foreground flex flex-col">
-        <header className="sticky top-0 z-30 border-b border-border/60 bg-background/80 backdrop-blur">
-          <div className="container flex items-center justify-between gap-3 py-4">
+        <header className="sticky top-0 z-40 border-b border-border/60 bg-background backdrop-blur">
+          <div className="container flex items-stretch justify-between gap-3">
             <Link
               to="/"
-              className="flex items-center gap-3 min-w-0 flex-shrink"
+              className="flex items-center gap-2 min-w-0 flex-shrink"
             >
               {(() => {
                 const displayLogoUrl = getActiveLogoUrl()
@@ -226,22 +226,13 @@ export default function SiteLayout({ children }: Props) {
                     <img
                       src={displayLogoUrl}
                       alt={siteSettings.site_name}
-                      style={{
-                        objectFit: 'contain',
-                        width: activeLogo?.logo_width === 'auto' ? 'auto' : (activeLogo?.logo_width ?? 'auto'),
-                        maxWidth: activeLogo?.logo_max_width && activeLogo.logo_max_width !== 'none'
-                          ? activeLogo.logo_max_width
-                          : undefined,
-                        height: activeLogo?.logo_height === 'auto' ? 'auto' : (activeLogo?.logo_height ?? 'auto'),
-                        maxHeight: '44px',
-                      }}
-                      className="flex-shrink-0"
+                      className="flex-shrink-0 h-15 w-auto max-w-[150px] object-contain"
                       decoding="async"
                       fetchPriority="high"
                     />
                   )
                 }
-                return <BrainCircuit className="h-6 w-6 text-primary flex-shrink-0" />
+                return <BrainCircuit className="h-10 w-10 text-primary flex-shrink-0" />
               })()}
               <div className="flex flex-col min-w-0">
                 <span className="text-lg font-bold leading-tight truncate">{siteSettings.site_name}</span>
@@ -266,13 +257,13 @@ export default function SiteLayout({ children }: Props) {
                   onChange={(e) => setQ(e.target.value)}
                   placeholder="ابحث عن ما يهمك"
                   enterKeyHint="search"
-                  className="flex-1 max-w-[180px] sm:max-w-[200px] md:max-w-[280px] rounded-[5px] border border-border bg-background/70 px-3 py-2 backdrop-blur focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="flex-1 max-w-[180px] sm:max-w-[200px] md:max-w-[280px] rounded-[5px] border border-border bg-background px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring"
                 />
                 <button
                   type="button"
                   aria-label="تبديل الثيم"
                   onClick={toggle}
-                  className="inline-flex items-center justify-center rounded-[5px] border border-border/70 bg-background/60 px-3 py-2 backdrop-blur hover:bg-background/80 transition"
+                  className="inline-flex items-center justify-center rounded-[5px] border border-input bg-background px-3 py-2 hover:bg-muted/50 transition"
                 >
                   {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
                 </button>
@@ -281,12 +272,47 @@ export default function SiteLayout({ children }: Props) {
                 type="button"
                 aria-label="فتح القائمة"
                 onClick={() => setMenuOpen(true)}
-                className="inline-flex items-center justify-center rounded-[5px] border border-border/70 bg-background/60 px-3 py-2 backdrop-blur hover:bg-background/80 transition flex-shrink-0"
+                className="inline-flex items-center justify-center rounded-[5px] border border-input bg-background px-3 py-2 hover:bg-muted/50 transition flex-shrink-0"
               >
                 <Menu size={18} />
               </button>
             </div>
           </div>
+
+          {/* Horizontal scrollable category bar */}
+          {categories.length > 0 && (
+            <div className="border-t border-border/40 bg-background/95">
+              <div className="container flex items-center gap-1 overflow-x-auto py-2 hide-scrollbar">
+                <Link
+                  to="/"
+                  onClick={() => setMenuOpen(false)}
+                  className="shrink-0 rounded-md px-3 py-1.5 text-xs font-medium text-foreground/70 hover:text-primary hover:bg-muted/50 transition-colors"
+                >
+                  الرئيسية
+                </Link>
+                {[...categories].sort((a, b) => (a.sidebar_order || 0) - (b.sidebar_order || 0)).map((cat) => {
+                  const catPath = cat.slug ? `/قسم/${encodeURIComponent(cat.slug)}` : `/category/${cat.id}`
+                  const isActive =
+                    location.pathname.includes(`/category/${cat.id}`) ||
+                    (cat.slug && location.pathname.includes(`/قسم/${encodeURIComponent(cat.slug)}`))
+                  return (
+                    <Link
+                      key={cat.id}
+                      to={catPath}
+                      onClick={() => setMenuOpen(false)}
+                      className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                        isActive
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-foreground/70 hover:text-primary hover:bg-muted/50'
+                      }`}
+                    >
+                      {cat.name}
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </header>
 
         {/* Sidebar overlay */}
@@ -313,12 +339,12 @@ export default function SiteLayout({ children }: Props) {
                       <img
                         src={displayLogoUrl}
                         alt={siteSettings.site_name}
-                        className="h-8 w-8 object-contain flex-shrink-0"
+                        className="h-10 w-10 object-contain flex-shrink-0"
                         decoding="async"
                       />
                     )
                   }
-                  return <BrainCircuit className="h-6 w-6 text-primary flex-shrink-0" />
+                  return <BrainCircuit className="h-10 w-10 text-primary flex-shrink-0" />
                 })()}
                 <div className="flex flex-col min-w-0">
                   <span className="text-base font-bold leading-tight truncate">{siteSettings.site_name}</span>

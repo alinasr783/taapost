@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
-import { Facebook, Twitter, Instagram, Linkedin, Youtube, MessageCircle, Send, Mail, Globe, Link as LinkIcon, FileText, type LucideIcon } from 'lucide-react'
+import { Facebook, Twitter, Instagram, Linkedin, Youtube, MessageCircle, Send, Mail, Globe, Link as LinkIcon, Phone, type LucideIcon } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+import type { ContactInfo } from '../lib/supabase'
 import { useSiteSettings } from './useSiteSettings'
 
 type SocialLink = {
@@ -23,6 +24,7 @@ const iconMap: Record<string, LucideIcon> = {
   whatsapp: MessageCircle,
   telegram: Send,
   mail: Mail,
+  phone: Phone,
   globe: Globe,
 }
 
@@ -47,6 +49,21 @@ export default function Footer({ siteSettings }: Props) {
         .order('sort_order', { ascending: true })
       if (error) throw error
       return (data ?? []) as SocialLink[]
+    },
+    staleTime: 10 * 60_000,
+    gcTime: 60 * 60_000,
+  })
+
+  const { data: contactMethods = [] } = useQuery<ContactInfo[]>({
+    queryKey: ['contact_info'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('contact_info')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
+      if (error) throw error
+      return (data ?? []) as ContactInfo[]
     },
     staleTime: 10 * 60_000,
     gcTime: 60 * 60_000,
@@ -127,18 +144,16 @@ export default function Footer({ siteSettings }: Props) {
           <div>
             <h3 className="font-bold text-lg mb-6 text-foreground border-b-2 border-primary/20 pb-2 inline-block">تواصل معنا</h3>
             <ul className="space-y-3 text-sm text-muted-foreground">
-              <li className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-primary" />
-                <span>info@taapost.com</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <MessageCircle className="w-4 h-4 text-primary" />
-                <span>فريق التحرير</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-primary" />
-                <span>سياسة الخصوصية</span>
-              </li>
+              {contactMethods.map((method) => {
+                const iconKey = (method.icon || method.type).toLowerCase()
+                const Icon = iconMap[iconKey] || Mail
+                return (
+                  <li key={method.id} className="flex items-center gap-2">
+                    <Icon className="w-4 h-4 text-primary" />
+                    <span>{method.value}</span>
+                  </li>
+                )
+              })}
             </ul>
           </div>
         </div>

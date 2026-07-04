@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Save, Plus, Trash2, GripVertical, X, Facebook, Twitter, Instagram, Linkedin, Youtube, MessageCircle, Send, Mail, Globe, Link as LinkIcon, Loader2, Settings, Image, Search, Share2 } from 'lucide-react'
-import { supabase, type SocialLink, type ShareMessage } from '../../lib/supabase'
+import { Save, Plus, Trash2, GripVertical, X, Facebook, Twitter, Instagram, Linkedin, Youtube, MessageCircle, Send, Mail, Globe, Link as LinkIcon, Phone, Loader2, Settings, Image, Search, Share2 } from 'lucide-react'
+import { supabase, type SocialLink, type ShareMessage, type ContactInfo } from '../../lib/supabase'
 import Switch from '../components/Switch'
 import LogoController from '../components/LogoController'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -16,6 +16,7 @@ const AVAILABLE_ICONS = [
   { name: 'Whatsapp', icon: MessageCircle },
   { name: 'Telegram', icon: Send },
   { name: 'Mail', icon: Mail },
+  { name: 'Phone', icon: Phone },
   { name: 'Globe', icon: Globe },
   { name: 'Link', icon: LinkIcon }
 ]
@@ -43,7 +44,7 @@ const TABS: { key: TabKey; label: string; icon: typeof Settings }[] = [
   { key: 'general', label: 'إعدادات الموقع', icon: Settings },
   { key: 'logo', label: 'التحكم باللوجو', icon: Image },
   { key: 'seo', label: 'SEO', icon: Search },
-  { key: 'social', label: 'التواصل الاجتماعي', icon: Globe },
+  { key: 'social', label: 'طرق التواصل', icon: Globe },
   { key: 'share', label: 'رسائل المشاركة', icon: Share2 },
 ]
 
@@ -64,6 +65,11 @@ export default function DashboardSettings() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [newLink, setNewLink] = useState<Partial<SocialLink> | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<SocialLink | null>(null)
+
+  const [contactMethods, setContactMethods] = useState<ContactInfo[]>([])
+  const [editingContactId, setEditingContactId] = useState<number | null>(null)
+  const [newContact, setNewContact] = useState<Partial<ContactInfo> | null>(null)
+  const [deleteContactTarget, setDeleteContactTarget] = useState<ContactInfo | null>(null)
   
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({
     id: 1,
@@ -91,7 +97,7 @@ export default function DashboardSettings() {
     void (async () => {
       try {
         setLoading(true)
-        await Promise.all([fetchLinks(), fetchSiteSettings(), fetchShareMessages()])
+        await Promise.all([fetchLinks(), fetchSiteSettings(), fetchShareMessages(), fetchContactInfo()])
       } catch (error) {
         console.error('Error fetching data:', error)
       } finally {
@@ -136,6 +142,16 @@ export default function DashboardSettings() {
 
     if (error) throw error
     if (data) setShareMessages(data)
+  }
+
+  async function fetchContactInfo() {
+    const { data, error } = await supabase
+      .from('contact_info')
+      .select('*')
+      .order('sort_order', { ascending: true })
+
+    if (error) throw error
+    if (data) setContactMethods(data)
   }
 
   async function handleSaveSettings() {
@@ -262,6 +278,67 @@ export default function DashboardSettings() {
     }
   }
 
+  const handleSaveContact = async (contact: Partial<ContactInfo>) => {
+    try {
+      if (contact.id) {
+        const { error } = await supabase
+          .from('contact_info')
+          .update({
+            type: contact.type,
+            label: contact.label,
+            value: contact.value,
+            icon: contact.icon,
+            is_active: contact.is_active,
+            sort_order: contact.sort_order,
+          })
+          .eq('id', contact.id)
+
+        if (error) throw error
+        showToast('تم تعديل طريقة التواصل بنجاح')
+      } else {
+        const { error } = await supabase
+          .from('contact_info')
+          .insert([{
+            type: contact.type || 'custom',
+            label: contact.label || '',
+            value: contact.value || '',
+            icon: contact.icon || 'Mail',
+            is_active: contact.is_active !== false,
+            sort_order: contact.sort_order || contactMethods.length + 1,
+          }])
+
+        if (error) throw error
+        showToast('تم إضافة طريقة التواصل بنجاح')
+      }
+
+      setEditingContactId(null)
+      setNewContact(null)
+      fetchContactInfo()
+    } catch (error) {
+      console.error('Error saving contact:', error)
+      showToast('حدث خطأ أثناء الحفظ', 'error')
+    }
+  }
+
+  const handleDeleteContact = async () => {
+    if (!deleteContactTarget) return
+
+    try {
+      const { error } = await supabase
+        .from('contact_info')
+        .delete()
+        .eq('id', deleteContactTarget.id)
+
+      if (error) throw error
+      showToast('تم حذف طريقة التواصل بنجاح')
+      setDeleteContactTarget(null)
+      fetchContactInfo()
+    } catch (error) {
+      console.error('Error deleting contact:', error)
+      showToast('حدث خطأ أثناء الحذف', 'error')
+    }
+  }
+
   const renderForm = (link: Partial<SocialLink>, isNew = false) => {
     const updateLink = (updates: Partial<SocialLink>) => {
       if (isNew) {
@@ -342,6 +419,102 @@ export default function DashboardSettings() {
             } else {
               setEditingId(null)
               fetchLinks()
+            }
+          }} className="p-2 bg-gray-500 text-white rounded hover:bg-gray-600 flex items-center gap-2">
+            <X size={18} /> إلغاء
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const renderContactForm = (contact: Partial<ContactInfo>, isNew = false) => {
+    const updateContact = (updates: Partial<ContactInfo>) => {
+      if (isNew) {
+        setNewContact(prev => prev ? { ...prev, ...updates } : null)
+      } else {
+        setContactMethods(prev => prev.map(c => c.id === contact.id ? { ...c, ...updates } : c))
+      }
+    }
+
+    return (
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <input
+          type="text"
+          value={contact.label || ''}
+          onChange={(e) => updateContact({ label: e.target.value })}
+          placeholder="التسمية (مثال: رقم الهاتف)"
+          className="p-2 border rounded bg-background"
+        />
+        <input
+          type="text"
+          value={contact.value || ''}
+          onChange={(e) => updateContact({ value: e.target.value })}
+          placeholder="القيمة (مثال: 01234567890)"
+          className="p-2 border rounded bg-background"
+        />
+        <input
+          type="text"
+          value={contact.type || ''}
+          onChange={(e) => updateContact({ type: e.target.value })}
+          placeholder="النوع (phone, whatsapp, email, ...)"
+          className="p-2 border rounded bg-background"
+        />
+        <div className="flex items-center gap-2">
+          <label className="text-sm">الترتيب:</label>
+          <input
+            type="number"
+            value={contact.sort_order || 0}
+            onChange={(e) => updateContact({ sort_order: parseInt(e.target.value) })}
+            className="p-2 border rounded bg-background w-20"
+          />
+        </div>
+
+        <div className="md:col-span-2">
+          <label className="text-sm block mb-2 font-medium">الأيقونة:</label>
+          <div className="flex flex-wrap gap-2 bg-background p-3 rounded border border-input max-h-40 overflow-y-auto">
+            {AVAILABLE_ICONS.map((iconItem) => {
+              const Icon = iconItem.icon
+              const isSelected = (contact.icon || 'Mail') === iconItem.name
+              return (
+                <button
+                  key={iconItem.name}
+                  onClick={() => updateContact({ icon: iconItem.name })}
+                  className={`p-2 rounded border transition-all ${
+                    isSelected 
+                      ? 'bg-primary text-primary-foreground border-primary ring-2 ring-primary/30' 
+                      : 'bg-muted/50 hover:bg-muted text-muted-foreground border-transparent'
+                  }`}
+                  title={iconItem.name}
+                >
+                  <Icon size={20} />
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label htmlFor={`contact-active-${isNew ? 'new' : contact.id}`} className="text-sm font-medium">
+            نشط
+          </label>
+          <Switch
+            id={`contact-active-${isNew ? 'new' : contact.id}`}
+            checked={contact.is_active !== false}
+            onCheckedChange={(checked) => updateContact({ is_active: checked })}
+          />
+        </div>
+
+        <div className="md:col-span-2 flex justify-end gap-2 mt-2">
+          <button onClick={() => handleSaveContact(contact)} className="p-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2">
+            <Save size={18} /> حفظ
+          </button>
+          <button onClick={() => {
+            if (isNew) {
+              setNewContact(null)
+            } else {
+              setEditingContactId(null)
+              fetchContactInfo()
             }
           }} className="p-2 bg-gray-500 text-white rounded hover:bg-gray-600 flex items-center gap-2">
             <X size={18} /> إلغاء
@@ -647,58 +820,118 @@ export default function DashboardSettings() {
       )}
 
       {activeTab === 'social' && (
-        <div className="bg-card rounded-lg shadow-sm border border-border p-6">
-          <div className="flex items-center justify-between gap-3 mb-4">
-            <h2 className="text-xl font-semibold">حسابات التواصل الاجتماعي</h2>
-            <button
-              onClick={() => setNewLink({ platform: '', url: '', icon: 'Link', is_active: true, sort_order: links.length + 1 })}
-              className="bg-primary text-primary-foreground px-4 py-2 rounded-md flex items-center gap-2 hover:bg-primary/90 transition-colors"
-            >
-              <Plus size={20} />
-              <span>إضافة رابط</span>
-            </button>
-          </div>
-          
-          <div className="space-y-4">
-            {links.map((link) => (
-              <div key={link.id} className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg border border-border">
-                {editingId === link.id ? (
-                  renderForm(link)
-                ) : (
-                  <>
-                    <div className="p-2 bg-background rounded border border-border text-muted-foreground cursor-grab">
-                      <GripVertical size={20} />
-                    </div>
-                    <div className="p-2 bg-background rounded-full border border-border">
-                      {(() => {
-                        const IconItem = AVAILABLE_ICONS.find(i => i.name === link.icon) || AVAILABLE_ICONS.find(i => i.name === 'Link')
-                        const Icon = IconItem?.icon || LinkIcon
-                        return <Icon size={20} />
-                      })()}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-bold flex items-center gap-2">
-                        {link.platform}
-                        {!link.is_active && <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">غير نشط</span>}
-                      </div>
-                      <div className="text-sm text-muted-foreground truncate w-[220px] sm:w-[260px] md:w-[340px]">{link.url}</div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => setEditingId(link.id)} className="p-2 hover:bg-muted rounded text-blue-600">تعديل</button>
-                      <button onClick={() => setDeleteTarget(link)} className="p-2 hover:bg-muted rounded text-red-600">
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
+        <div className="space-y-8">
+          {/* Contact Methods Section */}
+          <div className="bg-card rounded-lg shadow-sm border border-border p-6">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h2 className="text-xl font-semibold">طرق التواصل المباشر</h2>
+              <button
+                onClick={() => setNewContact({ type: '', label: '', value: '', icon: 'Mail', is_active: true, sort_order: contactMethods.length + 1 })}
+                className="bg-primary text-primary-foreground px-4 py-2 rounded-md flex items-center gap-2 hover:bg-primary/90 transition-colors"
+              >
+                <Plus size={20} />
+                <span>إضافة طريقة</span>
+              </button>
+            </div>
 
-            {newLink && (
-              <div className="flex items-center gap-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
-                {renderForm(newLink, true)}
-              </div>
-            )}
+            <div className="space-y-4">
+              {contactMethods.map((method) => (
+                <div key={method.id} className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg border border-border">
+                  {editingContactId === method.id ? (
+                    renderContactForm(method)
+                  ) : (
+                    <>
+                      <div className="p-2 bg-background rounded-full border border-border">
+                        {(() => {
+                          const IconItem = AVAILABLE_ICONS.find(i => i.name === method.icon) || AVAILABLE_ICONS.find(i => i.name === 'Mail')
+                          const Icon = IconItem?.icon || Mail
+                          return <Icon size={20} />
+                        })()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold flex items-center gap-2">
+                          {method.label}
+                          {!method.is_active && <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">غير نشط</span>}
+                        </div>
+                        <div className="text-sm text-muted-foreground">{method.value}</div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => setEditingContactId(method.id)} className="p-2 hover:bg-muted rounded text-blue-600">تعديل</button>
+                        <button onClick={() => setDeleteContactTarget(method)} className="p-2 hover:bg-muted rounded text-red-600">
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+
+              {newContact && (
+                <div className="flex items-start gap-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
+                  {renderContactForm(newContact, true)}
+                </div>
+              )}
+
+              {contactMethods.length === 0 && !newContact && (
+                <p className="text-center text-muted-foreground py-8">لا توجد طرق تواصل مضافة. أضف أول طريقة تواصل الآن.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Social Links Section */}
+          <div className="bg-card rounded-lg shadow-sm border border-border p-6">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h2 className="text-xl font-semibold">حسابات التواصل الاجتماعي</h2>
+              <button
+                onClick={() => setNewLink({ platform: '', url: '', icon: 'Link', is_active: true, sort_order: links.length + 1 })}
+                className="bg-primary text-primary-foreground px-4 py-2 rounded-md flex items-center gap-2 hover:bg-primary/90 transition-colors"
+              >
+                <Plus size={20} />
+                <span>إضافة رابط</span>
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {links.map((link) => (
+                <div key={link.id} className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg border border-border">
+                  {editingId === link.id ? (
+                    renderForm(link)
+                  ) : (
+                    <>
+                      <div className="p-2 bg-background rounded border border-border text-muted-foreground cursor-grab">
+                        <GripVertical size={20} />
+                      </div>
+                      <div className="p-2 bg-background rounded-full border border-border">
+                        {(() => {
+                          const IconItem = AVAILABLE_ICONS.find(i => i.name === link.icon) || AVAILABLE_ICONS.find(i => i.name === 'Link')
+                          const Icon = IconItem?.icon || LinkIcon
+                          return <Icon size={20} />
+                        })()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold flex items-center gap-2">
+                          {link.platform}
+                          {!link.is_active && <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">غير نشط</span>}
+                        </div>
+                        <div className="text-sm text-muted-foreground truncate w-[220px] sm:w-[260px] md:w-[340px]">{link.url}</div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => setEditingId(link.id)} className="p-2 hover:bg-muted rounded text-blue-600">تعديل</button>
+                        <button onClick={() => setDeleteTarget(link)} className="p-2 hover:bg-muted rounded text-red-600">
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+
+              {newLink && (
+                <div className="flex items-center gap-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
+                  {renderForm(newLink, true)}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -832,6 +1065,15 @@ export default function DashboardSettings() {
         cancelLabel="إلغاء"
         onConfirm={handleDeleteSocial}
         onCancel={() => setDeleteTarget(null)}
+      />
+      <ConfirmDialog
+        isOpen={!!deleteContactTarget}
+        title="حذف طريقة التواصل"
+        message={`هل أنت متأكد من حذف "${deleteContactTarget?.label}"؟`}
+        confirmLabel="حذف"
+        cancelLabel="إلغاء"
+        onConfirm={handleDeleteContact}
+        onCancel={() => setDeleteContactTarget(null)}
       />
     </div>
   )

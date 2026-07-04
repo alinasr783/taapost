@@ -83,6 +83,16 @@ export type SocialLink = {
   sort_order: number
 }
 
+export type ContactInfo = {
+  id: number
+  type: string
+  label: string
+  value: string
+  icon: string
+  sort_order: number
+  is_active: boolean
+}
+
 export type Author = {
   id: number
   name: string
