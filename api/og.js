@@ -1,6 +1,5 @@
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || ''
 const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || ''
-const SITE_URL = process.env.VITE_SITE_URL || ''
 const SITE_NAME = 'تاء بوست'
 const SITE_DESC = 'منصة إعلامية عربية رقمية'
 const DEFAULT_OG_IMAGE = '/og-default.svg'
@@ -92,86 +91,72 @@ ${extraTags}
 </html>`
 }
 
-function getOrigin(request) {
-  const url = new URL(request.url)
-  const configuredOrigin = SITE_URL ? SITE_URL.replace(/\/+$/, '') : ''
-  if (configuredOrigin) return configuredOrigin
-  return `${url.protocol}//${url.host}`
+function extractPath(req) {
+  const urlObj = new URL(req.url, `https://${req.headers.host || 'localhost'}`)
+  const rawPath = urlObj.pathname
+  if (rawPath.startsWith('/og/')) return rawPath.slice(3) || '/'
+  if (rawPath.startsWith('/article/') || rawPath.startsWith('/post/')) return rawPath
+  return urlObj.searchParams.get('path') || urlObj.searchParams.get('p') || '/'
 }
 
-function getArticleParam(pathname) {
-  const postMatch = pathname.match(/^\/post\/([^/]+)/)
-  if (postMatch) return { param: decodeURIComponent(postMatch[1]), type: 'post' }
-  const articleMatch = pathname.match(/^\/article\/([^/]+)/)
-  if (articleMatch) return { param: decodeURIComponent(articleMatch[1]), type: 'article' }
-  return null
+function getOrigin(req) {
+  const configured = process.env.VITE_SITE_URL || process.env.SITE_URL || ''
+  if (configured) return configured.replace(/\/+$/, '')
+  const proto = (req.headers['x-forwarded-proto'] || 'https').split(',')[0]
+  const host = (req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0]
+  return `${proto}://${host}`.replace(/\/+$/, '')
 }
 
-export default async function middleware(request) {
-  const url = new URL(request.url)
-  const { pathname } = url
-  const ua = request.headers.get('user-agent') || ''
-  const origin = getOrigin(request)
+export default async function handler(req, res) {
+  try {
+    const origin = getOrigin(req)
+    const ua = req.headers['user-agent'] || ''
+    const path = extractPath(req)
 
-  if (pathname === '/' || pathname === '') {
-    if (isBot(ua)) {
-      const settings = await fetchSiteSettings()
-      const logoOrOg = settings?.og_image || settings?.logo_url || null
-      const image = resolveImage(logoOrOg, origin)
-      const html = buildOGHtml('', SITE_DESC, image, origin, SITE_NAME,
-        '<meta property="og:type" content="website">')
-      return new Response(html, {
-        status: 200,
-        headers: {
-          'content-type': 'text/html; charset=utf-8',
-          'cache-control': 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400',
-        },
-      })
+    if (!path || path === '/') {
+      if (isBot(ua)) {
+        const settings = await fetchSiteSettings()
+        const logoOrOg = settings?.og_image || settings?.logo_url || null
+        const image = resolveImage(logoOrOg, origin)
+        const html = buildOGHtml('', SITE_DESC, image, origin, SITE_NAME,
+          '<meta property="og:type" content="website">')
+        res.setHeader('Content-Type', 'text/html; charset=utf-8')
+        res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400')
+        return res.status(200).send(html)
+      }
+      return res.redirect(302, origin + '/')
     }
-    return
+
+    const isArticle = path.startsWith('/article/')
+    const isPost = path.startsWith('/post/')
+    if (!isArticle && !isPost) {
+      return res.redirect(302, origin + path)
+    }
+
+    const param = decodeURIComponent(path.replace(/^\/(article|post)\//, ''))
+    const type = isArticle ? 'article' : 'post'
+
+    const article = await fetchArticle(param)
+    if (!article) {
+      return res.redirect(302, origin + path)
+    }
+
+    if (isBot(ua)) {
+      const image = resolveImage(article.image, origin)
+      const articleUrl = article.slug
+        ? `${origin}/${type}/${encodeURIComponent(article.slug)}`
+        : `${origin}/${type}/${article.id}`
+      const extraTags = article.date
+        ? `<meta property="article:published_time" content="${esc(article.date)}">`
+        : ''
+      const html = buildOGHtml(article.title, article.excerpt || article.title, image, articleUrl, SITE_NAME, extraTags)
+      res.setHeader('Content-Type', 'text/html; charset=utf-8')
+      res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400')
+      return res.status(200).send(html)
+    }
+
+    return res.redirect(302, origin + path)
+  } catch {
+    return res.redirect(302, '/')
   }
-
-  const articleInfo = getArticleParam(pathname)
-  if (!articleInfo) return
-
-  if (isBot(ua)) {
-    const article = await fetchArticle(articleInfo.param)
-    if (!article) return
-    const image = resolveImage(article.image, origin)
-    const type = articleInfo.type
-    const articleUrl = article.slug
-      ? `${origin}/${type}/${encodeURIComponent(article.slug)}`
-      : `${origin}/${type}/${article.id}`
-    const extraTags = article.date
-      ? `<meta property="article:published_time" content="${esc(article.date)}">`
-      : ''
-    const html = buildOGHtml(article.title, article.excerpt || article.title, image, articleUrl, SITE_NAME, extraTags)
-    return new Response(html, {
-      status: 200,
-      headers: {
-        'content-type': 'text/html; charset=utf-8',
-        'cache-control': 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400',
-      },
-    })
-  }
-
-  const isId = /^\d+$/.test(articleInfo.param)
-  if (!isId) {
-    const article = await fetchArticle(articleInfo.param)
-    if (!article) return
-    const newPath = article.type === 'article' ? `/article/${article.id}` : `/post/${article.id}`
-    return new Response(null, {
-      status: 301,
-      headers: {
-        'location': `${origin}${newPath}`,
-        'cache-control': 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400',
-      },
-    })
-  }
-
-  return
-}
-
-export const config = {
-  matcher: ['/', '/article/:path*', '/post/:path*'],
 }
