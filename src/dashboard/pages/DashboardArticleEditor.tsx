@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, Save, Video, Check, AlertCircle, Loader2 } from 'lucide-react'
+import { ArrowRight, Save, Video, Loader2 } from 'lucide-react'
 import { supabase, type Category, type User, type UserPermission, type Author } from '../../lib/supabase'
 import { hasPermission } from '../utils'
 import ImageUpload from '../components/ImageUpload'
@@ -27,21 +27,6 @@ const decodeHtml = (html: string) => {
   const txt = document.createElement('textarea')
   txt.innerHTML = html
   return txt.value
-}
-
-const SLUG_REGEX = /^[a-z0-9]+(-[a-z0-9]+)*$/
-const SLUG_MAX = 100
-
-function validateSlug(value: string): string | null {
-  if (!value.trim()) return 'الرابط مطلوب'
-  if (value.length > SLUG_MAX) return `الرابط يجب ألا يتجاوز ${SLUG_MAX} حرفاً`
-  if (/\s/.test(value)) return 'الرابط لا يجب أن يحتوي على مسافات'
-  if (/[A-Z]/.test(value)) return 'استخدم الحروف الإنجليزية الصغيرة فقط'
-  if (/[^a-z0-9-]/.test(value)) return 'الرابط يقبل فقط الحروف الإنجليزية والأرقام والشرطات (-)'
-  if (value.startsWith('-') || value.endsWith('-')) return 'الرابط لا يبدأ أو ينتهي بشرطة'
-  if (value.includes('--')) return 'الرابط لا يحتوي على شرطتين متتاليتين'
-  if (!SLUG_REGEX.test(value)) return 'صيغة الرابط غير صالحة - مثال: my-article-slug'
-  return null
 }
 
 function extractYoutubeEmbedUrl(url: string): string | null {
@@ -81,13 +66,9 @@ export default function DashboardArticleEditor() {
   const [permissions, setPermissions] = useState<UserPermission[]>([])
   const [videoModalOpen, setVideoModalOpen] = useState(false)
   const [videoUrl, setVideoUrl] = useState('')
+  const [videoCaption, setVideoCaption] = useState('')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const quillRef = useRef<any>(null)
-  const [slug, setSlug] = useState('')
-  const [slugError, setSlugError] = useState<string | null>(null)
-  const [slugChecking, setSlugChecking] = useState(false)
-  const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null)
-  const slugCheckTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [user] = useState<User | null>(() => {
     const storedUser = localStorage.getItem('dashboard_user')
@@ -113,42 +94,12 @@ export default function DashboardArticleEditor() {
     category_id: 0,
     author_id: 0,
     image: '',
+    image_caption: '',
     type: 'article',
     is_exclusive: false,
     date: new Date().toISOString().split('T')[0],
     content_source: ''
   })
-
-  const checkSlugUnique = useCallback(async (value: string) => {
-    if (!value.trim()) return
-    setSlugChecking(true)
-    try {
-      const { data } = await supabase
-        .from('articles')
-        .select('id')
-        .eq('slug', value.trim())
-        .maybeSingle()
-      const exists = data && (!isEditing || data.id !== Number(id))
-      setSlugAvailable(!exists)
-    } catch {
-      setSlugAvailable(null)
-    } finally {
-      setSlugChecking(false)
-    }
-  }, [isEditing, id])
-
-  const handleSlugChange = useCallback((value: string) => {
-    const sanitized = value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
-    setSlug(sanitized)
-    const err = validateSlug(sanitized)
-    setSlugError(err)
-    if (err) {
-      setSlugAvailable(null)
-      return
-    }
-    if (slugCheckTimeout.current) clearTimeout(slugCheckTimeout.current)
-    slugCheckTimeout.current = setTimeout(() => checkSlugUnique(sanitized), 600)
-  }, [checkSlugUnique])
 
   useEffect(() => {
     const loadData = async () => {
@@ -168,7 +119,7 @@ export default function DashboardArticleEditor() {
         setFetchingArticle(true)
         const { data: article } = await supabase
           .from('articles')
-          .select('id, slug, title, excerpt, content, image, category_id, type, date, is_exclusive, content_source, author_id')
+          .select('id, slug, title, excerpt, content, image, image_caption, category_id, type, date, is_exclusive, content_source, author_id')
           .eq('id', Number(id))
           .single()
 
@@ -180,12 +131,12 @@ export default function DashboardArticleEditor() {
             category_id: article.category_id || 0,
             author_id: article.author_id || 0,
             image: article.image || '',
+            image_caption: article.image_caption || '',
             type: article.type || 'article',
             is_exclusive: article.is_exclusive || false,
             date: article.date ? article.date.split('T')[0] : new Date().toISOString().split('T')[0],
             content_source: article.content_source || ''
           })
-          setSlug(article.slug || '')
         }
         setFetchingArticle(false)
       }
@@ -204,6 +155,16 @@ export default function DashboardArticleEditor() {
     }
   }, [categories, user, permissions, isEditing, formData.category_id])
 
+  // Auto-assign articles to the dedicated "Articles" category
+  useEffect(() => {
+    if (formData.type === 'article' && categories.length > 0) {
+      const articlesCategory = categories.find(c => c.slug === 'articles')
+      if (articlesCategory && formData.category_id !== articlesCategory.id) {
+        setFormData(prev => ({ ...prev, category_id: articlesCategory.id }))
+      }
+    }
+  }, [formData.type, categories, formData.category_id])
+
   const handleVideoToolbarClick = useCallback(() => {
     setVideoModalOpen(true)
   }, [])
@@ -220,14 +181,17 @@ export default function DashboardArticleEditor() {
 
     const range = editor.getSelection(true)
     const videoId = embedUrl.split('/').pop() || ''
-    const marker = `{{youtube:${videoId}}}`
+    const marker = videoCaption.trim() 
+      ? `{{youtube:${videoId}|${videoCaption.trim()}}}` 
+      : `{{youtube:${videoId}}}`
 
     editor.insertText(range.index, marker, 'user')
     editor.setSelection(range.index + marker.length, 0, 'silent')
 
     setVideoModalOpen(false)
     setVideoUrl('')
-  }, [videoUrl, showToast])
+    setVideoCaption('')
+  }, [videoUrl, videoCaption, showToast])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -239,19 +203,13 @@ export default function DashboardArticleEditor() {
       return
     }
 
-    const err = validateSlug(slug)
-    if (err) {
-      setSlugError(err)
-      return
-    }
-
     setLoading(true)
     try {
       const dataToSave = {
         ...formData,
         author_id: formData.author_id === 0 ? null : formData.author_id,
         content_source: formData.content_source || null,
-        slug: slug.trim() || null,
+        slug: null,
       }
 
       let error
@@ -328,69 +286,25 @@ export default function DashboardArticleEditor() {
           />
         </div>
 
-        {/* Slug */}
-        <div className="bg-card rounded-lg border border-border p-6">
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium text-foreground">الرابط (Slug)</label>
-            <div className="flex items-center gap-2 text-xs">
-              {slugChecking && (
-                <span className="flex items-center gap-1 text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  جاري التحقق...
-                </span>
-              )}
-              {!slugChecking && slugAvailable === true && !slugError && slug.trim() && (
-                <span className="flex items-center gap-1 text-green-600">
-                  <Check className="h-3 w-3" />
-                  الرابط متاح
-                </span>
-              )}
-              {!slugChecking && slugAvailable === false && !slugError && (
-                <span className="flex items-center gap-1 text-destructive">
-                  <AlertCircle className="h-3 w-3" />
-                  الرابط مستخدم من قبل
-                </span>
-              )}
-            </div>
-          </div>
-          <input
-            type="text"
-            value={slug}
-            onChange={(e) => handleSlugChange(e.target.value)}
-            placeholder="مثال: my-article-slug"
-            dir="ltr"
-            className={`w-full p-3 bg-background border rounded-lg focus:ring-2 focus:ring-ring outline-none text-foreground ${slugError ? 'border-destructive' : slugAvailable === false ? 'border-destructive' : slugAvailable === true ? 'border-green-500' : 'border-input'}`}
-          />
-          {slugError && (
-            <p className="mt-2 text-xs text-destructive flex items-center gap-1">
-              <AlertCircle className="h-3 w-3" />
-              {slugError}
-            </p>
-          )}
-          {!slugError && slug.trim() && (
-            <p className="mt-2 text-xs text-muted-foreground" dir="ltr">
-              رابط {formData.type === 'article' ? 'المقال' : 'المحتوى'}: /{formData.type === 'article' ? 'article' : 'post'}/<span className="font-mono text-primary">{slug.trim()}</span>
-            </p>
-          )}
-        </div>
-
         {/* Category, Type, Exclusive, Date */}
         <div className="bg-card rounded-lg border border-border p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">القسم</label>
-              <select
-                required
-                value={formData.category_id}
-                onChange={(e) => setFormData({ ...formData, category_id: Number(e.target.value) })}
-                className="w-full p-3 bg-background border border-input rounded-lg focus:ring-2 focus:ring-ring outline-none text-foreground"
-              >
-                <option value={0} disabled>اختر القسم</option>
-                {availableCategories.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
+          <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${isOtherType ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
+            {isOtherType && (
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">القسم</label>
+                <select
+                  required
+                  value={formData.category_id}
+                  onChange={(e) => setFormData({ ...formData, category_id: Number(e.target.value) })}
+                  className="w-full p-3 bg-background border border-input rounded-lg focus:ring-2 focus:ring-ring outline-none text-foreground"
+                >
+                  <option value={0} disabled>اختر القسم</option>
+                  {availableCategories.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">نوع المحتوى</label>
@@ -472,6 +386,9 @@ export default function DashboardArticleEditor() {
             value={formData.image}
             onChange={(url) => setFormData({ ...formData, image: url })}
             label="صورة المقال"
+            caption={formData.image_caption}
+            onCaptionChange={(caption) => setFormData({ ...formData, image_caption: caption })}
+            showCaption={true}
           />
         </div>
 
@@ -559,7 +476,7 @@ export default function DashboardArticleEditor() {
 
       {/* Video Modal */}
       {videoModalOpen && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70]" onClick={() => { setVideoModalOpen(false); setVideoUrl(''); }}>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70]" onClick={() => { setVideoModalOpen(false); setVideoUrl(''); setVideoCaption(''); }}>
           <div className="bg-card rounded-lg shadow-xl w-full max-w-md p-6 border border-border mx-4" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
               <Video size={20} className="text-primary" />
@@ -571,13 +488,22 @@ export default function DashboardArticleEditor() {
               value={videoUrl}
               onChange={(e) => setVideoUrl(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleVideoInsert()}
-              className="w-full p-3 bg-background border border-input rounded-lg focus:ring-2 focus:ring-ring outline-none text-foreground mb-4"
+              className="w-full p-3 bg-background border border-input rounded-lg focus:ring-2 focus:ring-ring outline-none text-foreground mb-3"
               autoFocus
               dir="ltr"
             />
+            <input
+              type="text"
+              placeholder="التسمية التوضيحية للفيديو (اختياري)"
+              value={videoCaption}
+              onChange={(e) => setVideoCaption(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleVideoInsert()}
+              className="w-full p-3 bg-background border border-input rounded-lg focus:ring-2 focus:ring-ring outline-none text-foreground mb-4"
+              dir="rtl"
+            />
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => { setVideoModalOpen(false); setVideoUrl(''); }}
+                onClick={() => { setVideoModalOpen(false); setVideoUrl(''); setVideoCaption(''); }}
                 className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg transition-colors"
               >
                 إلغاء

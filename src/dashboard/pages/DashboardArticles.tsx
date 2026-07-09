@@ -433,7 +433,7 @@ export default function DashboardArticles() {
 
                     <div className="flex shrink-0 items-center gap-1">
                         <a
-                          href={article.slug ? `${article.type === 'article' ? '/article/' : '/post/'}${encodeURIComponent(article.slug)}` : `${article.type === 'article' ? '/article/' : '/post/'}${article.id}`}
+                          href={`${article.type === 'article' ? '/article/' : '/post/'}${article.id}`}
                           target="_blank"
                           rel="noreferrer"
                           className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded transition-colors"
@@ -523,7 +523,7 @@ export default function DashboardArticles() {
                       <td className="p-4 text-muted-foreground">{new Date(article.created_at || article.date).toLocaleDateString('ar-EG')}</td>
                       <td className="p-4 flex gap-2">
                         <a
-                          href={article.slug ? `${article.type === 'article' ? '/article/' : '/post/'}${encodeURIComponent(article.slug)}` : `${article.type === 'article' ? '/article/' : '/post/'}${article.id}`}
+                          href={`${article.type === 'article' ? '/article/' : '/post/'}${article.id}`}
                           target="_blank"
                           rel="noreferrer"
                           className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded transition-colors"

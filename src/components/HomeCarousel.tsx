@@ -4,14 +4,14 @@ import type { Article } from '../lib/supabase'
 
 type Props = {
   articles: Article[]
+  title?: string
 }
 
 function articleUrl(article: Article) {
-  const base = article.type === 'article' ? '/article/' : '/post/'
-  return article.slug ? `${base}${encodeURIComponent(article.slug)}` : `${base}${article.id}`
+  return `/article/${article.id}`
 }
 
-export default function HomeCarousel({ articles }: Props) {
+export default function HomeCarousel({ articles, title }: Props) {
   const navigate = useNavigate()
   const scrollRef = useRef<HTMLDivElement>(null)
   const [carouselIndex, setCarouselIndex] = useState(0)
@@ -72,6 +72,13 @@ export default function HomeCarousel({ articles }: Props) {
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
+      {title && (
+        <div className="container mb-4">
+          <div className="flex items-center justify-between border-b border-primary/10 pb-4">
+            <h2 className="text-2xl font-bold border-r-4 border-primary pr-3">{title}</h2>
+          </div>
+        </div>
+      )}
       <div 
         ref={scrollRef}
         className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar"

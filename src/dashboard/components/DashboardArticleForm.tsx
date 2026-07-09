@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { X, Save, Video, Check, AlertCircle, Loader2 } from 'lucide-react'
+import { X, Save, Video } from 'lucide-react'
 import { supabase, type Article, type Category, type User, type UserPermission, type Author } from '../../lib/supabase'
 import { hasPermission } from '../utils'
 import ImageUpload from './ImageUpload'
@@ -37,21 +37,6 @@ const decodeHtml = (html: string) => {
   return txt.value
 }
 
-const SLUG_REGEX = /^[a-z0-9]+(-[a-z0-9]+)*$/
-const SLUG_MAX = 100
-
-function validateSlug(value: string): string | null {
-  if (!value.trim()) return 'الرابط مطلوب'
-  if (value.length > SLUG_MAX) return `الرابط يجب ألا يتجاوز ${SLUG_MAX} حرفاً`
-  if (/\s/.test(value)) return 'الرابط لا يجب أن يحتوي على مسافات'
-  if (/[A-Z]/.test(value)) return 'استخدم الحروف الإنجليزية الصغيرة فقط'
-  if (/[^a-z0-9-]/.test(value)) return 'الرابط يقبل فقط الحروف الإنجليزية والأرقام والشرطات (-)'
-  if (value.startsWith('-') || value.endsWith('-')) return 'الرابط لا يبدأ أو ينتهي بشرطة'
-  if (value.includes('--')) return 'الرابط لا يحتوي على شرطتين متتاليتين'
-  if (!SLUG_REGEX.test(value)) return 'صيغة الرابط غير صالحة - مثال: my-article-slug'
-  return null
-}
-
 function extractYoutubeEmbedUrl(url: string): string | null {
   const trimmed = url.trim()
   if (!trimmed) return null
@@ -84,11 +69,6 @@ export default function DashboardArticleForm({ article, categories, user, permis
   const [videoUrl, setVideoUrl] = useState('')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const quillRef = useRef<any>(null)
-  const [slug, setSlug] = useState(article?.slug || '')
-  const [slugError, setSlugError] = useState<string | null>(null)
-  const [slugChecking, setSlugChecking] = useState(false)
-  const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null)
-  const slugCheckTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [formData, setFormData] = useState(() => {
     if (article) {
@@ -119,37 +99,6 @@ export default function DashboardArticleForm({ article, categories, user, permis
     }
   })
 
-  const checkSlugUnique = useCallback(async (value: string) => {
-    if (!value.trim()) return
-    setSlugChecking(true)
-    try {
-      const { data } = await supabase
-        .from('articles')
-        .select('id')
-        .eq('slug', value.trim())
-        .maybeSingle()
-      const exists = data && (!article || data.id !== article.id)
-      setSlugAvailable(!exists)
-    } catch {
-      setSlugAvailable(null)
-    } finally {
-      setSlugChecking(false)
-    }
-  }, [article])
-
-  const handleSlugChange = useCallback((value: string) => {
-    const sanitized = value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
-    setSlug(sanitized)
-    const err = validateSlug(sanitized)
-    setSlugError(err)
-    if (err) {
-      setSlugAvailable(null)
-      return
-    }
-    if (slugCheckTimeout.current) clearTimeout(slugCheckTimeout.current)
-    slugCheckTimeout.current = setTimeout(() => checkSlugUnique(sanitized), 600)
-  }, [checkSlugUnique])
-
   useEffect(() => {
     supabase.from('authors').select('*').order('name').then(({ data }) => {
       if (data) setAuthors(data)
@@ -165,6 +114,16 @@ export default function DashboardArticleForm({ article, categories, user, permis
       }
     }
   }, [article, categories, user, permissions, formData.category_id])
+
+  // Auto-assign articles to the dedicated "Articles" category
+  useEffect(() => {
+    if (formData.type === 'article' && categories.length > 0) {
+      const articlesCategory = categories.find(c => c.slug === 'articles')
+      if (articlesCategory && formData.category_id !== articlesCategory.id) {
+        setFormData(prev => ({ ...prev, category_id: articlesCategory.id }))
+      }
+    }
+  }, [formData.type, categories, formData.category_id])
 
   const handleVideoToolbarClick = useCallback(() => {
     setVideoModalOpen(true)
@@ -202,19 +161,13 @@ export default function DashboardArticleForm({ article, categories, user, permis
       return
     }
 
-    const err = validateSlug(slug)
-    if (err) {
-      setSlugError(err)
-      return
-    }
-
     setLoading(true)
     try {
       const dataToSave = {
         ...formData,
         author_id: formData.author_id === 0 ? null : formData.author_id,
         content_source: formData.content_source || null,
-        slug: slug.trim() || null,
+        slug: null,
       }
 
       let error
@@ -283,73 +236,23 @@ export default function DashboardArticleForm({ article, categories, user, permis
             <div />
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="block text-sm font-medium text-foreground">الرابط (Slug)</label>
-              <div className="flex items-center gap-2 text-xs">
-                {slugChecking && (
-                  <span className="flex items-center gap-1 text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    جاري التحقق...
-                  </span>
-                )}
-                {!slugChecking && slugAvailable === true && !slugError && slug.trim() && (
-                  <span className="flex items-center gap-1 text-green-600">
-                    <Check className="h-3 w-3" />
-                    الرابط متاح
-                  </span>
-                )}
-                {!slugChecking && slugAvailable === false && !slugError && (
-                  <span className="flex items-center gap-1 text-destructive">
-                    <AlertCircle className="h-3 w-3" />
-                    الرابط مستخدم من قبل
-                  </span>
-                )}
+          <div className={`grid grid-cols-1 md:grid-cols-3 gap-6`}>
+            {formData.type !== 'article' && (
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">القسم</label>
+                <select
+                  required
+                  value={formData.category_id}
+                  onChange={(e) => setFormData({ ...formData, category_id: Number(e.target.value) })}
+                  className="w-full p-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring outline-none text-foreground"
+                >
+                  <option value={0} disabled>اختر القسم</option>
+                  {availableCategories.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
               </div>
-            </div>
-            <input
-              type="text"
-              value={slug}
-              onChange={(e) => handleSlugChange(e.target.value)}
-              placeholder="مثال: my-article-slug"
-              dir="ltr"
-              className={`w-full p-2 bg-background border rounded-md focus:ring-2 focus:ring-ring outline-none text-foreground ${slugError ? 'border-destructive' : slugAvailable === false ? 'border-destructive' : slugAvailable === true ? 'border-green-500' : 'border-input'}`}
-            />
-            {slugError && (
-              <p className="text-xs text-destructive flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                {slugError}
-              </p>
             )}
-            {!slugError && slug.trim() && (
-              <p className="text-xs text-muted-foreground" dir="ltr">
-                رابط المحتوى: /post/<span className="font-mono text-primary">{slug.trim()}</span>
-              </p>
-            )}
-            <div className="rounded-md bg-muted/30 border border-border/40 p-3 text-xs text-muted-foreground space-y-1">
-              <p className="font-medium text-foreground mb-1">شروط الرابط:</p>
-              <p>• حروف إنجليزية صغيرة وأرقام وشرطات (-) فقط</p>
-              <p>• بدون مسافات أو رموز خاصة</p>
-              <p>• لا يبدأ أو ينتهي بشرطة</p>
-              <p>• مثال صحيح: <span dir="ltr" className="font-mono text-primary">latest-tech-news-2025</span></p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">القسم</label>
-              <select
-                required
-                value={formData.category_id}
-                onChange={(e) => setFormData({ ...formData, category_id: Number(e.target.value) })}
-                className="w-full p-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring outline-none text-foreground"
-              >
-                <option value={0} disabled>اختر القسم</option>
-                {availableCategories.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1">نوع المحتوى</label>
               <select
@@ -359,11 +262,7 @@ export default function DashboardArticleForm({ article, categories, user, permis
                 className="w-full p-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring outline-none text-foreground"
               >
                 <option value="article">مقال</option>
-                <option value="breaking">خبر عاجل</option>
-                <option value="report">تقرير</option>
-                <option value="video">فيديو</option>
-                <option value="podcast">بودكاست</option>
-                <option value="statement">بيان رسمي</option>
+                <option value="other">محتوى آخر</option>
               </select>
             </div>
             <div className="flex items-end mb-1">

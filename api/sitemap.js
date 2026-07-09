@@ -45,14 +45,14 @@ export default async function handler(req, res) {
     push(`${base}/content`, now, 'weekly', '0.6')
 
     for (const c of categories) {
-      const loc = c.slug ? `${base}/قسم/${encodeURIComponent(c.slug)}` : `${base}/category/${c.id}`
+      const loc = `${base}/category/${c.id}`
       push(loc, c.updated_at || now, 'weekly', '0.7')
     }
 
     for (const a of articles) {
       const isArticle = a.type === 'article'
       const basePath = isArticle ? 'article' : 'post'
-      const loc = a.slug ? `${base}/${basePath}/${encodeURIComponent(a.slug)}` : `${base}/${basePath}/${a.id}`
+      const loc = `${base}/${basePath}/${a.id}`
       push(loc, a.updated_at || a.date || now, 'daily', isArticle ? '0.9' : '0.7')
     }
 

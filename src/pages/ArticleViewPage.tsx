@@ -65,37 +65,24 @@ const ARTICLE_STYLE = `
 `
 
 export default function ArticleViewPage() {
-  const { slug } = useParams()
+  const { id } = useParams()
   const navigate = useNavigate()
-  const decodedSlug = slug ? decodeURIComponent(slug) : ''
+  const articleId = id ? decodeURIComponent(id) : ''
 
   const articleQuery = useQuery({
-    queryKey: ['article_view', decodedSlug],
+    queryKey: ['article_view', articleId],
     queryFn: async () => {
-      if (!decodedSlug) return { article: null as Article | null, related: [] as Article[], error: null as string | null }
+      if (!articleId) return { article: null as Article | null, related: [] as Article[], error: null as string | null }
 
-      let data: unknown
-      const isNumeric = /^\d+$/.test(decodedSlug)
+      const res = await supabase
+        .from('articles')
+        .select('*, categories(name), authors(id, name, image, bio, role)')
+        .eq('id', Number(articleId))
+        .eq('type', 'article')
+        .single()
 
-      if (isNumeric) {
-        const res = await supabase
-          .from('articles')
-          .select('*, categories(name), authors(id, name, image, bio, role)')
-          .eq('id', Number(decodedSlug))
-          .eq('type', 'article')
-          .single()
-        data = res.data
-        if (res.error) return { article: null, related: [], error: res.error.message }
-      } else {
-        const res = await supabase
-          .from('articles')
-          .select('*, categories(name), authors(id, name, image, bio, role)')
-          .eq('slug', decodedSlug)
-          .eq('type', 'article')
-          .single()
-        data = res.data
-        if (res.error) return { article: null, related: [], error: res.error.message }
-      }
+      if (res.error) return { article: null, related: [], error: res.error.message }
+      const data = res.data as Record<string, unknown>
 
       if (!data) return { article: null as Article | null, related: [], error: 'المقال غير موجود' }
 
@@ -129,10 +116,11 @@ export default function ArticleViewPage() {
         })
 
         const processedHtml = doc.body.innerHTML.replace(/&nbsp;/gi, ' ').replace(/\u00A0/g, ' ')
-        const youTubeMarkerRegex = /\{\{youtube:([a-zA-Z0-9_-]{11})\}\}/g
-        contentHtml = processedHtml.replace(youTubeMarkerRegex, (_match: string, videoId: string) => {
+        const youTubeMarkerRegex = /\{\{youtube:([a-zA-Z0-9_-]{11})(?:\|([^}]*))?\}\}/g
+        contentHtml = processedHtml.replace(youTubeMarkerRegex, (_match: string, videoId: string, caption?: string) => {
           const embedUrl = `https://www.youtube.com/embed/${videoId}`
-          return `<div class="ql-video-wrapper" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%;margin:1.5em 0;"><iframe class="ql-video" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" src="${embedUrl}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`
+          const captionHtml = caption ? `<figcaption style="font-size:0.875rem;opacity:0.7;margin-top:0.5em;text-align:center;color:hsl(var(--foreground));">${caption}</figcaption>` : ''
+          return `<figure style="max-width:100%;margin:1.5em 0;"><div class="ql-video-wrapper" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%;"><iframe class="ql-video" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" src="${embedUrl}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>${captionHtml}</figure>`
         })
       } catch {
         contentHtml = (data as Record<string, unknown>).content as string || ''
@@ -176,7 +164,7 @@ export default function ArticleViewPage() {
 
       return { article, related: (relatedData ?? []) as Article[], authorArticles, error: null }
     },
-    enabled: Boolean(decodedSlug),
+    enabled: Boolean(articleId),
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
     retry: 1,
@@ -203,7 +191,6 @@ export default function ArticleViewPage() {
   }
 
   const buildArticleUrl = (a: Article) => {
-    if (a.slug) return `/article/${encodeURIComponent(a.slug)}`
     return `/article/${a.id}`
   }
 
@@ -224,7 +211,6 @@ export default function ArticleViewPage() {
   }
 
   if (articleQuery.error || (!article && articleQuery.data?.error)) {
-    const errorMessage = articleQuery.error instanceof Error ? articleQuery.error.message : (articleQuery.data?.error || 'حدث خطأ غير معروف')
     return (
       <div className="container flex flex-col items-center justify-center py-20 text-center">
         <Seo title="خطأ في تحميل المقال" description="حدث خطأ أثناء تحميل المقال" robots="noindex,follow" />
@@ -262,9 +248,11 @@ export default function ArticleViewPage() {
       <Seo
         title={article.title}
         description={article.excerpt || article.title}
-        canonicalPath={`/article/${encodeURIComponent(article.slug || String(article.id))}`}
+        canonicalPath={`/article/${article.id}`}
         ogType="article"
         image={article.image}
+        articleDate={article.date}
+        articleAuthor={article.authors?.name}
         jsonLd={{
           '@context': 'https://schema.org',
           '@type': 'Article',
@@ -350,6 +338,11 @@ export default function ArticleViewPage() {
             width={1200}
             height={600}
           />
+          {article.image_caption && (
+            <p className="text-sm text-center text-muted-foreground py-2 px-4 bg-muted/30">
+              {article.image_caption}
+            </p>
+          )}
         </div>
       )}
 
@@ -435,7 +428,7 @@ export default function ArticleViewPage() {
               {authorArticles.map((item) => (
                 <Link
                   key={item.id}
-                  to={`/article/${encodeURIComponent(item.slug || String(item.id))}`}
+                  to={`/article/${item.id}`}
                   className="group rounded-xl border border-border/30 bg-card overflow-hidden hover:shadow-md hover:border-primary/25 transition-all"
                 >
                   <div className="relative aspect-[16/9] overflow-hidden bg-muted/30">
@@ -483,7 +476,7 @@ export default function ArticleViewPage() {
             {relatedArticles.map((related) => (
               <Link
                 key={related.id}
-                to={`/article/${encodeURIComponent(related.slug || String(related.id))}`}
+                to={`/article/${related.id}`}
                 className="group rounded-xl border border-border/40 bg-card overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all"
               >
                 <div className="relative aspect-[16/10] overflow-hidden">

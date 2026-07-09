@@ -61,7 +61,7 @@ export default function Categories() {
         {categories.map((c) => (
           <Link
             key={c.id}
-            to={c.slug ? `/قسم/${encodeURIComponent(c.slug)}` : `/category/${c.id}`}
+            to={`/category/${c.id}`}
             className="flex flex-col overflow-hidden rounded-[5px] border border-white/10 bg-background/10 shadow-sm backdrop-blur-md hover:bg-background/20"
           >
             <img

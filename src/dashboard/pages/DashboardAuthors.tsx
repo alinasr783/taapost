@@ -44,7 +44,9 @@ export default function DashboardAuthors() {
           .update({
             name: formData.name,
             image: formData.image,
+            image_caption: formData.image_caption || null,
             banner: formData.banner,
+            banner_caption: formData.banner_caption || null,
             bio: formData.bio,
             role: formData.role
           })
@@ -58,7 +60,9 @@ export default function DashboardAuthors() {
           .insert([{
             name: formData.name,
             image: formData.image,
+            image_caption: formData.image_caption || null,
             banner: formData.banner,
+            banner_caption: formData.banner_caption || null,
             bio: formData.bio,
             role: formData.role
           }])
@@ -224,11 +228,17 @@ export default function DashboardAuthors() {
                   value={formData.image || ''}
                   onChange={(url) => setFormData({ ...formData, image: url })}
                   label="صورة الكاتب"
+                  caption={formData.image_caption || ''}
+                  onCaptionChange={(caption) => setFormData({ ...formData, image_caption: caption })}
+                  showCaption={true}
                 />
                 <ImageUpload
                   value={formData.banner || ''}
                   onChange={(url) => setFormData({ ...formData, banner: url })}
                   label="صورة الغلاف (بانر)"
+                  caption={formData.banner_caption || ''}
+                  onCaptionChange={(caption) => setFormData({ ...formData, banner_caption: caption })}
+                  showCaption={true}
                 />
               </div>
 

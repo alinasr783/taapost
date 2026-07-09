@@ -47,9 +47,7 @@ function ogHtml(article, origin, siteName) {
   const title = article.title || ''
   const description = article.excerpt || article.title || ''
   const image = resolveImage(article.image, origin)
-  const url = article.slug
-    ? `${origin}/post/${encodeURIComponent(article.slug)}`
-    : `${origin}/post/${article.id}`
+  const url = `${origin}/post/${article.id}`
   const pageTitle = `${title} | ${siteName}`
 
   return `<!doctype html>
@@ -71,6 +69,7 @@ function ogHtml(article, origin, siteName) {
 <meta name="twitter:title" content="${esc(pageTitle)}">
 <meta name="twitter:description" content="${esc(description)}">
 <meta name="twitter:image" content="${esc(image)}">
+${article.date ? `<meta property="article:published_time" content="${esc(article.date)}">` : ''}
 <link rel="canonical" href="${esc(url)}">
 <meta http-equiv="refresh" content="0;url=${esc(url)}">
 </head>
@@ -84,7 +83,8 @@ async function fetchArticle(param) {
   if (!SUPABASE_URL || !SUPABASE_KEY) return null
 
   const isId = /^\d+$/.test(param)
-  const queryParam = isId ? `id=eq.${param}` : `slug=eq.${encodeURIComponent(param)}`
+  if (!isId) return null
+  const queryParam = `id=eq.${param}`
   const url = `${SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/articles?select=id,slug,title,excerpt,image,date&${queryParam}&limit=1`
   const headers = {
     apikey: SUPABASE_KEY,
@@ -111,12 +111,10 @@ function getOrigin(request) {
 }
 
 function getArticleParam(pathname) {
-  const postMatch = pathname.match(/^\/post\/([^/]+)/)
-  if (postMatch) return { param: decodeURIComponent(postMatch[1]), type: 'post' }
-  const articleMatch = pathname.match(/^\/article\/([^/]+)/)
-  if (articleMatch) return { param: decodeURIComponent(articleMatch[1]), type: 'article' }
-  const arabicMatch = pathname.match(/^\/\u0645\u0642\u0627\u0644\/([^/]+)/)
-  if (arabicMatch) return { param: decodeURIComponent(arabicMatch[1]), type: 'arabic' }
+  const postMatch = pathname.match(/^\/post\/(\d+)/)
+  if (postMatch) return { param: postMatch[1], type: 'post' }
+  const articleMatch = pathname.match(/^\/article\/(\d+)/)
+  if (articleMatch) return { param: articleMatch[1], type: 'article' }
   return null
 }
 
@@ -143,5 +141,5 @@ export default async function middleware(request) {
 }
 
 export const config = {
-  matcher: ['/article/:path*', '/post/:path*', '/مقال/:path*'],
+  matcher: ['/article/:path*', '/post/:path*'],
 }

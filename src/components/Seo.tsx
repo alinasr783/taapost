@@ -9,6 +9,8 @@ type Props = {
   image?: string
   robots?: string
   ogType?: string
+  articleDate?: string
+  articleAuthor?: string
   jsonLd?: unknown
 }
 
@@ -140,6 +142,15 @@ export default function Seo(props: Props) {
       upsertMetaByName('twitter:site', site.twitter_handle.trim())
     }
 
+    if (ogType === 'article') {
+      if (props.articleDate) {
+        upsertMetaByProperty('article:published_time', props.articleDate)
+      }
+      if (props.articleAuthor) {
+        upsertMetaByProperty('article:author', props.articleAuthor)
+      }
+    }
+
     if (props.jsonLd) {
       const v = props.jsonLd
       if (Array.isArray(v)) {
@@ -148,7 +159,7 @@ export default function Seo(props: Props) {
         upsertJsonLd(v)
       }
     }
-  }, [canonicalUrl, description, image, ogType, origin, props.jsonLd, robots, site, title])
+  }, [canonicalUrl, description, image, ogType, origin, props.articleAuthor, props.articleDate, props.jsonLd, robots, site, title])
 
   return null
 }

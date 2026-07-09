@@ -18,6 +18,7 @@ export type Category = {
   description: string
   topics: string[]
   image: string
+  image_caption?: string
   icon?: string
   order_index?: number
   display_order?: number
@@ -33,6 +34,7 @@ export type Article = {
   excerpt: string
   content: string
   image: string
+  image_caption?: string
   category_id: number
   type: ContentType
   date: string
@@ -97,9 +99,11 @@ export type Author = {
   id: number
   name: string
   image: string
+  image_caption?: string
   bio: string
   role?: string
   banner?: string
+  banner_caption?: string
   social_links?: Record<string, string>
   website?: string
   slug?: string
@@ -114,12 +118,12 @@ export type SectionSettings = {
 
 export type HomepageSection = {
   id: number
-  type: 'carousel' | 'category_grid' | 'category_list' | 'custom' | 'latest_grid' | 'category_section' | 'author_focus'
+  type: 'carousel' | 'category_grid' | 'category_list' | 'custom' | 'latest_grid' | 'category_section' | 'author_focus' | 'managed_slider'
   title: string
   category_id?: number
   display_order: number
   is_active: boolean
-  settings?: SectionSettings
+  settings?: SectionSettings & { slider_id?: number; hide_title?: boolean }
   categories?: Category // For joined data
 }
 
@@ -156,4 +160,35 @@ export type SiteSettingsSeo = {
   og_image: string | null
   twitter_handle: string | null
   keywords: string | null
+}
+
+export type HomepageSlider = {
+  id: number
+  name: string
+  category_id: number
+  post_count: number
+  hide_title: boolean
+  is_active: boolean
+  display_order: number
+  created_at: string
+  categories?: Category
+  slider_posts?: SliderPost[]
+  section_id?: number // linked homepage_sections id
+}
+
+export type SliderPost = {
+  id: number
+  slider_id: number
+  article_id: number
+  sort_order: number
+  articles?: Article
+}
+
+export type BreakingNewsHero = {
+  id: number
+  article_id: number
+  is_active: boolean
+  display_order: number
+  created_at: string
+  articles?: Article
 }

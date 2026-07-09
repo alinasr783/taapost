@@ -85,7 +85,7 @@ export default function ContentListPage() {
         {list.map((item) => (
           <Link
             key={item.id}
-            to={item.slug ? `/post/${encodeURIComponent(item.slug)}` : `/post/${item.id}`}
+            to={`/post/${item.id}`}
             className="group flex flex-col rounded-xl border border-border/40 bg-card overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all"
           >
             <div className="relative aspect-[16/9] overflow-hidden">

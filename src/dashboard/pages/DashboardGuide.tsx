@@ -384,33 +384,29 @@ export default function DashboardGuide() {
             <p>أدخل عنوان المقال في حقل <strong className="text-foreground">"العنوان"</strong>. يجب أن يكون العنوان واضحاً وجذاباً.</p>
           </StepCard>
 
-          <StepCard number={3} title="تحديد الرابط (Slug)">
-            <p>أدخل رابط المقال بالحروف الإنجليزية الصغيرة والأرقام والشرطات فقط. مثال: <code className="bg-muted px-1.5 py-0.5 rounded text-primary font-mono text-xs">my-article-slug</code></p>
+          <StepCard number={3} title="تحديد القسم ونوع المحتوى">
+            <p>اختر القسم المناسب من القائمة المنسدلة. يمكنك أيضاً تحديد نوع المحتوى (مقال أو محتوى آخر) والتحقق مما إذا كان المقال حصرياً.</p>
             <InfoBox type="tip">
-              الرابط يجب أن يكون فريداً. النظام يتحقق من توفر الرابط تلقائياً. يُفضّل استخدام كلمات مفيدة وواضحة تعكس محتوى المقال.
+              الروابط تتولد تلقائياً对于 كل مقال بعد الحفظ بناءً على رقم المقال في قاعدة البيانات.
             </InfoBox>
           </StepCard>
 
-          <StepCard number={4} title="تحديد القسم ونوع المحتوى">
-            <p>اختر القسم المناسب من القائمة المنسدلة. يمكنك أيضاً تحديد نوع المحتوى (مقال أو نوع آخر) والتحقق مما إذا كان المقال حصرياً.</p>
-          </StepCard>
-
-          <StepCard number={5} title="اختيار الكاتب ومصدر المحتوى">
+          <StepCard number={4} title="اختيار الكاتب ومصدر المحتوى">
             <p>اختر الكاتب من القائمة (اختياري). يمكنك أيضاً إدخال مصدر المحتوى مثل "المراسل: أحمد من القاهرة".</p>
           </StepCard>
 
-          <StepCard number={6} title="رفع صورة المقال">
+          <StepCard number={5} title="رفع صورة المقال">
             <p>اضغط على منطقة رفع الصورة واختر صورة من جهازك. الصورة تكون هي الصورة الظاهرة في البطاقة والصفحة الرئيسية.</p>
             <InfoBox type="tip">
               يُفضّل استخدام صورة بأبعاد 1200×630 بكسل للحصول على أفضل عرض عند المشاركة على وسائل التواصل.
             </InfoBox>
           </StepCard>
 
-          <StepCard number={7} title="كتابة المقتطف (Excerpt)">
+          <StepCard number={6} title="كتابة المقتطف (Excerpt)">
             <p>اكتب ملخصاً مختصراً للمقال في حقل <strong className="text-foreground">"مقتطف"</strong>. هذا الملخص يظهر في بطاقة المقال而在 الصفحة الرئيسية.</p>
           </StepCard>
 
-          <StepCard number={8} title="كتابة المحتوى">
+          <StepCard number={7} title="كتابة المحتوى">
             <p>استخدم محرر النصوص المتقدم لكتابة محتوى المقال. يدعم المحرر:</p>
             <ul className="list-disc list-inside space-y-1 mt-2">
               <li>العناوين (H1 - H6) والنصوص العريضة والمائلة والمشطوبة</li>
@@ -423,15 +419,14 @@ export default function DashboardGuide() {
             </ul>
           </StepCard>
 
-          <StepCard number={9} title="حفظ المقال">
+          <StepCard number={8} title="حفظ المقال">
             <p>بعد الانتهاء من جميع الحقول، اضغط على زر <strong className="text-foreground">"حفظ المقال"</strong>. سيتم حفظ المقال والعودة إلى صفحة قائمة المقالات.</p>
           </StepCard>
 
           <FieldTable fields={[
             { name: 'العنوان', required: true, description: 'عنوان المقال الذي يظهر للقراء' },
-            { name: 'Slug', required: true, description: 'الرابط المختصر بالإنجليزية - يجب أن يكون فريداً' },
             { name: 'القسم', required: true, description: 'القسم الذي ينتمي إليه المقال' },
-            { name: 'نوع المحتوى', required: true, description: 'مقال أو نوع آخر' },
+            { name: 'نوع المحتوى', required: true, description: 'مقال أو محتوى آخر' },
             { name: 'التاريخ', required: true, description: 'تاريخ نشر المقال' },
             { name: 'الكاتب', required: false, description: 'اسم الكاتب (من الكتّاب المُسجّلين)' },
             { name: 'صورة المقال', required: false, description: 'الصورة الظاهرة في البطاقة' },

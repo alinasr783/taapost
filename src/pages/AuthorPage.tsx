@@ -20,11 +20,11 @@ export default function AuthorPage() {
 
       let authorData: Author | null = null
       if (authorId) {
-        const { data, error } = await supabase.from('authors').select('id, name, image, bio, role, slug, banner, social_links, website').eq('id', authorId).maybeSingle()
+        const { data, error } = await supabase.from('authors').select('id, name, image, image_caption, bio, role, slug, banner, banner_caption, social_links, website').eq('id', authorId).maybeSingle()
         if (error) throw error
         authorData = (data as Author | null) ?? null
       } else if (authorSlug) {
-        const { data, error } = await supabase.from('authors').select('id, name, image, bio, role, slug, banner, social_links, website').eq('slug', authorSlug).maybeSingle()
+        const { data, error } = await supabase.from('authors').select('id, name, image, image_caption, bio, role, slug, banner, banner_caption, social_links, website').eq('slug', authorSlug).maybeSingle()
         if (error) throw error
         authorData = (data as Author | null) ?? null
         if (authorData) return { author: null, articles: [], redirectToId: authorData.id }
@@ -102,7 +102,7 @@ export default function AuthorPage() {
       <Seo
         title={`${author.name} - كاتب`}
         description={author.bio?.slice(0, 160) || `مقالات ${author.name} على ${site.site_name}`}
-        canonicalPath={author.slug ? `/كاتب/${encodeURIComponent(author.slug)}` : `/author/${author.id}`}
+        canonicalPath={`/author/${author.id}`}
         ogType="profile"
         image={author.image}
         jsonLd={{ '@context': 'https://schema.org', '@type': 'Person', name: author.name, description: author.bio || '', image: author.image || undefined, jobTitle: author.role || undefined, url: author.website || undefined }}
@@ -118,6 +118,11 @@ export default function AuthorPage() {
               <div className="w-full h-full bg-gradient-to-r from-primary/30 via-primary/10 to-transparent" />
             )}
           </div>
+          {author.banner_caption && (
+            <p className="text-sm text-center text-muted-foreground py-2 px-4 bg-muted/30">
+              {author.banner_caption}
+            </p>
+          )}
 
           {/* Floating Glass Back Button - far right in RTL */}
           <button
@@ -130,11 +135,18 @@ export default function AuthorPage() {
 
           {/* Profile Card */}
           <div className="flex flex-col md:flex-row items-center md:items-end gap-5 -mt-16 md:-mt-20 px-4">
-            <div className="w-28 h-28 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-background shadow-xl shrink-0 bg-card">
-              {author.image ? (
-                <img src={author.image} alt={author.name} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full bg-primary/10 flex items-center justify-center text-primary text-4xl font-bold">{author.name.charAt(0)}</div>
+            <div className="flex flex-col items-center">
+              <div className="w-28 h-28 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-background shadow-xl shrink-0 bg-card">
+                {author.image ? (
+                  <img src={author.image} alt={author.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-primary/10 flex items-center justify-center text-primary text-4xl font-bold">{author.name.charAt(0)}</div>
+                )}
+              </div>
+              {author.image_caption && (
+                <p className="text-xs text-muted-foreground mt-1 text-center max-w-[128px]">
+                  {author.image_caption}
+                </p>
               )}
             </div>
             <div className="flex-1">
@@ -166,7 +178,7 @@ export default function AuthorPage() {
                   {catSlug && (
                     <button
                       type="button"
-                      onClick={() => navigate(`/category/${catSlug}`)}
+                      onClick={() => navigate(`/category/${catId}`)}
                       className="text-xs font-medium bg-primary/10 text-primary px-4 py-1.5 rounded-full hover:bg-primary hover:text-primary-foreground transition-all"
                     >
                       المزيد
@@ -179,7 +191,7 @@ export default function AuthorPage() {
                       <button
                         key={article.id}
                         type="button"
-                        onClick={() => navigate(article.slug ? `/article/${encodeURIComponent(article.slug)}` : `/article/${article.id}`)}
+                        onClick={() => navigate(`/article/${article.id}`)}
                         className="relative flex min-w-[360px] max-w-[480px] flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md"
                       >
                         <div className="relative h-56 w-full">

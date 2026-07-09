@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Route, Routes, Outlet, Navigate } from 'react-router-dom'
+import { BrowserRouter, Route, Routes, Outlet } from 'react-router-dom'
 const Home = lazy(() => import('./pages/Home'))
 const Categories = lazy(() => import('./pages/Categories'))
 const CategoryPage = lazy(() => import('./pages/CategoryPage'))
@@ -69,20 +69,11 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/categories" element={<Categories />} />
             <Route path="/category/:id" element={<CategoryPage />} />
-            <Route path="/posts" element={<Navigate to="/articles" replace />} />
             <Route path="/articles" element={<ArticlesPage />} />
-            <Route path="/article/:slug" element={<ArticleViewPage />} />
+            <Route path="/article/:id" element={<ArticleViewPage />} />
             <Route path="/content" element={<ContentListPage />} />
             <Route path="/post/:id" element={<ArticlePage />} />
             <Route path="/author/:id" element={<AuthorPage />} />
-
-            <Route path="/الأقسام" element={<Navigate to="/categories" replace />} />
-            <Route path="/قسم/:slug" element={<CategoryPage />} />
-            <Route path="/المقالات" element={<Navigate to="/articles" replace />} />
-            <Route path="/مقال/:slug" element={<ArticleViewPage />} />
-            <Route path="/محتوى" element={<Navigate to="/content" replace />} />
-            <Route path="/محتوى/:slug" element={<ArticlePage />} />
-            <Route path="/كاتب/:slug" element={<AuthorPage />} />
 
             <Route path="*" element={<NotFound />} />
           </Route>

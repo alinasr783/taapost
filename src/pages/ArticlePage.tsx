@@ -142,17 +142,14 @@ const ARTICLE_STYLE = `
 ` as const
 
 export default function ArticlePage() {
-  const { id, slug } = useParams()
+  const { id } = useParams()
   const navigate = useNavigate()
   const routeArticleId = id && /^\d+$/.test(id) ? Number(id) : null
-  const routeSlugFromId = id && !/^\d+$/.test(id) ? decodeURIComponent(id) : ''
-  const routeSlug = slug ? decodeURIComponent(slug) : routeSlugFromId
 
   const articleQueryKey = useMemo(() => {
     if (routeArticleId) return { type: 'id' as const, value: routeArticleId }
-    if (routeSlug) return { type: 'slug' as const, value: routeSlug }
     return null
-  }, [routeArticleId, routeSlug])
+  }, [routeArticleId])
 
   const articleQuery = useQuery({
     queryKey: ['article_page', articleQueryKey],
@@ -163,10 +160,7 @@ export default function ArticlePage() {
         .from('articles')
         .select('*, categories(name), authors(id, name, image, bio, role)')
 
-      const { data, error } =
-        articleQueryKey.type === 'id'
-          ? await baseQuery.eq('id', articleQueryKey.value).single()
-          : await baseQuery.eq('slug', articleQueryKey.value).single()
+      const { data, error } = await baseQuery.eq('id', articleQueryKey.value).single()
 
       if (error) {
         console.error('[ArticlePage] Supabase error:', error)
@@ -179,12 +173,8 @@ export default function ArticlePage() {
       }
 
       if (data.type === 'article') {
-        const target = data.slug ? `/article/${encodeURIComponent(data.slug)}` : `/article/${data.id}`
+        const target = `/article/${data.id}`
         return { article: null as Article | null, toc: [], related: [], redirectToId: null as number | null, redirectToArticle: target }
-      }
-
-      if (articleQueryKey.type === 'slug') {
-        return { article: data as Article, toc: [], related: [], redirectToId: Number(data.id), redirectToArticle: null }
       }
 
       if (!data.content) {
@@ -228,10 +218,11 @@ export default function ArticlePage() {
 
         const processedHtml = doc.body.innerHTML.replace(/&nbsp;/gi, ' ').replace(/\u00A0/g, ' ')
 
-        const youTubeMarkerRegex = /\{\{youtube:([a-zA-Z0-9_-]{11})\}\}/g
-        contentHtml = processedHtml.replace(youTubeMarkerRegex, (_match: string, videoId: string) => {
+        const youTubeMarkerRegex = /\{\{youtube:([a-zA-Z0-9_-]{11})(?:\|([^}]*))?\}\}/g
+        contentHtml = processedHtml.replace(youTubeMarkerRegex, (_match: string, videoId: string, caption?: string) => {
           const embedUrl = `https://www.youtube.com/embed/${videoId}`
-          return `<div class="ql-video-wrapper" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%;margin:1.5em 0;"><iframe class="ql-video" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" src="${embedUrl}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>`
+          const captionHtml = caption ? `<figcaption style="font-size:0.875rem;opacity:0.7;margin-top:0.5em;text-align:center;color:hsl(var(--foreground));">${caption}</figcaption>` : ''
+          return `<figure style="max-width:100%;margin:1.5em 0;"><div class="ql-video-wrapper" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%;"><iframe class="ql-video" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" src="${embedUrl}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>${captionHtml}</figure>`
         })
       } catch (err) {
         console.error('[ArticlePage] Error processing article content HTML:', err)
@@ -300,13 +291,11 @@ export default function ArticlePage() {
 
   const buildArticleUrl = (article: Article | null) => {
     if (!article) return ''
-    if (article.slug) return `/post/${encodeURIComponent(article.slug)}`
     return `/post/${article.id}`
   }
 
   const buildContentUrl = (a: Article) => {
-    const p = a.slug ? `/post/${encodeURIComponent(a.slug)}` : `/post/${a.id}`
-    return p
+    return `/post/${a.id}`
   }
 
   useEffect(() => {
@@ -319,7 +308,7 @@ export default function ArticlePage() {
     const redirectToId = articleQuery.data?.redirectToId
     const article = articleQuery.data?.article
     if (!redirectToId || !article) return
-    const target = article.slug ? `/post/${encodeURIComponent(article.slug)}` : `/post/${redirectToId}`
+    const target = `/post/${redirectToId}`
     if (decodeURIComponent(window.location.pathname).replace(/\/+$/, '') === target.replace(/\/+$/, '')) return
     navigate(target, { replace: true })
   }, [articleQuery.data?.redirectToArticle, articleQuery.data?.redirectToId, articleQuery.data?.article, navigate])
@@ -444,9 +433,11 @@ export default function ArticlePage() {
       <Seo
         title={article.title}
         description={article.excerpt || article.title}
-        canonicalPath={article.slug ? `/post/${encodeURIComponent(article.slug)}` : `/post/${article.id}`}
+        canonicalPath={`/post/${article.id}`}
         ogType="website"
         image={article.image}
+        articleDate={article.date}
+        articleAuthor={article.authors?.name}
         jsonLd={{
           '@context': 'https://schema.org',
           '@type': 'WebPage',
@@ -512,6 +503,11 @@ export default function ArticlePage() {
           width={1200}
           height={600}
         />
+        {article.image_caption && (
+          <p className="text-sm text-center text-muted-foreground py-2 px-4 bg-muted/30">
+            {article.image_caption}
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-8">

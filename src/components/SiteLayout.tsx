@@ -226,7 +226,7 @@ export default function SiteLayout({ children }: Props) {
                     <img
                       src={displayLogoUrl}
                       alt={siteSettings.site_name}
-                      className="flex-shrink-0 h-15 w-auto max-w-[150px] object-contain"
+                      className="flex-shrink-0 h-10 w-auto max-w-[120px] object-contain"
                       decoding="async"
                       fetchPriority="high"
                     />
@@ -291,10 +291,8 @@ export default function SiteLayout({ children }: Props) {
                   الرئيسية
                 </Link>
                 {[...categories].sort((a, b) => (a.sidebar_order || 0) - (b.sidebar_order || 0)).map((cat) => {
-                  const catPath = cat.slug ? `/قسم/${encodeURIComponent(cat.slug)}` : `/category/${cat.id}`
-                  const isActive =
-                    location.pathname.includes(`/category/${cat.id}`) ||
-                    (cat.slug && location.pathname.includes(`/قسم/${encodeURIComponent(cat.slug)}`))
+                  const catPath = `/category/${cat.id}`
+                  const isActive = location.pathname.includes(`/category/${cat.id}`)
                   return (
                     <Link
                       key={cat.id}
@@ -401,10 +399,8 @@ export default function SiteLayout({ children }: Props) {
                 <div className="px-3 py-2 text-xs text-muted-foreground">فشل تحميل الأقسام</div>
               ) : (
                 [...categories].sort((a, b) => (a.sidebar_order || 0) - (b.sidebar_order || 0)).map((cat) => {
-                  const catPath = cat.slug ? `/قسم/${encodeURIComponent(cat.slug)}` : `/category/${cat.id}`
-                  const isActive =
-                    location.pathname.includes(`/category/${cat.id}`) ||
-                    (cat.slug && location.pathname.includes(`/قسم/${encodeURIComponent(cat.slug)}`))
+                  const catPath = `/category/${cat.id}`
+                  const isActive = location.pathname.includes(`/category/${cat.id}`)
                   return (
                     <Link
                       key={cat.id}
@@ -427,7 +423,7 @@ export default function SiteLayout({ children }: Props) {
                 to="/articles"
                 onClick={() => setMenuOpen(false)}
                 className={`flex items-center gap-3 rounded-[5px] px-3 py-2.5 transition-colors ${
-                  location.pathname.includes('/articles') || location.pathname.includes('/article') || location.pathname.includes('/المقالات') || location.pathname.includes('/مقال') ? 'bg-primary/10 text-primary font-medium' : 'text-foreground/80 hover:bg-muted/50 hover:text-primary'
+                  location.pathname.includes('/articles') || location.pathname.includes('/article') ? 'bg-primary/10 text-primary font-medium' : 'text-foreground/80 hover:bg-muted/50 hover:text-primary'
                 }`}
               >
                 <FileText size={20} />

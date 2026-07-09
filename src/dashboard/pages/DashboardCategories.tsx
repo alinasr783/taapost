@@ -27,6 +27,7 @@ export default function DashboardCategories() {
     name: '',
     description: '',
     image: '',
+    image_caption: '',
     topics: '',
     icon: '',
     order_index: 0,
@@ -167,6 +168,7 @@ export default function DashboardCategories() {
         name: formData.name,
         description: formData.description,
         image: formData.image,
+        image_caption: formData.image_caption || null,
         topics: formData.topics.split(',').map(t => t.trim()).filter(Boolean),
         icon: formData.icon || null,
         order_index: formData.order_index,
@@ -207,6 +209,7 @@ export default function DashboardCategories() {
         name: category.name,
         description: category.description || '',
         image: category.image || '',
+        image_caption: category.image_caption || '',
         topics: category.topics ? category.topics.join(', ') : '',
         icon: category.icon || '',
         order_index: category.order_index || 0,
@@ -218,6 +221,7 @@ export default function DashboardCategories() {
         name: '',
         description: '',
         image: '',
+        image_caption: '',
         topics: '',
         icon: '',
         order_index: 0,
@@ -527,6 +531,9 @@ export default function DashboardCategories() {
                   value={formData.image}
                   onChange={(url) => setFormData({ ...formData, image: url })}
                   label="صورة القسم"
+                  caption={formData.image_caption}
+                  onCaptionChange={(caption) => setFormData({ ...formData, image_caption: caption })}
+                  showCaption={true}
                 />
               </div>
               <div>

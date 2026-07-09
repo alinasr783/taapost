@@ -19,11 +19,11 @@ export default function CategoryPage() {
 
       let catData: Category | null = null
       if (categoryId) {
-        const { data, error } = await supabase.from('categories').select('id, name, slug, description, image').eq('id', categoryId).maybeSingle()
+        const { data, error } = await supabase.from('categories').select('id, name, slug, description, image, image_caption').eq('id', categoryId).maybeSingle()
         if (error) throw error
         catData = (data as Category | null) ?? null
       } else if (categorySlug) {
-        const { data, error } = await supabase.from('categories').select('id, name, slug, description, image').eq('slug', categorySlug).maybeSingle()
+        const { data, error } = await supabase.from('categories').select('id, name, slug, description, image, image_caption').eq('slug', categorySlug).maybeSingle()
         if (error) throw error
         catData = (data as Category | null) ?? null
         if (catData) {
@@ -40,7 +40,7 @@ export default function CategoryPage() {
         .from('articles')
         .select('id,slug,title,excerpt,image,date,is_exclusive,authors(name,image)')
         .eq('category_id', catData.id)
-        .eq('type', 'article')
+        .neq('type', 'article')
         .order('date', { ascending: false })
         .limit(60)
 
@@ -124,7 +124,7 @@ export default function CategoryPage() {
       <Seo
         title={category.name}
         description={category.description || `مقالات قسم ${category.name} في ${site.site_name}`}
-        canonicalPath={category.slug ? `/قسم/${encodeURIComponent(category.slug)}` : `/category/${category.id}`}
+        canonicalPath={`/category/${category.id}`}
         ogType="website"
         jsonLd={[
           {
@@ -162,7 +162,7 @@ export default function CategoryPage() {
             {articles.map((i) => (
               <button
                 key={i.id}
-                onClick={() => navigate(i.slug ? `/article/${encodeURIComponent(i.slug)}` : `/article/${i.id}`)}
+                onClick={() => navigate(`/article/${i.id}`)}
                 className="relative flex flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md hover:border-white/20 transition-colors w-full"
               >
                 <div className="relative h-56 w-full">

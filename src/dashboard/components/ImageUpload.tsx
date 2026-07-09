@@ -8,9 +8,12 @@ type Props = {
   onChange: (url: string) => void
   label?: string
   className?: string
+  caption?: string
+  onCaptionChange?: (caption: string) => void
+  showCaption?: boolean
 }
 
-export default function ImageUpload({ value, onChange, label = 'صورة', className = '' }: Props) {
+export default function ImageUpload({ value, onChange, label = 'صورة', className = '', caption = '', onCaptionChange, showCaption = false }: Props) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -97,6 +100,18 @@ export default function ImageUpload({ value, onChange, label = 'صورة', class
               disabled={uploading}
             />
           </label>
+        </div>
+      )}
+      
+      {showCaption && value && onCaptionChange && (
+        <div className="mt-2">
+          <input
+            type="text"
+            value={caption}
+            onChange={(e) => onCaptionChange(e.target.value)}
+            placeholder="التسمية التوضيحية للصورة (اختياري)"
+            className="w-full p-2 bg-background border border-input rounded-md focus:ring-2 focus:ring-ring outline-none text-sm"
+          />
         </div>
       )}
       

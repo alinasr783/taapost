@@ -128,7 +128,7 @@ export default function ArticlesPage() {
 
       {featured && !normalizedQ && (
         <Link
-          to={`/article/${encodeURIComponent(featured.slug || String(featured.id))}`}
+          to={`/article/${featured.id}`}
           className="group block relative overflow-hidden rounded-2xl shadow-lg"
         >
           <div className="relative h-[300px] md:h-[450px] w-full">
@@ -184,7 +184,7 @@ export default function ArticlesPage() {
           {(normalizedQ ? allArticles : rest.slice(0, showCount)).map((article) => (
             <Link
               key={article.id}
-              to={`/article/${encodeURIComponent(article.slug || String(article.id))}`}
+              to={`/article/${article.id}`}
               className="group flex flex-col rounded-xl border border-border/40 bg-card overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all"
             >
               <div className="relative aspect-[16/10] overflow-hidden">

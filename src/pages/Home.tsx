@@ -1,8 +1,9 @@
 import { useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase, type Article, type Author, type HomepageSection } from '../lib/supabase'
+import { supabase, type Article, type Author, type HomepageSection, type HomepageSlider, type BreakingNewsHero } from '../lib/supabase'
 import HomeCarousel from '../components/HomeCarousel'
+import BreakingNewsHeroComponent from '../components/BreakingNewsHero'
 import Seo from '../components/Seo'
 import { useSiteSettings } from '../components/useSiteSettings'
 
@@ -62,7 +63,7 @@ export default function Home() {
       const [articlesRes, sectionsRes, authorsRes] = await Promise.all([
         supabase
           .from('articles')
-          .select('id,slug,title,excerpt,image,category_id,type,date,is_exclusive,categories(id,name,slug),authors(id,name,image)')
+          .select('id,slug,title,excerpt,image,image_caption,category_id,type,date,is_exclusive,categories(id,name,slug),authors(id,name,image)')
           .order('date', { ascending: false })
           .limit(limit),
         supabase
@@ -84,6 +85,29 @@ export default function Home() {
           .select('id, name, image, bio, role, slug')
           .order('name'),
       ])
+
+      // Fetch sliders and breaking news separately - fail gracefully if tables don't exist
+      let slidersData: HomepageSlider[] = []
+      let breakingNewsData: BreakingNewsHero[] = []
+      try {
+        const [slidersRes, breakingRes] = await Promise.all([
+          supabase
+            .from('homepage_sliders')
+            .select('*, categories(id, name, slug), slider_posts(sort_order, articles(id, slug, title, image, date, category_id, type, is_exclusive, categories(id, name, slug)))')
+            .eq('is_active', true)
+            .order('display_order', { ascending: true }),
+          supabase
+            .from('breaking_news_hero')
+            .select('*, articles(id, slug, title, image, date, category_id, type, is_exclusive, categories(id, name, slug))')
+            .eq('is_active', true)
+            .order('display_order', { ascending: true })
+            .limit(1),
+        ])
+        if (slidersRes.data) slidersData = slidersRes.data as HomepageSlider[]
+        if (breakingRes.data) breakingNewsData = breakingRes.data as BreakingNewsHero[]
+      } catch {
+        // Tables don't exist yet - ignore
+      }
 
       let sections: HomepageSection[] = []
 
@@ -121,7 +145,13 @@ export default function Home() {
       } as Article
     })
 
-      return { articles, sections, authors: (authorsRes.data ?? []) as Author[] }
+      return {
+        articles,
+        sections,
+        authors: (authorsRes.data ?? []) as Author[],
+        sliders: slidersData,
+        breakingNews: breakingNewsData,
+      }
     },
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
@@ -131,6 +161,8 @@ export default function Home() {
   const articlesData = homeQuery.data?.articles
   const sections = homeQuery.data?.sections ?? emptySections
   const authorsData = homeQuery.data?.authors ?? emptyAuthors
+  const slidersData = homeQuery.data?.sliders ?? []
+  const breakingNewsData = homeQuery.data?.breakingNews ?? []
   const hadData = useRef(false)
   if (homeQuery.data) hadData.current = true
 
@@ -143,8 +175,8 @@ export default function Home() {
     console.error('Home query error:', homeQuery.error)
   }
 
-  const prefetchArticle = (slug: string | undefined, id: number) => {
-    const queryType = slug ? { type: 'slug' as const, value: slug } : { type: 'id' as const, value: id }
+  const prefetchArticle = (id: number) => {
+    const queryType = { type: 'id' as const, value: id }
     if (queryClient.getQueryData(['article_page', queryType])) return
 
     // Minimal prefetch: only get basic article data without processing
@@ -156,9 +188,7 @@ export default function Home() {
           .from('articles')
           .select('id, slug, title, excerpt, image, category_id, date, is_exclusive, content_source, categories(name), authors(id, name, image, bio, role)')
 
-        const { data, error } = slug
-          ? await baseQuery.eq('slug', slug).single()
-          : await baseQuery.eq('id', id).single()
+        const { data, error } = await baseQuery.eq('id', id).single()
 
         if (error) throw error
         if (!data) return { article: null as Article | null, toc: [], related: [], redirectToId: null as number | null }
@@ -272,7 +302,37 @@ export default function Home() {
               },
         ]}
       />
+      {/* Breaking News Hero */}
+      {breakingNewsData.length > 0 && breakingNewsData[0].articles && (
+        <div className="container">
+          <BreakingNewsHeroComponent data={breakingNewsData[0]} />
+        </div>
+      )}
+
+      {/* Existing Homepage Sections (including managed sliders) */}
       {sections.map((section) => {
+        if (section.type === 'managed_slider') {
+          const sliderId = section.settings?.slider_id
+          const slider = slidersData.find(s => s.id === sliderId)
+          if (!slider) return null
+
+          const posts = (slider.slider_posts || [])
+            .filter(sp => sp.articles)
+            .sort((a, b) => a.sort_order - b.sort_order)
+            .map(sp => {
+              const art = sp.articles!
+              const cat = art.categories
+              return {
+                ...art,
+                category: Array.isArray(cat) ? cat[0]?.name : cat?.name || '',
+                categoryId: art.category_id,
+              } as Article
+            })
+
+          if (posts.length === 0) return null
+          const hideTitle = section.settings?.hide_title ?? slider.hide_title ?? false
+          return <HomeCarousel key={`slider-${section.id}`} articles={posts} title={hideTitle ? undefined : slider.name} />
+        }
         if (section.type === 'carousel') {
            const count = getSettingsCount(section.settings, 5)
            let slides = sortedArticles;
@@ -317,9 +377,9 @@ export default function Home() {
                         {list.map((article) => (
                            <div key={article.id} 
                                  onClick={() =>
-                                   navigate(article.slug ? `/article/${encodeURIComponent(article.slug)}` : `/article/${article.id}`)
+                                   navigate(`/article/${article.id}`)
                                  }
-                                 onMouseEnter={() => prefetchArticle(article.slug, article.id)}
+                                 onMouseEnter={() => prefetchArticle(article.id)}
                                  className="group cursor-pointer space-y-3"
                             >
                                  <div className="relative aspect-video overflow-hidden rounded-lg shadow-sm group-hover:shadow-md transition-all border border-border/50 group-hover:border-primary/50">
@@ -387,9 +447,9 @@ export default function Home() {
                        key={article.id}
                        type="button"
                        onClick={() =>
-                         navigate(article.slug ? `/article/${encodeURIComponent(article.slug)}` : `/article/${article.id}`)
+                         navigate(`/article/${article.id}`)
                        }
-                       onMouseEnter={() => prefetchArticle(article.slug, article.id)}
+                       onMouseEnter={() => prefetchArticle(article.id)}
                        className="group relative flex items-center gap-4 p-3 rounded-2xl border border-border/30 bg-gradient-to-l from-primary/[0.02] to-transparent hover:shadow-md hover:border-primary/25 transition-all duration-300 w-full text-right overflow-hidden"
                      >
                        <div className="absolute right-0 top-3 bottom-3 w-0.5 bg-primary/0 group-hover:bg-primary/30 rounded-full transition-all duration-300" />
@@ -464,9 +524,9 @@ export default function Home() {
                       key={article.id}
                       type="button"
                       onClick={() =>
-                        navigate(article.slug ? `/article/${encodeURIComponent(article.slug)}` : `/article/${article.id}`)
+                        navigate(`/article/${article.id}`)
                       }
-                      onMouseEnter={() => prefetchArticle(article.slug, article.id)}
+                      onMouseEnter={() => prefetchArticle(article.id)}
                       className="relative flex min-w-[360px] max-w-[480px] flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md"
                     >
                       <div className="relative h-56 w-full">
@@ -547,9 +607,9 @@ export default function Home() {
                       key={article.id}
                       type="button"
                       onClick={() =>
-                        navigate(article.slug ? `/article/${encodeURIComponent(article.slug)}` : `/article/${article.id}`)
+                        navigate(`/article/${article.id}`)
                       }
-                      onMouseEnter={() => prefetchArticle(article.slug, article.id)}
+                      onMouseEnter={() => prefetchArticle(article.id)}
                       className="group flex gap-5 py-5 w-full text-right hover:bg-muted/30 px-3 -mx-3 rounded-lg transition-colors"
                     >
                       <div className="flex-1 min-w-0 space-y-2">
@@ -600,9 +660,9 @@ export default function Home() {
                     <div
                       key={article.id}
                       onClick={() =>
-                        navigate(article.slug ? `/article/${encodeURIComponent(article.slug)}` : `/article/${article.id}`)
+                        navigate(`/article/${article.id}`)
                       }
-                      onMouseEnter={() => prefetchArticle(article.slug, article.id)}
+                      onMouseEnter={() => prefetchArticle(article.id)}
                       className="group cursor-pointer space-y-3"
                     >
                       <div className="relative aspect-video overflow-hidden rounded-lg shadow-sm group-hover:shadow-md transition-all border border-border/50 group-hover:border-primary/50">
