@@ -128,7 +128,7 @@ export default function ArticlesPage() {
 
       {featured && !normalizedQ && (
         <Link
-          to={`/article/${featured.id}`}
+          to={featured.type === 'article' ? `/article/${featured.id}` : `/post/${featured.id}`}
           className="group block relative overflow-hidden rounded-2xl shadow-lg"
         >
           <div className="relative h-[300px] md:h-[450px] w-full">

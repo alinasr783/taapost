@@ -35,10 +35,10 @@ export default function CategoryPage() {
         return { category: null, articles: [], redirectToId: null as number | null }
       }
 
-      type CategoryArticle = Pick<Article, 'id' | 'slug' | 'title' | 'excerpt' | 'image' | 'date' | 'is_exclusive'> & { authors?: { name: string; image?: string } | null }
+      type CategoryArticle = Pick<Article, 'id' | 'slug' | 'title' | 'excerpt' | 'image' | 'date' | 'is_exclusive' | 'type'> & { authors?: { name: string; image?: string } | null }
       const { data: artData, error: artError } = await supabase
         .from('articles')
-        .select('id,slug,title,excerpt,image,date,is_exclusive,authors(name,image)')
+        .select('id,slug,title,excerpt,image,date,is_exclusive,type,authors(name,image)')
         .eq('category_id', catData.id)
         .neq('type', 'article')
         .order('date', { ascending: false })
@@ -162,7 +162,7 @@ export default function CategoryPage() {
             {articles.map((i) => (
               <button
                 key={i.id}
-                onClick={() => navigate(`/article/${i.id}`)}
+                onClick={() => navigate(i.type === 'article' ? `/article/${i.id}` : `/post/${i.id}`)}
                 className="relative flex flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md hover:border-white/20 transition-colors w-full"
               >
                 <div className="relative h-56 w-full">

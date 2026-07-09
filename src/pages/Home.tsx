@@ -377,7 +377,7 @@ export default function Home() {
                         {list.map((article) => (
                            <div key={article.id} 
                                  onClick={() =>
-                                   navigate(`/article/${article.id}`)
+                                   navigate(article.type === 'article' ? `/article/${article.id}` : `/post/${article.id}`)
                                  }
                                  onMouseEnter={() => prefetchArticle(article.id)}
                                  className="group cursor-pointer space-y-3"
@@ -447,7 +447,7 @@ export default function Home() {
                        key={article.id}
                        type="button"
                        onClick={() =>
-                         navigate(`/article/${article.id}`)
+                         navigate(article.type === 'article' ? `/article/${article.id}` : `/post/${article.id}`)
                        }
                        onMouseEnter={() => prefetchArticle(article.id)}
                        className="group relative flex items-center gap-4 p-3 rounded-2xl border border-border/30 bg-gradient-to-l from-primary/[0.02] to-transparent hover:shadow-md hover:border-primary/25 transition-all duration-300 w-full text-right overflow-hidden"
@@ -524,7 +524,7 @@ export default function Home() {
                       key={article.id}
                       type="button"
                       onClick={() =>
-                        navigate(`/article/${article.id}`)
+                        navigate(article.type === 'article' ? `/article/${article.id}` : `/post/${article.id}`)
                       }
                       onMouseEnter={() => prefetchArticle(article.id)}
                       className="relative flex min-w-[360px] max-w-[480px] flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md"
@@ -607,7 +607,7 @@ export default function Home() {
                       key={article.id}
                       type="button"
                       onClick={() =>
-                        navigate(`/article/${article.id}`)
+                        navigate(article.type === 'article' ? `/article/${article.id}` : `/post/${article.id}`)
                       }
                       onMouseEnter={() => prefetchArticle(article.id)}
                       className="group flex gap-5 py-5 w-full text-right hover:bg-muted/30 px-3 -mx-3 rounded-lg transition-colors"
@@ -660,7 +660,7 @@ export default function Home() {
                     <div
                       key={article.id}
                       onClick={() =>
-                        navigate(`/article/${article.id}`)
+                        navigate(article.type === 'article' ? `/article/${article.id}` : `/post/${article.id}`)
                       }
                       onMouseEnter={() => prefetchArticle(article.id)}
                       className="group cursor-pointer space-y-3"

@@ -32,13 +32,13 @@ export default function AuthorPage() {
 
       if (!authorData) return { author: null, articles: [], redirectToId: null as number | null }
 
-      type AuthorArticle = Pick<Article, 'id' | 'slug' | 'title' | 'excerpt' | 'image' | 'date' | 'is_exclusive'> & {
+      type AuthorArticle = Pick<Article, 'id' | 'slug' | 'title' | 'excerpt' | 'image' | 'date' | 'is_exclusive' | 'type'> & {
         category_id?: number
         categories?: { id: number; name: string; slug: string } | { id: number; name: string; slug: string }[] | null
       }
       const { data: artData, error: artError } = await supabase
         .from('articles')
-        .select('id,slug,title,excerpt,image,date,is_exclusive,category_id,categories(id,name,slug)')
+        .select('id,slug,title,excerpt,image,date,is_exclusive,type,category_id,categories(id,name,slug)')
         .eq('author_id', authorData.id)
         .eq('type', 'article')
         .order('date', { ascending: false })
@@ -191,7 +191,7 @@ export default function AuthorPage() {
                       <button
                         key={article.id}
                         type="button"
-                        onClick={() => navigate(`/article/${article.id}`)}
+                        onClick={() => navigate(article.type === 'article' ? `/article/${article.id}` : `/post/${article.id}`)}
                         className="relative flex min-w-[360px] max-w-[480px] flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md"
                       >
                         <div className="relative h-56 w-full">
