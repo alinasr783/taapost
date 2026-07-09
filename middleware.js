@@ -43,11 +43,60 @@ function esc(s) {
     .replace(/"/g, '&quot;')
 }
 
-function ogHtml(article, origin, siteName) {
+async function fetchSiteSettings() {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return null
+  const url = `${SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/site_settings?select=logo_url,og_image&limit=1`
+  const headers = {
+    apikey: SUPABASE_KEY,
+    Authorization: `Bearer ${SUPABASE_KEY}`,
+    Accept: 'application/json',
+  }
+  try {
+    const res = await fetch(url, { headers })
+    if (!res.ok) return null
+    const data = await res.json()
+    if (!Array.isArray(data) || data.length === 0) return null
+    return data[0]
+  } catch {
+    return null
+  }
+}
+
+function homeOGHtml(siteUrl, siteName, settings) {
+  const logoOrOg = settings?.og_image || settings?.logo_url || null
+  const image = resolveImage(logoOrOg, siteUrl)
+  const description = SITE_DESC
+  return `<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>${esc(siteName)}</title>
+<meta name="description" content="${esc(description)}">
+<meta property="og:locale" content="ar_AR">
+<meta property="og:site_name" content="${esc(siteName)}">
+<meta property="og:type" content="website">
+<meta property="og:title" content="${esc(siteName)}">
+<meta property="og:description" content="${esc(description)}">
+<meta property="og:url" content="${esc(siteUrl)}">
+<meta property="og:image" content="${esc(image)}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${esc(siteName)}">
+<meta name="twitter:description" content="${esc(description)}">
+<meta name="twitter:image" content="${esc(image)}">
+<link rel="canonical" href="${esc(siteUrl)}">
+</head>
+<body></body>
+</html>`
+}
+
+function ogHtml(article, origin, siteName, type) {
   const title = article.title || ''
   const description = article.excerpt || article.title || ''
   const image = resolveImage(article.image, origin)
-  const url = `${origin}/post/${article.id}`
+  const path = type === 'article' ? 'article' : 'post'
+  const url = `${origin}/${path}/${article.id}`
   const pageTitle = `${title} | ${siteName}`
 
   return `<!doctype html>
@@ -83,9 +132,8 @@ async function fetchArticle(param) {
   if (!SUPABASE_URL || !SUPABASE_KEY) return null
 
   const isId = /^\d+$/.test(param)
-  if (!isId) return null
-  const queryParam = `id=eq.${param}`
-  const url = `${SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/articles?select=id,slug,title,excerpt,image,date&${queryParam}&limit=1`
+  const queryParam = isId ? `id=eq.${param}` : `slug=eq.${encodeURIComponent(param)}`
+  const url = `${SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/articles?select=id,slug,title,excerpt,image,date,type&${queryParam}&limit=1`
   const headers = {
     apikey: SUPABASE_KEY,
     Authorization: `Bearer ${SUPABASE_KEY}`,
@@ -111,35 +159,67 @@ function getOrigin(request) {
 }
 
 function getArticleParam(pathname) {
-  const postMatch = pathname.match(/^\/post\/(\d+)/)
-  if (postMatch) return { param: postMatch[1], type: 'post' }
-  const articleMatch = pathname.match(/^\/article\/(\d+)/)
-  if (articleMatch) return { param: articleMatch[1], type: 'article' }
+  const postMatch = pathname.match(/^\/post\/([^/]+)/)
+  if (postMatch) return { param: decodeURIComponent(postMatch[1]), type: 'post' }
+  const articleMatch = pathname.match(/^\/article\/([^/]+)/)
+  if (articleMatch) return { param: decodeURIComponent(articleMatch[1]), type: 'article' }
   return null
 }
 
 export default async function middleware(request) {
-  const { pathname } = new URL(request.url)
+  const url = new URL(request.url)
+  const { pathname } = url
+  const ua = request.headers.get('user-agent') || ''
+  const origin = getOrigin(request)
+
+  if (pathname === '/' || pathname === '') {
+    if (isBot(ua)) {
+      const settings = await fetchSiteSettings()
+      const html = homeOGHtml(origin, SITE_NAME, settings)
+      return new Response(html, {
+        status: 200,
+        headers: {
+          'content-type': 'text/html; charset=utf-8',
+          'cache-control': 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400',
+        },
+      })
+    }
+    return
+  }
+
   const articleInfo = getArticleParam(pathname)
   if (!articleInfo) return
 
-  const ua = request.headers.get('user-agent') || ''
-  if (!isBot(ua)) return
-
+  const isId = /^\d+$/.test(articleInfo.param)
   const article = await fetchArticle(articleInfo.param)
   if (!article) return
 
-  const origin = getOrigin(request)
-  const html = ogHtml(article, origin, SITE_NAME)
-  return new Response(html, {
-    status: 200,
-    headers: {
-      'content-type': 'text/html; charset=utf-8',
-      'cache-control': 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400',
-    },
-  })
+  if (isBot(ua)) {
+    const html = ogHtml(article, origin, SITE_NAME, articleInfo.type)
+    return new Response(html, {
+      status: 200,
+      headers: {
+        'content-type': 'text/html; charset=utf-8',
+        'cache-control': 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400',
+      },
+    })
+  }
+
+  if (!isId) {
+    const basePath = articleInfo.type === 'article' ? 'article' : 'post'
+    const newPath = article.type === 'article' ? `/article/${article.id}` : `/post/${article.id}`
+    return new Response(null, {
+      status: 301,
+      headers: {
+        'location': `${origin}${newPath}`,
+        'cache-control': 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400',
+      },
+    })
+  }
+
+  return
 }
 
 export const config = {
-  matcher: ['/article/:path*', '/post/:path*'],
+  matcher: ['/', '/article/:path*', '/post/:path*'],
 }

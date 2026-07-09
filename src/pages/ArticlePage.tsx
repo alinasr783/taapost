@@ -433,8 +433,8 @@ export default function ArticlePage() {
       <Seo
         title={article.title}
         description={article.excerpt || article.title}
-        canonicalPath={`/post/${article.id}`}
-        ogType="website"
+        canonicalPath={article.slug ? `/post/${encodeURIComponent(article.slug)}` : `/post/${article.id}`}
+        ogType="article"
         image={article.image}
         articleDate={article.date}
         articleAuthor={article.authors?.name}

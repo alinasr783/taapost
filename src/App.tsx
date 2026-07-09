@@ -9,6 +9,7 @@ const ContentListPage = lazy(() => import('./pages/ContentListPage'))
 const ArticlePage = lazy(() => import('./pages/ArticlePage'))
 const AuthorPage = lazy(() => import('./pages/AuthorPage'))
 const NotFound = lazy(() => import('./pages/NotFound'))
+const LegacyRedirect = lazy(() => import('./pages/LegacyRedirect'))
 import SiteLayout from './components/SiteLayout'
 const DashboardLogin = lazy(() => import('./dashboard/pages/DashboardLogin'))
 import DashboardLayout from './dashboard/DashboardLayout'
@@ -74,6 +75,11 @@ export default function App() {
             <Route path="/content" element={<ContentListPage />} />
             <Route path="/post/:id" element={<ArticlePage />} />
             <Route path="/author/:id" element={<AuthorPage />} />
+
+            <Route path="/قسم/:slug" element={<LegacyRedirect type="category" />} />
+            <Route path="/مقال/:slug" element={<LegacyRedirect type="article" />} />
+            <Route path="/كاتب/:slug" element={<LegacyRedirect type="author" />} />
+            <Route path="/محتوى/:slug" element={<LegacyRedirect type="post" />} />
 
             <Route path="*" element={<NotFound />} />
           </Route>

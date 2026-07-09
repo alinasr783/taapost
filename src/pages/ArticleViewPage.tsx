@@ -67,29 +67,44 @@ const ARTICLE_STYLE = `
 export default function ArticleViewPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const articleId = id ? decodeURIComponent(id) : ''
+  const param = id ? decodeURIComponent(id) : ''
+  const isNumericId = /^\d+$/.test(param)
 
   const articleQuery = useQuery({
-    queryKey: ['article_view', articleId],
+    queryKey: ['article_view', param],
     queryFn: async () => {
-      if (!articleId) return { article: null as Article | null, related: [] as Article[], error: null as string | null }
+      if (!param) return { article: null as Article | null, related: [] as Article[], error: null as string | null }
 
-      const res = await supabase
-        .from('articles')
-        .select('*, categories(name), authors(id, name, image, bio, role)')
-        .eq('id', Number(articleId))
-        .eq('type', 'article')
-        .single()
+      let articleData: Record<string, unknown> | null = null
 
-      if (res.error) return { article: null, related: [], error: res.error.message }
-      const data = res.data as Record<string, unknown>
+      if (isNumericId) {
+        const res = await supabase
+          .from('articles')
+          .select('*, categories(name), authors(id, name, image, bio, role)')
+          .eq('id', Number(param))
+          .eq('type', 'article')
+          .single()
+        if (res.error) return { article: null, related: [], error: res.error.message }
+        articleData = res.data as Record<string, unknown>
+      } else {
+        const res = await supabase
+          .from('articles')
+          .select('id, slug')
+          .eq('slug', param)
+          .eq('type', 'article')
+          .single()
+        if (res.data) {
+          return { article: null as Article | null, related: [] as Article[], error: null as string | null, redirectTo: `/article/${(res.data as Record<string, unknown>).id}` }
+        }
+        return { article: null as Article | null, related: [] as Article[], error: 'المقال غير موجود' }
+      }
 
-      if (!data) return { article: null as Article | null, related: [], error: 'المقال غير موجود' }
+      if (!articleData) return { article: null as Article | null, related: [], error: 'المقال غير موجود' }
 
       let contentHtml = ''
       try {
         const parser = new DOMParser()
-        const doc = parser.parseFromString((data as Record<string, unknown>).content as string || '', 'text/html')
+        const doc = parser.parseFromString((articleData as Record<string, unknown>).content as string || '', 'text/html')
 
         const blockedStyleProps = new Set([
           'word-break', 'overflow-wrap', 'white-space', 'word-wrap',
@@ -123,18 +138,18 @@ export default function ArticleViewPage() {
           return `<figure style="max-width:100%;margin:1.5em 0;"><div class="ql-video-wrapper" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%;"><iframe class="ql-video" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" src="${embedUrl}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>${captionHtml}</figure>`
         })
       } catch {
-        contentHtml = (data as Record<string, unknown>).content as string || ''
+        contentHtml = (articleData as Record<string, unknown>).content as string || ''
       }
 
-      const authorData = Array.isArray((data as Record<string, unknown>).authors)
-        ? ((data as Record<string, unknown>).authors as Array<Record<string, unknown>>).length > 0 ? (data as Record<string, unknown>).authors[0] : null
-        : (data as Record<string, unknown>).authors
+      const authorData = Array.isArray((articleData as Record<string, unknown>).authors)
+        ? ((articleData as Record<string, unknown>).authors as Array<Record<string, unknown>>).length > 0 ? (articleData as Record<string, unknown>).authors[0] : null
+        : (articleData as Record<string, unknown>).authors
 
       const article: Article = {
-        ...(data as Article),
-        category: (Array.isArray((data as Record<string, unknown>).categories)
-          ? ((data as Record<string, unknown>).categories as Array<Record<string, unknown>>)[0]?.name as string
-          : ((data as Record<string, unknown>).categories as Record<string, unknown>)?.name as string) || '',
+        ...(articleData as Article),
+        category: (Array.isArray((articleData as Record<string, unknown>).categories)
+          ? ((articleData as Record<string, unknown>).categories as Array<Record<string, unknown>>)[0]?.name as string
+          : ((articleData as Record<string, unknown>).categories as Record<string, unknown>)?.name as string) || '',
         authors: authorData as Article['authors'],
         contentHtml,
       } as Article
@@ -164,7 +179,7 @@ export default function ArticleViewPage() {
 
       return { article, related: (relatedData ?? []) as Article[], authorArticles, error: null }
     },
-    enabled: Boolean(articleId),
+    enabled: Boolean(param),
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
     retry: 1,
@@ -173,6 +188,21 @@ export default function ArticleViewPage() {
   const article = articleQuery.data?.article ?? null
   const relatedArticles = articleQuery.data?.related ?? []
   const authorArticles = articleQuery.data?.authorArticles ?? []
+  const redirectTo = articleQuery.data?.redirectTo
+
+  useEffect(() => {
+    if (redirectTo) {
+      navigate(redirectTo, { replace: true })
+    }
+  }, [redirectTo, navigate])
+
+  if (redirectTo) {
+    return (
+      <div className="container flex min-h-[50dvh] items-center justify-center py-10 text-muted-foreground">
+        جاري التحويل...
+      </div>
+    )
+  }
 
   const [fontSize, setFontSize] = useState(() => {
     try { const saved = localStorage.getItem('article_font_size'); return saved ? Number(saved) : 1.125 }
@@ -248,7 +278,7 @@ export default function ArticleViewPage() {
       <Seo
         title={article.title}
         description={article.excerpt || article.title}
-        canonicalPath={`/article/${article.id}`}
+        canonicalPath={article.slug ? `/article/${encodeURIComponent(article.slug)}` : `/article/${article.id}`}
         ogType="article"
         image={article.image}
         articleDate={article.date}
