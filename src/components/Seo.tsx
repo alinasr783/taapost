@@ -17,9 +17,21 @@ type Props = {
 function resolveAbsoluteUrl(origin: string, input: string) {
   const v = input.trim()
   if (!v) return ''
-  if (v.startsWith('http://') || v.startsWith('https://') || v.startsWith('data:') || v.startsWith('blob:')) return v
-  if (v.startsWith('/')) return `${origin}${v}`
-  return `${origin}/${v.replace(/^\/+/, '')}`
+  if (v.startsWith('data:') || v.startsWith('blob:')) return v
+  let url = ''
+  if (v.startsWith('http://') || v.startsWith('https://')) {
+    url = v
+  } else if (v.startsWith('/')) {
+    url = `${origin}${v}`
+  } else {
+    url = `${origin}/${v.replace(/^\/+/, '')}`
+  }
+  if (url.includes('.supabase.co/storage/v1/object/public/')) {
+    return url
+      .replace('/storage/v1/object/public/', '/storage/v1/render/image/')
+      .replace(/\?[^]*$/, '') + '?width=1200&height=630&resize=cover&format=png'
+  }
+  return url
 }
 
 function upsertMetaByName(name: string, content: string) {

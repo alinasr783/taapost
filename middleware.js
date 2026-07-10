@@ -1,111 +1,7 @@
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || ''
-const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || ''
-const SITE_URL = process.env.VITE_SITE_URL || ''
+import { isBot, resolveImage, buildOGHtml, esc, getArticleParam, getOrigin, fetchSiteSettings, fetchArticle } from './middleware-utils.js'
+
 const SITE_NAME = 'تاء بوست'
 const SITE_DESC = 'منصة إعلامية عربية رقمية'
-const DEFAULT_OG_IMAGE = '/og-default.svg'
-
-const BOT_UAS = [
-  'facebookexternalhit', 'Facebot', 'Twitterbot', 'WhatsApp',
-  'TelegramBot', 'LinkedInBot', 'RedditBot', 'Discordbot',
-  'Slackbot', 'Slack-ImgProxy', 'SkypeUriPreview', 'Viber', 'ia_archiver',
-]
-
-function isBot(ua) {
-  if (!ua) return false
-  const lower = ua.toLowerCase()
-  return BOT_UAS.some((b) => lower.includes(b.toLowerCase()))
-}
-
-function resolveImage(input, origin) {
-  if (!input) return origin ? `${origin}${DEFAULT_OG_IMAGE}` : DEFAULT_OG_IMAGE
-  const v = input.trim()
-  if (!v) return origin ? `${origin}${DEFAULT_OG_IMAGE}` : DEFAULT_OG_IMAGE
-  if (v.startsWith('http://') || v.startsWith('https://') || v.startsWith('data:')) return v
-  if (v.startsWith('/')) return `${origin}${v}`
-  return `${origin}/${v.replace(/^\/+/, '')}`
-}
-
-function esc(s) {
-  return String(s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
-}
-
-async function fetchSiteSettings() {
-  if (!SUPABASE_URL || !SUPABASE_KEY) return null
-  try {
-    const url = `${SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/site_settings?select=logo_url,og_image&limit=1`
-    const res = await fetch(url, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, Accept: 'application/json' },
-    })
-    if (!res.ok) return null
-    const data = await res.json()
-    return Array.isArray(data) && data.length > 0 ? data[0] : null
-  } catch { return null }
-}
-
-async function fetchArticle(param) {
-  if (!SUPABASE_URL || !SUPABASE_KEY) return null
-  const isId = /^\d+$/.test(param)
-  const queryParam = isId ? `id=eq.${param}` : `slug=eq.${encodeURIComponent(param)}`
-  try {
-    const url = `${SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/articles?select=id,slug,title,excerpt,image,date,type&${queryParam}&limit=1`
-    const res = await fetch(url, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, Accept: 'application/json' },
-    })
-    if (!res.ok) return null
-    const data = await res.json()
-    return Array.isArray(data) && data.length > 0 ? data[0] : null
-  } catch { return null }
-}
-
-function buildOGHtml(title, description, image, url, siteName, extraTags = '') {
-  const pageTitle = title ? `${title} | ${siteName}` : siteName
-  return `<!doctype html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<title>${esc(pageTitle)}</title>
-<meta name="description" content="${esc(description)}">
-<meta property="og:locale" content="ar_AR">
-<meta property="og:site_name" content="${esc(siteName)}">
-<meta property="og:type" content="article">
-<meta property="og:title" content="${esc(pageTitle)}">
-<meta property="og:description" content="${esc(description)}">
-<meta property="og:url" content="${esc(url)}">
-<meta property="og:image" content="${esc(image)}">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="${esc(pageTitle)}">
-<meta name="twitter:description" content="${esc(description)}">
-<meta name="twitter:image" content="${esc(image)}">
-${extraTags}
-<link rel="canonical" href="${esc(url)}">
-<meta http-equiv="refresh" content="0;url=${esc(url)}">
-</head>
-<body>
-<p>Redirecting to <a href="${esc(url)}">${esc(title || siteName)}</a></p>
-<script>window.location.href="${esc(url)}"</script>
-</body>
-</html>`
-}
-
-function getOrigin(request) {
-  const url = new URL(request.url)
-  const configuredOrigin = SITE_URL ? SITE_URL.replace(/\/+$/, '') : ''
-  if (configuredOrigin) return configuredOrigin
-  return `${url.protocol}//${url.host}`
-}
-
-function getArticleParam(pathname) {
-  const postMatch = pathname.match(/^\/post\/([^/]+)/)
-  if (postMatch) return { param: decodeURIComponent(postMatch[1]), type: 'post' }
-  const articleMatch = pathname.match(/^\/article\/([^/]+)/)
-  if (articleMatch) return { param: decodeURIComponent(articleMatch[1]), type: 'article' }
-  return null
-}
 
 export default async function middleware(request) {
   const url = new URL(request.url)
@@ -118,8 +14,7 @@ export default async function middleware(request) {
       const settings = await fetchSiteSettings()
       const logoOrOg = settings?.og_image || settings?.logo_url || null
       const image = resolveImage(logoOrOg, origin)
-      const html = buildOGHtml('', SITE_DESC, image, origin, SITE_NAME,
-        '<meta property="og:type" content="website">')
+      const html = buildOGHtml('', SITE_DESC, image, origin, SITE_NAME, 'website')
       return new Response(html, {
         status: 200,
         headers: {
@@ -139,13 +34,13 @@ export default async function middleware(request) {
     if (!article) return
     const image = resolveImage(article.image, origin)
     const type = articleInfo.type
-    const articleUrl = article.slug
-      ? `${origin}/${type}/${encodeURIComponent(article.slug)}`
-      : `${origin}/${type}/${article.id}`
+    const articleUrl = article.id
+      ? `${origin}/${type}/${article.id}`
+      : `${origin}/${pathname.slice(1)}`
     const extraTags = article.date
       ? `<meta property="article:published_time" content="${esc(article.date)}">`
       : ''
-    const html = buildOGHtml(article.title, article.excerpt || article.title, image, articleUrl, SITE_NAME, extraTags)
+    const html = buildOGHtml(article.title, article.excerpt || article.title, image, articleUrl, SITE_NAME, 'article', extraTags)
     return new Response(html, {
       status: 200,
       headers: {

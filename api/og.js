@@ -35,9 +35,13 @@ async function fetchSiteSettings() {
   if (!SUPABASE_URL || !SUPABASE_KEY) return null
   try {
     const url = `${SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/site_settings?select=logo_url,og_image&limit=1`
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 5000)
     const res = await fetch(url, {
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, Accept: 'application/json' },
+      signal: controller.signal,
     })
+    clearTimeout(timeout)
     if (!res.ok) return null
     const data = await res.json()
     return Array.isArray(data) && data.length > 0 ? data[0] : null
@@ -50,9 +54,13 @@ async function fetchArticle(param) {
   const queryParam = isId ? `id=eq.${param}` : `slug=eq.${encodeURIComponent(param)}`
   try {
     const url = `${SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/articles?select=id,slug,title,excerpt,image,date,type&${queryParam}&limit=1`
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 5000)
     const res = await fetch(url, {
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, Accept: 'application/json' },
+      signal: controller.signal,
     })
+    clearTimeout(timeout)
     if (!res.ok) return null
     const data = await res.json()
     return Array.isArray(data) && data.length > 0 ? data[0] : null
@@ -143,9 +151,9 @@ export default async function handler(req, res) {
 
     if (isBot(ua)) {
       const image = resolveImage(article.image, origin)
-      const articleUrl = article.slug
-        ? `${origin}/${type}/${encodeURIComponent(article.slug)}`
-        : `${origin}/${type}/${article.id}`
+      const articleUrl = article.id
+        ? `${origin}/${type}/${article.id}`
+        : `${origin}/${path.slice(1)}`
       const extraTags = article.date
         ? `<meta property="article:published_time" content="${esc(article.date)}">`
         : ''
