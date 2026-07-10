@@ -28,8 +28,8 @@ function resolveAbsoluteUrl(origin: string, input: string) {
   }
   if (url.includes('.supabase.co/storage/v1/object/public/')) {
     return url
-      .replace('/storage/v1/object/public/', '/storage/v1/render/image/')
-      .replace(/\?[^]*$/, '') + '?width=1200&height=630&resize=cover&format=png'
+      .replace('/storage/v1/object/', '/storage/v1/render/image/')
+      .replace(/\?[^]*$/, '') + '?width=1200&height=630&resize=cover'
   }
   return url
 }

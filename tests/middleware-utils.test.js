@@ -99,11 +99,11 @@ describe('resolveImage', () => {
   it('transforms Supabase Storage URLs for OG optimization', () => {
     const supabaseUrl = 'https://test.supabase.co/storage/v1/object/public/media/test.png'
     const result = resolveImage(supabaseUrl, origin)
-    expect(result).toContain('/storage/v1/render/image/')
+    expect(result).toContain('/storage/v1/render/image/public/')
     expect(result).toContain('width=1200')
     expect(result).toContain('height=630')
     expect(result).toContain('resize=cover')
-    expect(result).toContain('format=png')
+    expect(result).not.toContain('format=')
   })
 
   it('prepends origin for relative paths starting with /', () => {
