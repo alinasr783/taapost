@@ -20,9 +20,21 @@ function resolveImage(input, origin) {
   if (!input) return origin ? `${origin}${DEFAULT_OG_IMAGE}` : DEFAULT_OG_IMAGE
   const v = input.trim()
   if (!v) return origin ? `${origin}${DEFAULT_OG_IMAGE}` : DEFAULT_OG_IMAGE
-  if (v.startsWith('http://') || v.startsWith('https://') || v.startsWith('data:')) return v
-  if (v.startsWith('/')) return `${origin}${v}`
-  return `${origin}/${v.replace(/^\/+/, '')}`
+  if (v.startsWith('data:')) return v
+  let url = ''
+  if (v.startsWith('http://') || v.startsWith('https://')) {
+    url = v
+  } else if (v.startsWith('/')) {
+    url = `${origin}${v}`
+  } else {
+    url = `${origin}/${v.replace(/^\/+/, '')}`
+  }
+  if (url.includes('.supabase.co/storage/v1/object/public/')) {
+    return url
+      .replace('/storage/v1/object/', '/storage/v1/render/image/')
+      .replace(/\?[^]*$/, '') + '?width=1200&height=630&resize=cover'
+  }
+  return url
 }
 
 function esc(s) {
@@ -84,10 +96,12 @@ function buildOGHtml(title, description, image, url, siteName, extraTags = '') {
 <meta property="og:image" content="${esc(image)}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="${esc(title || siteName)}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${esc(pageTitle)}">
 <meta name="twitter:description" content="${esc(description)}">
 <meta name="twitter:image" content="${esc(image)}">
+<meta name="twitter:image:alt" content="${esc(title || siteName)}">
 ${extraTags}
 <link rel="canonical" href="${esc(url)}">
 <meta http-equiv="refresh" content="0;url=${esc(url)}">
@@ -102,7 +116,10 @@ ${extraTags}
 function extractPath(req) {
   const urlObj = new URL(req.url, `https://${req.headers.host || 'localhost'}`)
   const rawPath = urlObj.pathname
-  if (rawPath.startsWith('/og/')) return rawPath.slice(3) || '/'
+  if (rawPath.startsWith('/og/')) {
+    const rest = rawPath.slice(4)
+    return rest ? '/' + rest : '/'
+  }
   if (rawPath.startsWith('/article/') || rawPath.startsWith('/post/')) return rawPath
   return urlObj.searchParams.get('path') || urlObj.searchParams.get('p') || '/'
 }
@@ -154,9 +171,10 @@ export default async function handler(req, res) {
       const articleUrl = article.id
         ? `${origin}/${type}/${article.id}`
         : `${origin}/${path.slice(1)}`
-      const extraTags = article.date
-        ? `<meta property="article:published_time" content="${esc(article.date)}">`
-        : ''
+      const extraTags = [
+        article.date ? `<meta property="article:published_time" content="${esc(article.date)}">` : '',
+        article.type === 'article' ? '<meta property="article:section" content="مقالات">' : '',
+      ].filter(Boolean).join('\n')
       const html = buildOGHtml(article.title, article.excerpt || article.title, image, articleUrl, SITE_NAME, extraTags)
       res.setHeader('Content-Type', 'text/html; charset=utf-8')
       res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400')
