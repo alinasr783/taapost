@@ -43,10 +43,18 @@ function resolveImage(input, origin) {
   } else {
     url = `${origin}/${v.replace(/^\/+/, '')}`
   }
+  // Optimize OG image size and quality for social media sharing
   if (url.includes('.supabase.co/storage/v1/object/public/')) {
-    return url
+    // Convert to render endpoint with optimal OG dimensions (1200x630)
+    let optimizedUrl = url
       .replace('/storage/v1/object/', '/storage/v1/render/image/')
-      .replace(/\?[^]*$/, '') + '?width=1200&height=630&resize=cover'
+      .replace(/\?[^]*$/, '')
+      .replace(/\.jpg$/, '.webp')  // Convert to WebP for better compression
+      .replace(/\.jpeg$/, '.webp')
+      .replace(/\.png$/, '.webp')
+    // Add optimal OG image parameters for social sharing
+    optimizedUrl += '?width=1200&height=630&resize=cover&quality=85&format=webp&fit=cover'
+    return optimizedUrl
   }
   return url
 }
