@@ -1,8 +1,22 @@
+import { readFileSync } from 'fs'
+import { join } from 'path'
+
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || ''
 const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || ''
 const SITE_NAME = 'تاء بوست'
 const SITE_DESC = 'منصة إعلامية عربية رقمية'
 const DEFAULT_OG_IMAGE = '/og-default.svg'
+
+let cachedIndexHtml = null
+function getIndexHtml() {
+  if (cachedIndexHtml) return cachedIndexHtml
+  try {
+    cachedIndexHtml = readFileSync(join(process.cwd(), 'dist', 'index.html'), 'utf-8')
+    return cachedIndexHtml
+  } catch {
+    return null
+  }
+}
 
 const BOT_UAS = [
   'facebookexternalhit', 'Facebot', 'Twitterbot', 'WhatsApp',
@@ -149,6 +163,12 @@ export default async function handler(req, res) {
         res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400')
         return res.status(200).send(html)
       }
+      const spaHtml = getIndexHtml()
+      if (spaHtml) {
+        res.setHeader('Content-Type', 'text/html; charset=utf-8')
+        res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate')
+        return res.status(200).send(spaHtml)
+      }
       return res.redirect(302, origin + '/')
     }
 
@@ -163,6 +183,15 @@ export default async function handler(req, res) {
 
     const article = await fetchArticle(param)
     if (!article) {
+      if (isBot(ua)) {
+        return res.redirect(302, origin + path)
+      }
+      const spaHtml = getIndexHtml()
+      if (spaHtml) {
+        res.setHeader('Content-Type', 'text/html; charset=utf-8')
+        res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate')
+        return res.status(200).send(spaHtml)
+      }
       return res.redirect(302, origin + path)
     }
 
@@ -181,6 +210,12 @@ export default async function handler(req, res) {
       return res.status(200).send(html)
     }
 
+    const spaHtml = getIndexHtml()
+    if (spaHtml) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8')
+      res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate')
+      return res.status(200).send(spaHtml)
+    }
     return res.redirect(302, origin + path)
   } catch {
     return res.redirect(302, '/')

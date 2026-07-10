@@ -5,6 +5,8 @@
   "installCommand": "npm install",
   "rewrites": [
     { "source": "/og/:path+", "destination": "/api/og" },
+    { "source": "/article/:id", "destination": "/api/og" },
+    { "source": "/post/:id", "destination": "/api/og" },
     { "source": "/robots.txt", "destination": "/api/robots" },
     { "source": "/sitemap.xml", "destination": "/api/sitemap" },
     { "source": "/(.*)", "destination": "/index.html" }
