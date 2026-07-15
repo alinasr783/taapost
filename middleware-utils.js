@@ -3,12 +3,16 @@ const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || ''
 const SITE_URL = process.env.VITE_SITE_URL || ''
 const SITE_NAME = 'تاء بوست'
 const SITE_DESC = 'منصة إعلامية عربية رقمية'
-const DEFAULT_OG_IMAGE = '/og-default.svg'
+const DEFAULT_OG_IMAGE = '/og-default.png'
 
 const BOT_UAS = [
-  'facebookexternalhit', 'Facebot', 'Twitterbot', 'WhatsApp',
-  'TelegramBot', 'LinkedInBot', 'RedditBot', 'Discordbot',
-  'Slackbot', 'Slack-ImgProxy', 'SkypeUriPreview', 'Viber', 'ia_archiver',
+  'facebookexternalhit', 'Facebot', 'facebookcatalog', 'Twitterbot', 'WhatsApp',
+  'TelegramBot', 'LinkedInBot', 'RedditBot', 'Discordbot', 'Slackbot',
+  'Slack-ImgProxy', 'SkypeUriPreview', 'Viber', 'ia_archiver', 'Pinterest',
+  'Instagram', 'Line', 'Applebot', 'bingbot', 'Googlebot', 'YandexBot',
+  'outbrain', 'embedly', 'quora', 'showyoubot', 'tumblr', 'buffer', 'vkShare',
+  'pinterestbot', 'slack-imgproxy', 'discord', 'bot', 'crawler', 'spider',
+  'slurp', 'archiver', 'preview', 'embed',
 ]
 
 export function isBot(ua) {

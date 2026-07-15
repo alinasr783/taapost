@@ -75,10 +75,10 @@ describe('resolveImage', () => {
   const origin = 'https://www.taapost.com'
 
   it('returns default image when input is null/undefined/empty', () => {
-    expect(resolveImage(null, origin)).toBe(`${origin}/og-default.svg`)
-    expect(resolveImage(undefined, origin)).toBe(`${origin}/og-default.svg`)
-    expect(resolveImage('', origin)).toBe(`${origin}/og-default.svg`)
-    expect(resolveImage('   ', origin)).toBe(`${origin}/og-default.svg`)
+    expect(resolveImage(null, origin)).toBe(`${origin}/og-default.png`)
+    expect(resolveImage(undefined, origin)).toBe(`${origin}/og-default.png`)
+    expect(resolveImage('', origin)).toBe(`${origin}/og-default.png`)
+    expect(resolveImage('   ', origin)).toBe(`${origin}/og-default.png`)
   })
 
   it('returns absolute HTTPS URLs as-is', () => {
@@ -119,7 +119,7 @@ describe('resolveImage', () => {
   })
 
   it('returns just default when origin is empty', () => {
-    expect(resolveImage('', '')).toBe('/og-default.svg')
+    expect(resolveImage('', '')).toBe('/og-default.png')
   })
 })
 

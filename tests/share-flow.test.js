@@ -140,7 +140,7 @@ describe('Share URL → Crawler Response flow', () => {
       const res = await middleware(req)
 
       const html = await res.text()
-      expect(html).toContain('og:image" content="https://www.taapost.com/og-default.svg"')
+      expect(html).toContain('og:image" content="https://www.taapost.com/og-default.png"')
     })
   })
 

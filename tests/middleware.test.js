@@ -181,7 +181,7 @@ describe('middleware (integration)', () => {
       const res = await middleware(req)
 
       const html = await res.text()
-      expect(html).toContain('og:image" content="https://www.taapost.com/og-default.svg"')
+      expect(html).toContain('og:image" content="https://www.taapost.com/og-default.png"')
     })
 
     it('uses absolute image URL when article has one', async () => {

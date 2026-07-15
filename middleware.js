@@ -30,17 +30,23 @@ export default async function middleware(request) {
   if (!articleInfo) return
 
   if (isBot(ua)) {
-    const article = await fetchArticle(articleInfo.param)
-    if (!article) return
-    const image = resolveImage(article.image, origin)
+    let article = null
+    try {
+      article = await fetchArticle(articleInfo.param)
+    } catch {
+      article = null
+    }
+    const image = resolveImage(article?.image, origin)
     const type = articleInfo.type
-    const articleUrl = article.id
+    const title = article?.title || SITE_NAME
+    const description = article?.excerpt || article?.title || SITE_DESC
+    const articleUrl = article?.id
       ? `${origin}/${type}/${article.id}`
       : `${origin}/${pathname.slice(1)}`
-    const extraTags = article.date
+    const extraTags = article?.date
       ? `<meta property="article:published_time" content="${esc(article.date)}">`
       : ''
-    const html = buildOGHtml(article.title, article.excerpt || article.title, image, articleUrl, SITE_NAME, 'article', extraTags)
+    const html = buildOGHtml(title, description, image, articleUrl, SITE_NAME, 'article', extraTags)
     return new Response(html, {
       status: 200,
       headers: {

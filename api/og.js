@@ -5,7 +5,7 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL || ''
 const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || ''
 const SITE_NAME = 'تاء بوست'
 const SITE_DESC = 'منصة إعلامية عربية رقمية'
-const DEFAULT_OG_IMAGE = '/og-default.svg'
+const DEFAULT_OG_IMAGE = '/og-default.png'
 
 let cachedIndexHtml = null
 function getIndexHtml() {
@@ -19,9 +19,13 @@ function getIndexHtml() {
 }
 
 const BOT_UAS = [
-  'facebookexternalhit', 'Facebot', 'Twitterbot', 'WhatsApp',
-  'TelegramBot', 'LinkedInBot', 'RedditBot', 'Discordbot',
-  'Slackbot', 'Slack-ImgProxy', 'SkypeUriPreview', 'Viber', 'ia_archiver',
+  'facebookexternalhit', 'Facebot', 'facebookcatalog', 'Twitterbot', 'WhatsApp',
+  'TelegramBot', 'LinkedInBot', 'RedditBot', 'Discordbot', 'Slackbot',
+  'Slack-ImgProxy', 'SkypeUriPreview', 'Viber', 'ia_archiver', 'Pinterest',
+  'Instagram', 'Line', 'Applebot', 'bingbot', 'Googlebot', 'YandexBot',
+  'outbrain', 'embedly', 'quora', 'showyoubot', 'tumblr', 'buffer', 'vkShare',
+  'pinterestbot', 'slack-imgproxy', 'discord', 'bot', 'crawler', 'spider',
+  'slurp', 'archiver', 'preview', 'embed',
 ]
 
 function isBot(ua) {
@@ -137,13 +141,15 @@ ${extraTags}
 
 function extractPath(req) {
   const urlObj = new URL(req.url, `https://${req.headers.host || 'localhost'}`)
+  const fromQuery = urlObj.searchParams.get('path') || urlObj.searchParams.get('p')
+  if (fromQuery) return fromQuery
   const rawPath = urlObj.pathname
   if (rawPath.startsWith('/og/')) {
     const rest = rawPath.slice(4)
     return rest ? '/' + rest : '/'
   }
   if (rawPath.startsWith('/article/') || rawPath.startsWith('/post/')) return rawPath
-  return urlObj.searchParams.get('path') || urlObj.searchParams.get('p') || '/'
+  return '/'
 }
 
 function getOrigin(req) {
@@ -192,7 +198,12 @@ export default async function handler(req, res) {
     const article = await fetchArticle(param)
     if (!article) {
       if (isBot(ua)) {
-        return res.redirect(302, origin + path)
+        const image = resolveImage(null, origin)
+        const html = buildOGHtml(SITE_NAME, SITE_DESC, image, origin + path, SITE_NAME,
+          '<meta property="og:type" content="website">')
+        res.setHeader('Content-Type', 'text/html; charset=utf-8')
+        res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400')
+        return res.status(200).send(html)
       }
       const spaHtml = getIndexHtml()
       if (spaHtml) {

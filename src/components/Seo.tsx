@@ -108,7 +108,7 @@ export default function Seo(props: Props) {
   }, [props.description, site.meta_description, site.site_description])
 
   const image = useMemo(() => {
-    const fallback = site.og_image?.trim() || (site.logo_url?.trim() ? site.logo_url.trim() : '/og-default.svg')
+    const fallback = site.og_image?.trim() || (site.logo_url?.trim() ? site.logo_url.trim() : '/og-default.png')
     const src = props.image?.trim() ? props.image.trim() : fallback
     return origin ? resolveAbsoluteUrl(origin, src) : src
   }, [origin, props.image, site.og_image, site.logo_url])
