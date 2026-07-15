@@ -224,6 +224,22 @@ export default function ArticlePage() {
           const captionHtml = caption ? `<figcaption style="font-size:0.875rem;opacity:0.7;margin-top:0.5em;text-align:center;color:hsl(var(--foreground));">${caption}</figcaption>` : ''
           return `<figure style="max-width:100%;margin:1.5em 0;"><div class="ql-video-wrapper" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;max-width:100%;"><iframe class="ql-video" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" src="${embedUrl}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>${captionHtml}</figure>`
         })
+
+        const imageMarkerRegex = /\{\{image:([^|}]+)(?:\|([^}]*))?\}\}/g
+        contentHtml = contentHtml.replace(imageMarkerRegex, (_match: string, url: string, encodedCaption?: string) => {
+          let caption = ''
+          if (encodedCaption) {
+            try {
+              caption = decodeURIComponent(encodedCaption)
+            } catch {
+              caption = encodedCaption
+            }
+          }
+          const captionHtml = caption
+            ? `<figcaption style="font-size:0.875rem;opacity:0.7;margin-top:0.5em;text-align:center;color:hsl(var(--foreground));">${caption}</figcaption>`
+            : ''
+          return `<figure class="article-image" style="margin:1.5em 0;text-align:center;"><img src="${url}" alt="${caption}" style="max-width:100%;height:auto;border-radius:0.5rem;" />${captionHtml}</figure>`
+        })
       } catch (err) {
         console.error('[ArticlePage] Error processing article content HTML:', err)
         contentHtml = data.content || ''

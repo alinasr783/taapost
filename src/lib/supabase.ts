@@ -131,6 +131,8 @@ export type LogoSetting = {
   id: number
   logo_url: string
   logo_url_dark: string | null
+  logo_caption?: string
+  logo_caption_dark?: string
   logo_name: string
   is_active: boolean
   logo_width: string

@@ -42,6 +42,8 @@ export default function LogoController() {
     return {
       logo_url: '',
       logo_url_dark: null,
+      logo_caption: '',
+      logo_caption_dark: '',
       logo_name: 'اللوجو الرئيسي',
       is_active: logos.length === 0,
       logo_width: '100%',
@@ -66,6 +68,8 @@ export default function LogoController() {
           .update({
             logo_url: logo.logo_url,
             logo_url_dark: logo.logo_url_dark || null,
+            logo_caption: logo.logo_caption || null,
+            logo_caption_dark: logo.logo_caption_dark || null,
             logo_name: logo.logo_name,
             is_active: logo.is_active,
             logo_width: logo.logo_width,
@@ -87,6 +91,8 @@ export default function LogoController() {
           .insert([{
             logo_url: logo.logo_url,
             logo_url_dark: logo.logo_url_dark || null,
+            logo_caption: logo.logo_caption || null,
+            logo_caption_dark: logo.logo_caption_dark || null,
             logo_name: logo.logo_name,
             is_active: logo.is_active,
             logo_width: logo.logo_width,
@@ -335,6 +341,9 @@ function LogoEditor({
               value={form.logo_url}
               onChange={(url) => update({ logo_url: url })}
               label="لوجو Light Mode"
+              caption={form.logo_caption || ''}
+              onCaptionChange={(caption) => update({ logo_caption: caption })}
+              showCaption={true}
             />
           </div>
         </div>
@@ -345,6 +354,9 @@ function LogoEditor({
               value={form.logo_url_dark || ''}
               onChange={(url) => update({ logo_url_dark: url })}
               label="لوجو Dark Mode"
+              caption={form.logo_caption_dark || ''}
+              onCaptionChange={(caption) => update({ logo_caption_dark: caption })}
+              showCaption={true}
             />
           </div>
           <p className="text-xs text-muted-foreground mt-1 text-center">اتركه فارغاً لاستخدام لوجو النهاري في كلا الوضعين</p>

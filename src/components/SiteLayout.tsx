@@ -213,7 +213,7 @@ export default function SiteLayout({ children }: Props) {
   return (
     <SiteSettingsProvider value={mergedSettings}>
       <div className="min-h-dvh bg-background text-foreground flex flex-col">
-        <header className="sticky top-0 z-40 border-b border-border/60 bg-background backdrop-blur">
+        <header className="sticky top-0 z-50 border-b border-border bg-background shadow-sm py-3">
           <div className="container flex items-stretch justify-between gap-3">
             <Link
               to="/"
@@ -222,11 +222,11 @@ export default function SiteLayout({ children }: Props) {
               {(() => {
                 const displayLogoUrl = getActiveLogoUrl()
                 if (displayLogoUrl) {
-                  return (
+                   return (
                     <img
                       src={displayLogoUrl}
                       alt={siteSettings.site_name}
-                      className="flex-shrink-0 h-10 w-auto max-w-[120px] object-contain"
+                      className="flex-shrink-0 h-14 w-auto max-w-[160px] object-contain"
                       decoding="async"
                       fetchPriority="high"
                     />
@@ -281,7 +281,7 @@ export default function SiteLayout({ children }: Props) {
 
           {/* Horizontal scrollable category bar */}
           {categories.length > 0 && (
-            <div className="border-t border-border/40 bg-background/95">
+            <div className="border-t border-border/40 bg-background">
               <div className="container flex items-center gap-1 overflow-x-auto py-2 hide-scrollbar">
                 <Link
                   to="/"
@@ -342,7 +342,7 @@ export default function SiteLayout({ children }: Props) {
                       />
                     )
                   }
-                  return <BrainCircuit className="h-10 w-10 text-primary flex-shrink-0" />
+                return <BrainCircuit className="h-12 w-12 text-primary flex-shrink-0" />
                 })()}
                 <div className="flex flex-col min-w-0">
                   <span className="text-base font-bold leading-tight truncate">{siteSettings.site_name}</span>

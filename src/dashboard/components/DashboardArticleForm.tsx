@@ -4,6 +4,7 @@ import { X, Save, Video } from 'lucide-react'
 import { supabase, type Article, type Category, type User, type UserPermission, type Author } from '../../lib/supabase'
 import { hasPermission } from '../utils'
 import ImageUpload from './ImageUpload'
+import ImageWithCaptionModal from './ImageWithCaptionModal'
 import Switch from './Switch'
 import { useToast } from './Toast'
 import ReactQuill from 'react-quill-new'
@@ -67,6 +68,7 @@ export default function DashboardArticleForm({ article, categories, user, permis
   const [authors, setAuthors] = useState<Author[]>([])
   const [videoModalOpen, setVideoModalOpen] = useState(false)
   const [videoUrl, setVideoUrl] = useState('')
+  const [imageModalOpen, setImageModalOpen] = useState(false)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const quillRef = useRef<any>(null)
 
@@ -79,6 +81,7 @@ export default function DashboardArticleForm({ article, categories, user, permis
         category_id: article.category_id || 0,
         author_id: article.author_id || 0,
         image: article.image || '',
+        image_caption: article.image_caption || '',
         type: article.type || 'article',
         is_exclusive: article.is_exclusive || false,
         date: article.date ? article.date.split('T')[0] : new Date().toISOString().split('T')[0],
@@ -91,8 +94,9 @@ export default function DashboardArticleForm({ article, categories, user, permis
       content: '',
       category_id: 0,
       author_id: 0,
-      image: '',
-      type: 'article',
+       image: '',
+       image_caption: '',
+       type: 'article',
       is_exclusive: false,
       date: new Date().toISOString().split('T')[0],
       content_source: ''
@@ -127,6 +131,19 @@ export default function DashboardArticleForm({ article, categories, user, permis
 
   const handleVideoToolbarClick = useCallback(() => {
     setVideoModalOpen(true)
+  }, [])
+
+  const handleImageToolbarClick = useCallback(() => {
+    setImageModalOpen(true)
+  }, [])
+
+  const handleImageInsert = useCallback((marker: string) => {
+    const editor = quillRef.current?.getEditor()
+    if (!editor) return
+
+    const range = editor.getSelection(true)
+    editor.insertText(range.index, marker, 'user')
+    editor.setSelection(range.index + marker.length, 0, 'silent')
   }, [])
 
   const handleVideoInsert = useCallback(() => {
@@ -313,6 +330,9 @@ export default function DashboardArticleForm({ article, categories, user, permis
               value={formData.image}
               onChange={(url) => setFormData({ ...formData, image: url })}
               label="صورة المقال"
+              caption={formData.image_caption}
+              onCaptionChange={(caption) => setFormData({ ...formData, image_caption: caption })}
+              showCaption={true}
             />
           </div>
 
@@ -356,7 +376,8 @@ export default function DashboardArticleForm({ article, categories, user, permis
                       ['clean']
                     ],
                     handlers: {
-                      video: handleVideoToolbarClick
+                      video: handleVideoToolbarClick,
+                      image: handleImageToolbarClick
                     }
                   }
                 }}
@@ -429,6 +450,12 @@ export default function DashboardArticleForm({ article, categories, user, permis
             </div>
           </div>
         )}
+
+        <ImageWithCaptionModal
+          open={imageModalOpen}
+          onClose={() => setImageModalOpen(false)}
+          onInsert={handleImageInsert}
+        />
       </div>
     </div>
   )

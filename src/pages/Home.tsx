@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, type Article, type Author, type HomepageSection, type HomepageSlider, type BreakingNewsHero } from '../lib/supabase'
 import HomeCarousel from '../components/HomeCarousel'
-import BreakingNewsHeroComponent from '../components/BreakingNewsHero'
+import BreakingNewsTicker from '../components/BreakingNewsTicker'
 import Seo from '../components/Seo'
 import { useSiteSettings } from '../components/useSiteSettings'
 
@@ -96,12 +96,11 @@ export default function Home() {
             .select('*, categories(id, name, slug), slider_posts(sort_order, articles(id, slug, title, image, date, category_id, type, is_exclusive, categories(id, name, slug)))')
             .eq('is_active', true)
             .order('display_order', { ascending: true }),
-          supabase
+            supabase
             .from('breaking_news_hero')
             .select('*, articles(id, slug, title, image, date, category_id, type, is_exclusive, categories(id, name, slug))')
             .eq('is_active', true)
-            .order('display_order', { ascending: true })
-            .limit(1),
+            .order('display_order', { ascending: true }),
         ])
         if (slidersRes.data) slidersData = slidersRes.data as HomepageSlider[]
         if (breakingRes.data) breakingNewsData = breakingRes.data as BreakingNewsHero[]
@@ -302,11 +301,9 @@ export default function Home() {
               },
         ]}
       />
-      {/* Breaking News Hero */}
-      {breakingNewsData.length > 0 && breakingNewsData[0].articles && (
-        <div className="container">
-          <BreakingNewsHeroComponent data={breakingNewsData[0]} />
-        </div>
+      {/* Breaking News Ticker */}
+      {breakingNewsData.length > 0 && (
+        <BreakingNewsTicker items={breakingNewsData} />
       )}
 
       {/* Existing Homepage Sections (including managed sliders) */}
@@ -336,8 +333,9 @@ export default function Home() {
         if (section.type === 'carousel') {
            const count = getSettingsCount(section.settings, 5)
            let slides = sortedArticles;
-           const contentType = getSettingsContentType(section.settings)
-           slides = filterByContentType(slides, contentType)
+            const contentType = getSettingsContentType(section.settings)
+            slides = filterByContentType(slides, contentType)
+            slides = slides.filter(a => a.type !== 'article')
 
            const sourceType = getSettingsSourceType(section.settings)
            if (sourceType === 'category' && section.category_id) {

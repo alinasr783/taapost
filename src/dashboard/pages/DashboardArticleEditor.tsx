@@ -5,6 +5,7 @@ import { ArrowRight, Save, Video, Loader2 } from 'lucide-react'
 import { supabase, type Category, type User, type UserPermission, type Author } from '../../lib/supabase'
 import { hasPermission } from '../utils'
 import ImageUpload from '../components/ImageUpload'
+import ImageWithCaptionModal from '../components/ImageWithCaptionModal'
 import Switch from '../components/Switch'
 import { useToast } from '../components/Toast'
 import ReactQuill from 'react-quill-new'
@@ -67,6 +68,7 @@ export default function DashboardArticleEditor() {
   const [videoModalOpen, setVideoModalOpen] = useState(false)
   const [videoUrl, setVideoUrl] = useState('')
   const [videoCaption, setVideoCaption] = useState('')
+  const [imageModalOpen, setImageModalOpen] = useState(false)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const quillRef = useRef<any>(null)
 
@@ -167,6 +169,19 @@ export default function DashboardArticleEditor() {
 
   const handleVideoToolbarClick = useCallback(() => {
     setVideoModalOpen(true)
+  }, [])
+
+  const handleImageToolbarClick = useCallback(() => {
+    setImageModalOpen(true)
+  }, [])
+
+  const handleImageInsert = useCallback((marker: string) => {
+    const editor = quillRef.current?.getEditor()
+    if (!editor) return
+
+    const range = editor.getSelection(true)
+    editor.insertText(range.index, marker, 'user')
+    editor.setSelection(range.index + marker.length, 0, 'silent')
   }, [])
 
   const handleVideoInsert = useCallback(() => {
@@ -435,7 +450,8 @@ export default function DashboardArticleEditor() {
                     ['clean']
                   ],
                   handlers: {
-                    video: handleVideoToolbarClick
+                    video: handleVideoToolbarClick,
+                    image: handleImageToolbarClick
                   }
                 }
               }}
@@ -519,6 +535,13 @@ export default function DashboardArticleEditor() {
           </div>
         </div>
       )}
+
+      {/* Image + Caption Modal */}
+      <ImageWithCaptionModal
+        open={imageModalOpen}
+        onClose={() => setImageModalOpen(false)}
+        onInsert={handleImageInsert}
+      />
     </div>
   )
 }

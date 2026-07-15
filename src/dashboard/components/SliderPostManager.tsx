@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, X, ArrowLeft, ArrowRight } from 'lucide-react'
+import { GripVertical, X, ArrowLeft, Ban } from 'lucide-react'
 import type { Article } from '../../lib/supabase'
 import PostPicker from './PostPicker'
 
@@ -78,6 +78,12 @@ export default function SliderPostManager({ categoryId, selectedArticles, onChan
 
   return (
     <div className="space-y-3">
+      <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-500/10 border border-amber-500/40 rounded-md px-3 py-2 text-right">
+        <Ban size={14} className="mt-0.5 shrink-0" />
+        <span>
+          <span className="font-semibold">تنبيه:</span> لا يمكن إضافة أي محتوى من نوع «مقال» إلى هذا السلايدر — يقتصر على باقي الأنواع (فيديو، صور، إنفوجرافيك...) فقط.
+        </span>
+      </div>
       {selectedArticles.length > 0 && (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={selectedArticles.map(a => a.id)} strategy={verticalListSortingStrategy}>

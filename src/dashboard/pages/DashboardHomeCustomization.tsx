@@ -29,7 +29,7 @@ export default function DashboardHomeCustomization() {
   // Sliders state
   const [sliders, setSliders] = useState<HomepageSlider[]>([])
   const [isSliderFormOpen, setIsSliderFormOpen] = useState(false)
-  const [editingSlider, setEditingSlider] = useState<HomepageSlider | null>(null)
+  const [, setEditingSlider] = useState<HomepageSlider | null>(null)
   const [deleteSliderTarget, setDeleteSliderTarget] = useState<HomepageSlider | null>(null)
   const [expandedSlider, setExpandedSlider] = useState<number | null>(null)
 
@@ -45,6 +45,7 @@ export default function DashboardHomeCustomization() {
     category_id: '' as number | '',
     post_count: 5,
     hide_title: false,
+    position: 'bottom' as 'top' | 'bottom',
   })
 
   // Form State for existing sections
@@ -351,7 +352,7 @@ export default function DashboardHomeCustomization() {
           setSections([...sections, sectionData[0]])
         }
         setIsSliderFormOpen(false)
-        setSliderForm({ name: '', category_id: '', post_count: 5, hide_title: false })
+        setSliderForm({ name: '', category_id: '', post_count: 5, hide_title: false, position: 'bottom' })
         queryClient.invalidateQueries({ queryKey: ['home_data'] })
         showToast('تم إضافة السلايدر')
       }
@@ -521,7 +522,7 @@ export default function DashboardHomeCustomization() {
             <h2 className="text-lg font-bold text-foreground">السلايدرات</h2>
           </div>
           <button
-            onClick={() => { setEditingSlider(null); setSliderForm({ name: '', category_id: '', post_count: 5 }); setIsSliderFormOpen(true) }}
+            onClick={() => { setEditingSlider(null); setSliderForm({ name: '', category_id: '', post_count: 5, hide_title: false, position: 'bottom' }); setIsSliderFormOpen(true) }}
             className="bg-blue-500 text-white px-3 py-1.5 rounded-md flex items-center gap-1.5 text-sm hover:bg-blue-600 transition-colors"
           >
             <Plus size={16} />
@@ -685,11 +686,23 @@ export default function DashboardHomeCustomization() {
               <div className="space-y-3">
                 {sections.map((section) => (
                   <SortableItem key={section.id} id={section.id} className="bg-muted/30 border border-border">
-                    <div className="flex items-center justify-between w-full p-2">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-foreground">{section.title}</span>
-                        <span className="text-xs text-muted-foreground">{getSectionLabel(section)}</span>
-                      </div>
+                     <div className="flex items-center justify-between w-full p-2">
+                       <div className="flex flex-col gap-1">
+                         <div className="flex items-center gap-2">
+                           <span className="font-semibold text-foreground">{section.title}</span>
+                           {section.type === 'managed_slider' && (
+                             <span className="inline-flex items-center gap-1 bg-blue-500/10 text-blue-600 text-[10px] font-bold px-1.5 py-0.5 rounded">
+                               سلايدر
+                             </span>
+                           )}
+                         </div>
+                         <span className="text-xs text-muted-foreground">
+                           {getSectionLabel(section)}
+                           {section.type === 'managed_slider' && sliders.find(s => s.id === section.settings?.slider_id) && (
+                             <> â€¢ {(sliders.find(s => s.id === section.settings?.slider_id)?.slider_posts?.length ?? 0)} Ù…Ù‚Ø§Ù„Ø§Øª</>
+                           )}
+                         </span>
+                       </div>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={(e) => { e.stopPropagation(); handleToggleActive(section.id, section.is_active); }}
@@ -730,7 +743,7 @@ export default function DashboardHomeCustomization() {
                   onChange={(e) => {
                     const next = e.target.value
                     if (['carousel', 'category_grid', 'category_list', 'custom', 'latest_grid', 'author_focus'].includes(next)) {
-                      setFormData({ ...formData, type: next as SectionType, content_type: next === 'author_focus' ? 'article' : formData.content_type })
+                      setFormData({ ...formData, type: next as SectionType, content_type: next === 'carousel' ? 'other' : next === 'author_focus' ? 'article' : formData.content_type })
                     }
                   }}
                   className="w-full p-2 bg-background border border-input rounded-md"
@@ -742,6 +755,12 @@ export default function DashboardHomeCustomization() {
                   <option value="author_focus">بطاقات الكتّاب (Author Focus)</option>
                 </select>
               </div>
+
+              {formData.type === 'carousel' && (
+                <p className="text-xs text-muted-foreground bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2 text-right">
+                  ملاحظة: لا يمكن إضافة محتوى من نوع «مقال» داخل هذا الشريط المتحرك. يقتصر على باقي الأنواع فقط.
+                </p>
+              )}
 
               {formData.type === 'carousel' && (
                 <div className="space-y-4 border p-4 rounded-md bg-muted/20">
@@ -765,7 +784,6 @@ export default function DashboardHomeCustomization() {
                     <label className="block text-sm font-medium mb-1">نوع المحتوى</label>
                     <select value={formData.content_type} onChange={e => setFormData({ ...formData, content_type: e.target.value })} className="w-full p-2 bg-background border border-input rounded-md">
                       <option value="all">الكل</option>
-                      <option value="article">مقالات فقط</option>
                       <option value="other">محتوى آخر فقط</option>
                     </select>
                   </div>
