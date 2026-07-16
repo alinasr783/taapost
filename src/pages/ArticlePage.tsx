@@ -666,7 +666,7 @@ export default function ArticlePage() {
 
           <div className="border-t border-border/40 pt-8 mt-8">
             <ShareButton
-              url={`${window.location.origin}/og${buildArticleUrl(article)}`}
+              url={`${window.location.origin}${buildArticleUrl(article)}`}
               title={article.title}
               description={article.excerpt}
             />

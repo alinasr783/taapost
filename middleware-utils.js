@@ -72,12 +72,8 @@ export function buildOGHtml(title, description, image, url, siteName, ogType = '
 <meta name="twitter:image" content="${esc(image)}">
 ${extraTags}
 <link rel="canonical" href="${esc(url)}">
-<meta http-equiv="refresh" content="0;url=${esc(url)}">
 </head>
-<body>
-<p>Redirecting to <a href="${esc(url)}">${esc(title || siteName)}</a></p>
-<script>window.location.href="${esc(url)}"</script>
-</body>
+<body></body>
 </html>`
 }
 
