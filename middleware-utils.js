@@ -34,11 +34,10 @@ export function resolveImage(input, origin) {
   } else {
     url = `${origin}/${v.replace(/^\/+/, '')}`
   }
-  if (SUPABASE_URL && url.includes('.supabase.co/storage/v1/object/public/')) {
-    const transformed = url
-      .replace('/storage/v1/object/', '/storage/v1/render/image/')
-      .replace(/\?[^]*$/, '')
-    return `${transformed}?width=1200&height=630&resize=cover`
+  if (SUPABASE_URL && url.includes('.supabase.co/storage/')) {
+    // Use the fast direct public CDN object URL (no server-side resize transform)
+    // so social crawlers don't time out fetching the og:image.
+    return url.replace('/storage/v1/render/image/', '/storage/v1/object/').replace(/\?[^]*$/, '')
   }
   return url
 }
