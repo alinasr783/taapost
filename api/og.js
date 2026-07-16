@@ -142,7 +142,7 @@ ${extraTags}
 function extractPath(req) {
   const urlObj = new URL(req.url, `https://${req.headers.host || 'localhost'}`)
   const fromQuery = urlObj.searchParams.get('path') || urlObj.searchParams.get('p')
-  if (fromQuery) return fromQuery
+  if (fromQuery) return fromQuery.startsWith('/') ? fromQuery : '/' + fromQuery
   const rawPath = urlObj.pathname
   if (rawPath.startsWith('/og/')) {
     const rest = rawPath.slice(4)
