@@ -26,20 +26,20 @@ export function resolveImage(input, origin) {
   const v = input.trim()
   if (!v) return origin ? `${origin}${DEFAULT_OG_IMAGE}` : DEFAULT_OG_IMAGE
   if (v.startsWith('data:') || v.startsWith('blob:')) return v
-  let url = v
+  let abs
   if (v.startsWith('http://') || v.startsWith('https://')) {
-    url = v
+    abs = v
   } else if (v.startsWith('/')) {
-    url = `${origin}${v}`
+    abs = `${origin}${v}`
   } else {
-    url = `${origin}/${v.replace(/^\/+/, '')}`
+    abs = `${origin}/${v.replace(/^\/+/, '')}`
   }
-  if (SUPABASE_URL && url.includes('.supabase.co/storage/')) {
-    // Use the fast direct public CDN object URL (no server-side resize transform)
-    // so social crawlers don't time out fetching the og:image.
-    return url.replace('/storage/v1/render/image/', '/storage/v1/object/').replace(/\?[^]*$/, '')
+  // Heavy Supabase originals (often >1MB PNGs) make crawlers time out.
+  // Route them through our own resizer so they become a fast 1200x630 WebP.
+  if (abs.toLowerCase().includes('.supabase.co/storage/')) {
+    return `${origin}/api/og-image?url=${encodeURIComponent(abs)}`
   }
-  return url
+  return abs
 }
 
 export function esc(s) {

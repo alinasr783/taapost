@@ -96,14 +96,10 @@ describe('resolveImage', () => {
     expect(resolveImage(url, origin)).toBe(url)
   })
 
-  it('transforms Supabase Storage URLs for OG optimization', () => {
+  it('routes Supabase Storage URLs through our own 1200x630 WebP resizer', () => {
     const supabaseUrl = 'https://test.supabase.co/storage/v1/object/public/media/test.png'
     const result = resolveImage(supabaseUrl, origin)
-    expect(result).toContain('/storage/v1/render/image/public/')
-    expect(result).toContain('width=1200')
-    expect(result).toContain('height=630')
-    expect(result).toContain('resize=cover')
-    expect(result).not.toContain('format=')
+    expect(result).toBe(`${origin}/api/og-image?url=${encodeURIComponent(supabaseUrl)}`)
   })
 
   it('prepends origin for relative paths starting with /', () => {
@@ -182,7 +178,8 @@ describe('buildOGHtml', () => {
     expect(html).toContain('twitter:title" content="عنوان المقال | تاء بوست"')
     expect(html).toContain('twitter:image" content="https://example.com/image.png"')
     expect(html).toContain(`canonical" href="${baseUrl}/article/1"`)
-    expect(html).toContain('meta http-equiv="refresh"')
+    // No HTML refresh redirect (fast crawlers like WhatsApp bail on it)
+    expect(html).not.toContain('http-equiv="refresh"')
   })
 
   it('builds homepage OG HTML with website type', () => {
