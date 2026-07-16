@@ -58,6 +58,7 @@ export function buildOGHtml(title, description, image, url, siteName, ogType = '
 <meta name="description" content="${esc(description)}">
 <meta property="og:locale" content="ar_AR">
 <meta property="og:site_name" content="${esc(siteName)}">
+${process.env.VITE_FB_APP_ID ? `<meta property="fb:app_id" content="${esc(process.env.VITE_FB_APP_ID)}">` : ''}
 <meta property="og:type" content="${esc(ogType)}">
 <meta property="og:title" content="${esc(pageTitle)}">
 <meta property="og:description" content="${esc(description)}">

@@ -136,6 +136,8 @@ export default function Seo(props: Props) {
 
     upsertMetaByProperty('og:locale', 'ar_AR')
     upsertMetaByProperty('og:site_name', site.site_name)
+    const fbAppId = (import.meta as unknown as { env?: Record<string, unknown> }).env?.VITE_FB_APP_ID
+    if (typeof fbAppId === 'string' && fbAppId.trim()) upsertMetaByProperty('fb:app_id', fbAppId.trim())
     upsertMetaByProperty('og:type', ogType)
     upsertMetaByProperty('og:title', title)
     if (description) upsertMetaByProperty('og:description', description)
