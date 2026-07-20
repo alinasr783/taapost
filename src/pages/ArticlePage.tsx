@@ -13,6 +13,7 @@ import { supabase, type Article } from '../lib/supabase'
 import { useTrackView } from '../hooks/useTrackView'
 import Seo from '../components/Seo'
 import ShareButton from '../components/ShareButton'
+import SmartImage from '../components/SmartImage'
 
 function resolveImageSrc(input: string) {
   const src = input.trim()
@@ -251,7 +252,7 @@ export default function ArticlePage() {
           const doc = parser.parseFromString(data.content || '', 'text/html')
           return doc.querySelectorAll('h2')
         } catch {
-          return [] as NodeListOf<HTMLHeadingElement>
+          return [] as unknown as NodeListOf<HTMLHeadingElement>
         }
       })()
       const toc: { id: string; text: string }[] = []
@@ -508,14 +509,13 @@ export default function ArticlePage() {
       </div>
 
       {/* Featured Image (Full Width) */}
-      <div className="relative overflow-hidden rounded-[5px] shadow-lg mb-4 md:mb-8">
-        <img 
-          src={article.image} 
-          alt={article.title} 
-          className="w-full object-cover max-h-[300px] sm:max-h-[400px] md:max-h-[600px]"
-          loading="eager"
-          decoding="async"
-          fetchPriority="high"
+      <div className="relative overflow-hidden rounded-[5px] shadow-lg mb-4 md:mb-8 max-h-[300px] sm:max-h-[400px] md:max-h-[600px]">
+        <SmartImage
+          src={article.image}
+          alt={article.title}
+          eager
+          className="w-full"
+          imgClassName="object-cover max-h-[300px] sm:max-h-[400px] md:max-h-[600px]"
           width={1200}
           height={600}
         />
@@ -580,7 +580,7 @@ export default function ArticlePage() {
             >
               <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-primary/20 shrink-0">
                 {article.authors.image ? (
-                  <img src={article.authors.image} alt={article.authors.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                  <SmartImage src={article.authors.image} alt={article.authors.name} className="w-full h-full" imgClassName="object-cover" />
                 ) : (
                   <div className="w-full h-full bg-primary/10 flex items-center justify-center text-primary text-2xl font-bold">
                     {article.authors.name.charAt(0)}
@@ -615,15 +615,13 @@ export default function ArticlePage() {
                       className="group rounded-[5px] border border-border/40 bg-background/50 overflow-hidden hover:border-primary/30 hover:shadow-md transition-all"
                     >
                       <div className="relative h-40 w-full overflow-hidden">
-                        <img
-                          src={authArticle.image || ''}
+                        <SmartImage
+                          src={authArticle.image}
                           alt={authArticle.title}
-                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                          loading="lazy"
-                          decoding="async"
+                          className="h-full w-full"
+                          imgClassName="object-cover transition-transform duration-500 group-hover:scale-105"
                           width={400}
                           height={160}
-                          onError={(e) => { e.currentTarget.style.display = 'none' }}
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
                         {authArticle.is_exclusive && (
@@ -690,17 +688,13 @@ export default function ArticlePage() {
                   className="relative flex min-w-[360px] max-w-[480px] flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md group"
                 >
                   <div className="relative h-56 w-full">
-                    <img 
-                      src={resolveImageSrc(related.image ?? '')} 
-                      alt={related.title} 
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      loading="lazy"
-                      decoding="async"
+                    <SmartImage
+                      src={resolveImageSrc(related.image ?? '')}
+                      alt={related.title}
+                      className="h-full w-full"
+                      imgClassName="object-cover transition-transform duration-500 group-hover:scale-105"
                       width={480}
                       height={224}
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none'
-                      }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
                     {related.is_exclusive && (

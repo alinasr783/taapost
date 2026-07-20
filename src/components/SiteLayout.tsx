@@ -10,7 +10,9 @@ import {
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase, type Category, type LogoSetting } from '../lib/supabase'
+import { withTimeout } from '../lib/withTimeout'
 import Footer from './Footer'
+import OfflineBanner from './OfflineBanner'
 import { SiteSettingsProvider } from './SiteSettingsProvider'
 import { defaultSiteSettings } from './siteSettingsModel'
 import DynamicIcon from './DynamicIcon'
@@ -79,6 +81,8 @@ export default function SiteLayout({ children }: Props) {
   const navigate = useNavigate()
   const [q, setQ] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
+  const [logoError, setLogoError] = useState(false)
+  const [sidebarLogoError, setSidebarLogoError] = useState(false)
   const location = useLocation()
 
   useEffect(() => {
@@ -92,10 +96,14 @@ export default function SiteLayout({ children }: Props) {
   const categoriesQuery = useQuery({
     queryKey: ['categories'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('id, name, slug, sidebar_order')
-        .order('sidebar_order', { ascending: true, nullsFirst: false })
+      const { data, error } = await withTimeout(
+        supabase
+          .from('categories')
+          .select('id, name, slug, sidebar_order')
+          .order('sidebar_order', { ascending: true, nullsFirst: false }),
+        15_000,
+        'categories',
+      )
 
       if (error) {
         console.error('[SiteLayout] Categories query failed:', error)
@@ -111,7 +119,11 @@ export default function SiteLayout({ children }: Props) {
   const siteSettingsQuery = useQuery({
     queryKey: ['site_settings'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('site_settings').select('site_name, site_description, logo_url, primary_color, secondary_color, show_article_summary, meta_title, meta_description, og_title, og_description, og_image, twitter_handle, keywords').single()
+      const { data, error } = await withTimeout(
+        supabase.from('site_settings').select('site_name, site_description, logo_url, primary_color, secondary_color, show_article_summary, meta_title, meta_description, og_title, og_description, og_image, twitter_handle, keywords').single(),
+        15_000,
+        'site_settings',
+      )
       if (error) throw error
       return data as typeof defaultSiteSettings
     },
@@ -122,11 +134,15 @@ export default function SiteLayout({ children }: Props) {
   const activeLogoQuery = useQuery({
     queryKey: ['logo_settings_active'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('logo_settings')
-        .select('id, logo_url, logo_url_dark, logo_name, logo_width, logo_max_width, logo_height, position_x, position_y, alignment')
-        .eq('is_active', true)
-        .maybeSingle()
+      const { data, error } = await withTimeout(
+        supabase
+          .from('logo_settings')
+          .select('id, logo_url, logo_url_dark, logo_name, logo_width, logo_max_width, logo_height, position_x, position_y, alignment')
+          .eq('is_active', true)
+          .maybeSingle(),
+        15_000,
+        'logo_settings',
+      )
       if (error && error.code !== 'PGRST116') throw error
       return (data as LogoSetting | null) ?? null
     },
@@ -213,6 +229,7 @@ export default function SiteLayout({ children }: Props) {
   return (
     <SiteSettingsProvider value={mergedSettings}>
       <div className="min-h-dvh bg-background text-foreground flex flex-col">
+        <OfflineBanner />
         <header className="sticky top-0 z-50 border-b border-border bg-background shadow-sm py-3">
           <div className="container flex items-stretch justify-between gap-3">
             <Link
@@ -221,7 +238,7 @@ export default function SiteLayout({ children }: Props) {
             >
               {(() => {
                 const displayLogoUrl = getActiveLogoUrl()
-                if (displayLogoUrl) {
+                if (displayLogoUrl && !logoError) {
                    return (
                     <img
                       src={displayLogoUrl}
@@ -229,6 +246,7 @@ export default function SiteLayout({ children }: Props) {
                       className="flex-shrink-0 h-14 w-auto max-w-[160px] object-contain"
                       decoding="async"
                       fetchPriority="high"
+                      onError={() => setLogoError(true)}
                     />
                   )
                 }
@@ -332,13 +350,14 @@ export default function SiteLayout({ children }: Props) {
               >
                 {(() => {
                   const displayLogoUrl = getActiveLogoUrl()
-                  if (displayLogoUrl) {
+                  if (displayLogoUrl && !sidebarLogoError) {
                     return (
                       <img
                         src={displayLogoUrl}
                         alt={siteSettings.site_name}
                         className="h-10 w-10 object-contain flex-shrink-0"
                         decoding="async"
+                        onError={() => setSidebarLogoError(true)}
                       />
                     )
                   }

@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase, type Category } from '../lib/supabase'
+import { withTimeout } from '../lib/withTimeout'
 import Seo from '../components/Seo'
+import SmartImage from '../components/SmartImage'
+import QueryError from '../components/QueryError'
 import { useSiteSettings } from '../components/useSiteSettings'
 
 export default function Categories() {
@@ -9,7 +12,11 @@ export default function Categories() {
   const categoriesQuery = useQuery({
     queryKey: ['categories'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('categories').select('id, name, slug, description, image, order_index').order('order_index', { ascending: true })
+      const { data, error } = await withTimeout(
+        supabase.from('categories').select('id, name, slug, description, image, order_index').order('order_index', { ascending: true }),
+        15_000,
+        'categories',
+      )
       if (error) throw error
       return (data ?? []) as Category[]
     },
@@ -41,6 +48,18 @@ export default function Categories() {
 
   const categories = categoriesQuery.data ?? []
 
+  if (categoriesQuery.isError) {
+    return (
+      <div className="container py-16">
+        <QueryError
+          message="تعذّر تحميل الأقسام. تحقق من اتصالك بالإنترنت."
+          onRetry={() => categoriesQuery.refetch()}
+          isRetrying={categoriesQuery.isFetching}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="container py-8">
       <Seo
@@ -64,12 +83,11 @@ export default function Categories() {
             to={`/category/${c.id}`}
             className="flex flex-col overflow-hidden rounded-[5px] border border-white/10 bg-background/10 shadow-sm backdrop-blur-md hover:bg-background/20"
           >
-            <img
+            <SmartImage
               src={c.image}
               alt={c.name}
-              className="h-40 w-full object-cover"
-              loading="lazy"
-              decoding="async"
+              className="h-40 w-full"
+              imgClassName="object-cover"
             />
             <div className="space-y-2 px-4 py-3 text-right">
               <div className="text-sm font-semibold">{c.name}</div>

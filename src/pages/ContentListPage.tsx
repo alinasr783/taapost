@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase, type Article } from '../lib/supabase'
+import { withTimeout } from '../lib/withTimeout'
 import Seo from '../components/Seo'
+import SmartImage from '../components/SmartImage'
 import { useSiteSettings } from '../components/useSiteSettings'
 
 export default function ContentListPage() {
@@ -10,11 +12,15 @@ export default function ContentListPage() {
   const articlesQuery = useQuery({
     queryKey: ['content_list'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('articles')
-        .select('id,slug,title,excerpt,image,date,is_exclusive,category_id,categories(name)')
-        .eq('type', 'other')
-        .order('date', { ascending: false })
+      const { data, error } = await withTimeout(
+        supabase
+          .from('articles')
+          .select('id,slug,title,excerpt,image,date,is_exclusive,category_id,categories(name)')
+          .eq('type', 'other')
+          .order('date', { ascending: false }),
+        15_000,
+        'content_list',
+      )
 
       if (error) throw error
 
@@ -89,11 +95,11 @@ export default function ContentListPage() {
             className="group flex flex-col rounded-xl border border-border/40 bg-card overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all"
           >
             <div className="relative aspect-[16/9] overflow-hidden">
-              <img
+              <SmartImage
                 src={item.image}
                 alt={item.title}
-                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                loading="lazy"
+                className="h-full w-full"
+                imgClassName="object-cover transition-transform duration-500 group-hover:scale-105"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
               {item.is_exclusive && (

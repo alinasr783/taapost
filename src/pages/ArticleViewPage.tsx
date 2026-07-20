@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase, type Article } from '../lib/supabase'
 import Seo from '../components/Seo'
 import ShareButton from '../components/ShareButton'
+import SmartImage from '../components/SmartImage'
 
 const ARTICLE_STYLE = `
   .article-body {
@@ -158,11 +159,11 @@ export default function ArticleViewPage() {
       }
 
       const authorData = Array.isArray((articleData as Record<string, unknown>).authors)
-        ? ((articleData as Record<string, unknown>).authors as Array<Record<string, unknown>>).length > 0 ? (articleData as Record<string, unknown>).authors[0] : null
+        ? ((articleData as Record<string, unknown>).authors as Array<Record<string, unknown>>).length > 0 ? ((articleData as Record<string, unknown>).authors as Array<Record<string, unknown>>)[0] : null
         : (articleData as Record<string, unknown>).authors
 
       const article: Article = {
-        ...(articleData as Article),
+        ...(articleData as unknown as Article),
         category: (Array.isArray((articleData as Record<string, unknown>).categories)
           ? ((articleData as Record<string, unknown>).categories as Array<Record<string, unknown>>)[0]?.name as string
           : ((articleData as Record<string, unknown>).categories as Record<string, unknown>)?.name as string) || '',
@@ -349,7 +350,7 @@ export default function ArticleViewPage() {
             <Link to={`/author/${article.authors.id}`} className="flex items-center gap-2 hover:text-primary transition-colors">
               <div className="w-10 h-10 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center">
                 {article.authors.image ? (
-                  <img src={article.authors.image} alt={article.authors.name} className="w-full h-full object-cover" />
+                  <SmartImage src={article.authors.image} alt={article.authors.name} className="w-full h-full" imgClassName="object-cover" />
                 ) : (
                   <User size={18} className="text-primary" />
                 )}
@@ -373,14 +374,13 @@ export default function ArticleViewPage() {
 
       {/* Featured Image */}
       {article.image && (
-        <div className="relative overflow-hidden rounded-2xl shadow-lg mb-10">
-          <img
+        <div className="relative overflow-hidden rounded-2xl shadow-lg mb-10 max-h-[500px]">
+          <SmartImage
             src={article.image}
             alt={article.title}
-            className="w-full object-cover max-h-[500px]"
-            loading="eager"
-            decoding="async"
-            fetchPriority="high"
+            eager
+            className="w-full"
+            imgClassName="object-cover max-h-[500px]"
             width={1200}
             height={600}
           />
@@ -439,7 +439,7 @@ export default function ArticleViewPage() {
               <Link to={`/author/${article.authors.id}`} className="flex items-center gap-4 p-4 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors">
                 <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-primary/20 shrink-0">
                   {article.authors.image ? (
-                    <img src={article.authors.image} alt={article.authors.name} className="w-full h-full object-cover" />
+                    <SmartImage src={article.authors.image} alt={article.authors.name} className="w-full h-full" imgClassName="object-cover" />
                   ) : (
                     <div className="w-full h-full bg-primary/10 flex items-center justify-center text-2xl font-bold text-primary">
                       {article.authors.name.charAt(0)}
@@ -479,11 +479,11 @@ export default function ArticleViewPage() {
                 >
                   <div className="relative aspect-[16/9] overflow-hidden bg-muted/30">
                     {item.image ? (
-                      <img
+                      <SmartImage
                         src={item.image}
                         alt={item.title}
-                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        loading="lazy"
+                        className="h-full w-full"
+                        imgClassName="object-cover transition-transform duration-500 group-hover:scale-105"
                       />
                     ) : (
                       <div className="h-full w-full flex items-center justify-center text-muted-foreground/30">
@@ -526,12 +526,11 @@ export default function ArticleViewPage() {
                 className="group rounded-xl border border-border/40 bg-card overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all"
               >
                 <div className="relative aspect-[16/10] overflow-hidden">
-                  <img
-                    src={related.image || ''}
+                  <SmartImage
+                    src={related.image}
                     alt={related.title}
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    loading="lazy"
-                    onError={(e) => { e.currentTarget.style.display = 'none' }}
+                    className="h-full w-full"
+                    imgClassName="object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                   {related.is_exclusive && (
                     <div className="absolute right-2 top-2 rounded-md bg-red-600/80 px-2 py-0.5 text-[10px] text-white font-bold">

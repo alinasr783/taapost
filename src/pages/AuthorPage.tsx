@@ -3,7 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight, User as UserIcon } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase, type Author, type Article } from '../lib/supabase'
+import { withTimeout } from '../lib/withTimeout'
 import Seo from '../components/Seo'
+import SmartImage from '../components/SmartImage'
+import QueryError from '../components/QueryError'
 import { useSiteSettings } from '../components/useSiteSettings'
 
 export default function AuthorPage() {
@@ -20,11 +23,19 @@ export default function AuthorPage() {
 
       let authorData: Author | null = null
       if (authorId) {
-        const { data, error } = await supabase.from('authors').select('id, name, image, image_caption, bio, role, slug, banner, banner_caption, social_links, website').eq('id', authorId).maybeSingle()
+        const { data, error } = await withTimeout(
+          supabase.from('authors').select('id, name, image, image_caption, bio, role, slug, banner, banner_caption, social_links, website').eq('id', authorId).maybeSingle(),
+          15_000,
+          'authors',
+        )
         if (error) throw error
         authorData = (data as Author | null) ?? null
       } else if (authorSlug) {
-        const { data, error } = await supabase.from('authors').select('id, name, image, image_caption, bio, role, slug, banner, banner_caption, social_links, website').eq('slug', authorSlug).maybeSingle()
+        const { data, error } = await withTimeout(
+          supabase.from('authors').select('id, name, image, image_caption, bio, role, slug, banner, banner_caption, social_links, website').eq('slug', authorSlug).maybeSingle(),
+          15_000,
+          'authors',
+        )
         if (error) throw error
         authorData = (data as Author | null) ?? null
         if (authorData) return { author: null, articles: [], redirectToId: authorData.id }
@@ -36,13 +47,17 @@ export default function AuthorPage() {
         category_id?: number
         categories?: { id: number; name: string; slug: string } | { id: number; name: string; slug: string }[] | null
       }
-      const { data: artData, error: artError } = await supabase
-        .from('articles')
-        .select('id,slug,title,excerpt,image,date,is_exclusive,type,category_id,categories(id,name,slug)')
-        .eq('author_id', authorData.id)
-        .eq('type', 'article')
-        .order('date', { ascending: false })
-        .limit(60)
+      const { data: artData, error: artError } = await withTimeout(
+        supabase
+          .from('articles')
+          .select('id,slug,title,excerpt,image,date,is_exclusive,type,category_id,categories(id,name,slug)')
+          .eq('author_id', authorData.id)
+          .eq('type', 'article')
+          .order('date', { ascending: false })
+          .limit(60),
+        15_000,
+        'author_articles',
+      )
 
       if (artError) throw artError
 
@@ -87,6 +102,18 @@ export default function AuthorPage() {
     )
   }
 
+  if (authorQuery.isError) {
+    return (
+      <div className="container py-16">
+        <QueryError
+          message="تعذّر تحميل بيانات الكاتب. تحقق من اتصالك بالإنترنت."
+          onRetry={() => authorQuery.refetch()}
+          isRetrying={authorQuery.isFetching}
+        />
+      </div>
+    )
+  }
+
   if (!author) {
     return (
       <div className="container flex flex-col items-center justify-center py-20 text-center">
@@ -113,7 +140,7 @@ export default function AuthorPage() {
         <div className="relative mb-12">
           <div className="w-full h-40 md:h-56 rounded-[5px] overflow-hidden bg-muted/30">
             {author.banner ? (
-              <img src={author.banner} alt="" className="w-full h-full object-cover" />
+              <SmartImage src={author.banner} alt="" className="w-full h-full" imgClassName="object-cover" />
             ) : (
               <div className="w-full h-full bg-gradient-to-r from-primary/30 via-primary/10 to-transparent" />
             )}
@@ -138,7 +165,7 @@ export default function AuthorPage() {
             <div className="flex flex-col items-center">
               <div className="w-28 h-28 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-background shadow-xl shrink-0 bg-card">
                 {author.image ? (
-                  <img src={author.image} alt={author.name} className="w-full h-full object-cover" />
+                  <SmartImage src={author.image} alt={author.name} className="w-full h-full" imgClassName="object-cover" />
                 ) : (
                   <div className="w-full h-full bg-primary/10 flex items-center justify-center text-primary text-4xl font-bold">{author.name.charAt(0)}</div>
                 )}
@@ -195,11 +222,11 @@ export default function AuthorPage() {
                         className="relative flex min-w-[360px] max-w-[480px] flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md"
                       >
                         <div className="relative h-56 w-full">
-                          <img
-                            src={article.image || ''}
+                          <SmartImage
+                            src={article.image}
                             alt={article.title}
-                            className="h-full w-full object-cover"
-                            loading="lazy"
+                            className="h-full w-full"
+                            imgClassName="object-cover"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
                           {article.is_exclusive && (

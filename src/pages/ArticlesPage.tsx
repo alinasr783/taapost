@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase, type Article } from '../lib/supabase'
 import Seo from '../components/Seo'
+import SmartImage from '../components/SmartImage'
 import { useSiteSettings } from '../components/useSiteSettings'
 import { Search, Calendar, User } from 'lucide-react'
 
@@ -132,11 +133,12 @@ export default function ArticlesPage() {
           className="group block relative overflow-hidden rounded-2xl shadow-lg"
         >
           <div className="relative h-[300px] md:h-[450px] w-full">
-            <img
+            <SmartImage
               src={featured.image}
               alt={featured.title}
-              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-              loading="eager"
+              eager
+              className="h-full w-full"
+              imgClassName="object-cover transition-transform duration-700 group-hover:scale-105"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
             {featured.is_exclusive && (
@@ -153,7 +155,7 @@ export default function ArticlesPage() {
                   <span className="flex items-center gap-1.5 text-white/80 text-sm">
                     <div className="w-5 h-5 rounded-full overflow-hidden bg-white/20">
                       {featured.authors.image ? (
-                        <img src={featured.authors.image} alt={featured.authors.name} className="w-full h-full object-cover" />
+                        <SmartImage src={featured.authors.image} alt={featured.authors.name} className="w-full h-full" imgClassName="object-cover" />
                       ) : (
                         <User size={14} className="text-white/80 w-full h-full p-0.5" />
                       )}
@@ -188,11 +190,11 @@ export default function ArticlesPage() {
               className="group flex flex-col rounded-xl border border-border/40 bg-card overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all"
             >
               <div className="relative aspect-[16/10] overflow-hidden">
-                <img
+                <SmartImage
                   src={article.image}
                   alt={article.title}
-                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  loading="lazy"
+                  className="h-full w-full"
+                  imgClassName="object-cover transition-transform duration-500 group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                 {article.is_exclusive && (
@@ -220,7 +222,7 @@ export default function ArticlesPage() {
                   <div className="flex items-center gap-2 pt-2 border-t border-border/40">
                     <div className="w-7 h-7 rounded-full overflow-hidden bg-primary/10 shrink-0">
                       {article.authors.image ? (
-                        <img src={article.authors.image} alt={article.authors.name} className="w-full h-full object-cover" />
+                        <SmartImage src={article.authors.image} alt={article.authors.name} className="w-full h-full" imgClassName="object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-primary">
                           {article.authors.name.charAt(0)}

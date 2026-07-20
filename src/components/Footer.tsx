@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import type { ContactInfo } from '../lib/supabase'
 import { useSiteSettings } from './useSiteSettings'
+import SmartImage from './SmartImage'
 
 type SocialLink = {
   id: number
@@ -87,14 +88,13 @@ export default function Footer({ siteSettings }: Props) {
           <div className="space-y-4 md:col-span-2">
             <h2 className="text-2xl font-bold text-primary flex items-center gap-2">
               {getLogoUrl() ? (
-                <img
+                <SmartImage
                   src={getLogoUrl()!}
                   alt={siteSettings?.site_name || 'تاء بوست'}
-                  className="h-10 w-10 object-contain"
+                  className="h-10 w-10"
+                  imgClassName="object-contain"
                   width={40}
                   height={40}
-                  loading="lazy"
-                  decoding="async"
                 />
               ) : null}
               <span className="w-2 h-8 bg-primary rounded-full inline-block"></span>

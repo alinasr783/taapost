@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, User as UserIcon, FileText } from 'lucide-react'
 import { supabase, type Author } from '../lib/supabase'
 import Seo from '../components/Seo'
+import SmartImage from '../components/SmartImage'
 import { useSiteSettings } from '../components/useSiteSettings'
 
 export default function AuthorsList() {
@@ -101,10 +102,11 @@ export default function AuthorsList() {
                 <div className="relative mb-4">
                   <div className="w-20 h-20 md:w-24 md:h-24 rounded-full overflow-hidden border-2 border-border/50 group-hover:border-primary/30 transition-colors duration-300">
                     {author.image ? (
-                      <img
+                      <SmartImage
                         src={author.image}
                         alt={author.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        className="w-full h-full"
+                        imgClassName="object-cover group-hover:scale-105 transition-transform duration-500"
                       />
                     ) : (
                       <div className="w-full h-full bg-primary/10 flex items-center justify-center text-primary text-2xl md:text-3xl font-bold">

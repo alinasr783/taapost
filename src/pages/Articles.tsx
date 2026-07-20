@@ -2,7 +2,10 @@ import { useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase, type Article } from '../lib/supabase'
+import { withTimeout } from '../lib/withTimeout'
 import Seo from '../components/Seo'
+import SmartImage from '../components/SmartImage'
+import QueryError from '../components/QueryError'
 import { useSiteSettings } from '../components/useSiteSettings'
 
 export default function Articles() {
@@ -32,7 +35,7 @@ export default function Articles() {
         query = query.or(`title.ilike.${pattern},excerpt.ilike.${pattern}`)
       }
 
-      const { data, error } = await query
+      const { data, error } = await withTimeout(query, 15_000, 'articles_list')
       if (error) throw error
       return (data ?? []) as ArticleCard[]
     },
@@ -41,6 +44,18 @@ export default function Articles() {
   })
 
   const list = articlesQuery.data ?? []
+
+  if (articlesQuery.isError) {
+    return (
+      <div className="container py-16">
+        <QueryError
+          message="تعذّر تحميل المقالات. تحقق من اتصالك بالإنترنت."
+          onRetry={() => articlesQuery.refetch()}
+          isRetrying={articlesQuery.isFetching}
+        />
+      </div>
+    )
+  }
 
   if (articlesQuery.isLoading) {
     return (
@@ -102,11 +117,11 @@ export default function Articles() {
             className="relative flex flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md"
           >
             <div className="relative h-52 w-full">
-              <img
+              <SmartImage
                 src={i.image}
                 alt={i.title}
-                className="h-full w-full object-cover"
-                loading="lazy"
+                className="h-full w-full"
+                imgClassName="object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
               {i.is_exclusive && (

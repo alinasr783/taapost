@@ -2,6 +2,9 @@ import { useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, type Article, type Author, type HomepageSection, type HomepageSlider, type BreakingNewsHero } from '../lib/supabase'
+import { withTimeout } from '../lib/withTimeout'
+import SmartImage from '../components/SmartImage'
+import QueryError from '../components/QueryError'
 import HomeCarousel from '../components/HomeCarousel'
 import BreakingNewsTicker from '../components/BreakingNewsTicker'
 import Seo from '../components/Seo'
@@ -49,7 +52,6 @@ function filterByContentType(articles: Article[], contentType: string): Article[
 
 const emptyArticles: Article[] = []
 const emptySections: HomepageSection[] = []
-const emptyAuthors: Author[] = []
 
 export default function Home() {
   const navigate = useNavigate()
@@ -61,15 +63,20 @@ export default function Home() {
     queryKey: ['home_data', 30],
     queryFn: async () => {
       const [articlesRes, sectionsRes, authorsRes] = await Promise.all([
-        supabase
-          .from('articles')
-          .select('id,slug,title,excerpt,image,image_caption,category_id,type,date,is_exclusive,categories(id,name,slug),authors(id,name,image)')
-          .order('date', { ascending: false })
-          .limit(limit),
-        supabase
-          .from('homepage_sections')
-          .select(
-            `
+        withTimeout(
+          supabase
+            .from('articles')
+            .select('id,slug,title,excerpt,image,image_caption,category_id,type,date,is_exclusive,categories(id,name,slug),authors(id,name,image)')
+            .order('date', { ascending: false })
+            .limit(limit),
+          15_000,
+          'articles',
+        ),
+        withTimeout(
+          supabase
+            .from('homepage_sections')
+            .select(
+              `
             *,
             categories (
               id,
@@ -77,13 +84,20 @@ export default function Home() {
               slug
             )
           `
-          )
-          .eq('is_active', true)
-          .order('display_order', { ascending: true }),
-        supabase
-          .from('authors')
-          .select('id, name, image, bio, role, slug')
-          .order('name'),
+            )
+            .eq('is_active', true)
+            .order('display_order', { ascending: true }),
+          15_000,
+          'homepage_sections',
+        ),
+        withTimeout(
+          supabase
+            .from('authors')
+            .select('id, name, image, bio, role, slug')
+            .order('name'),
+          15_000,
+          'authors',
+        ),
       ])
 
       // Fetch sliders and breaking news separately - fail gracefully if tables don't exist
@@ -91,17 +105,25 @@ export default function Home() {
       let breakingNewsData: BreakingNewsHero[] = []
       try {
         const [slidersRes, breakingRes] = await Promise.all([
-          supabase
-            .from('homepage_sliders')
-            .select('*, categories(id, name, slug), slider_posts(sort_order, articles(id, slug, title, image, date, category_id, type, is_exclusive, categories(id, name, slug)))')
-            .eq('is_active', true)
-            .order('display_order', { ascending: true }),
+          withTimeout(
             supabase
-            .from('breaking_news_hero')
-            .select('*, articles(id, slug, title, image, date, category_id, type, is_exclusive, categories(id, name, slug))')
-            .eq('is_active', true)
-            .order('display_order', { ascending: true }),
-        ])
+              .from('homepage_sliders')
+              .select('*, categories(id, name, slug), slider_posts(sort_order, articles(id, slug, title, image, date, category_id, type, is_exclusive, categories(id, name, slug)))')
+              .eq('is_active', true)
+              .order('display_order', { ascending: true }),
+            15_000,
+            'homepage_sliders',
+          ),
+          withTimeout(
+            supabase
+              .from('breaking_news_hero')
+              .select('*, articles(id, slug, title, image, date, category_id, type, is_exclusive, categories(id, name, slug))')
+              .eq('is_active', true)
+              .order('display_order', { ascending: true }),
+            15_000,
+            'breaking_news_hero',
+          ),
+          ])
         if (slidersRes.data) slidersData = slidersRes.data as HomepageSlider[]
         if (breakingRes.data) breakingNewsData = breakingRes.data as BreakingNewsHero[]
       } catch {
@@ -159,7 +181,6 @@ export default function Home() {
 
   const articlesData = homeQuery.data?.articles
   const sections = homeQuery.data?.sections ?? emptySections
-  const authorsData = homeQuery.data?.authors ?? emptyAuthors
   const slidersData = homeQuery.data?.sliders ?? []
   const breakingNewsData = homeQuery.data?.breakingNews ?? []
   const hadData = useRef(false)
@@ -197,10 +218,12 @@ export default function Home() {
           : data.authors
 
         const article: Article = {
-          ...(data as Article),
-          category: (Array.isArray(data.categories) ? data.categories[0]?.name : data.categories?.name) || '',
+          ...(data as unknown as Article),
+          category: (Array.isArray((data as Record<string, unknown>).categories)
+            ? ((data as Record<string, unknown>).categories as Array<Record<string, unknown>>)[0]?.name
+            : ((data as Record<string, unknown>).categories as Record<string, unknown>)?.name) || '',
           authors: authorData,
-          contentHtml: data.content || '',
+          contentHtml: ((data as Record<string, unknown>).content as string) || '',
         } as Article
 
         return {
@@ -265,8 +288,12 @@ export default function Home() {
 
     if (homeQuery.isError) {
       return (
-        <div className="container py-8 text-center text-muted-foreground">
-          <p>تعذر تحميل الصفحة. حاول مرة أخرى.</p>
+        <div className="container py-16">
+          <QueryError
+            message="تعذّر تحميل الصفحة الرئيسية. تحقق من اتصالك بالإنترنت."
+            onRetry={() => homeQuery.refetch()}
+            isRetrying={homeQuery.isFetching}
+          />
         </div>
       )
     }
@@ -381,15 +408,14 @@ export default function Home() {
                                  className="group cursor-pointer space-y-3"
                             >
                                  <div className="relative aspect-video overflow-hidden rounded-lg shadow-sm group-hover:shadow-md transition-all border border-border/50 group-hover:border-primary/50">
-                                     <img 
-                                        src={article.image} 
-                                        alt={article.title}
-                                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                        loading="lazy"
-                                        decoding="async"
-                                        width={640}
-                                        height={360}
-                                     />
+                                      <SmartImage
+                                         src={article.image}
+                                         alt={article.title}
+                                         className="h-full w-full"
+                                         imgClassName="object-cover transition-transform duration-500 group-hover:scale-105"
+                                         width={640}
+                                         height={360}
+                                      />
                                 </div>
                                 <div className="space-y-2">
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -408,7 +434,7 @@ export default function Home() {
                                       <div className="flex items-center gap-1.5 pt-1">
                                         <div className="w-5 h-5 rounded-full overflow-hidden bg-primary/10 shrink-0">
                                           {article.authors.image ? (
-                                            <img src={article.authors.image} alt={article.authors.name} className="w-full h-full object-cover" />
+                                             <SmartImage src={article.authors.image} alt={article.authors.name} className="w-full h-full" imgClassName="object-cover" />
                                           ) : (
                                             <div className="w-full h-full flex items-center justify-center text-[8px] font-bold text-primary">
                                               {article.authors.name.charAt(0)}
@@ -453,7 +479,7 @@ export default function Home() {
                        <div className="absolute right-0 top-3 bottom-3 w-0.5 bg-primary/0 group-hover:bg-primary/30 rounded-full transition-all duration-300" />
                        <div className="relative w-16 h-16 md:w-[72px] md:h-[72px] rounded-2xl overflow-hidden border-2 border-primary/10 shrink-0 bg-gradient-to-br from-primary/10 to-primary/5 shadow-sm group-hover:shadow-md group-hover:border-primary/30 transition-all duration-300">
                          {article.authors?.image ? (
-                           <img src={article.authors.image} alt={article.authors.name} className="w-full h-full object-cover" />
+                            <SmartImage src={article.authors.image} alt={article.authors.name} className="w-full h-full" imgClassName="object-cover" />
                          ) : (
                            <div className="w-full h-full flex items-center justify-center text-xl font-bold text-primary">
                              {article.authors?.name?.charAt(0) || '?'}
@@ -528,15 +554,14 @@ export default function Home() {
                       className="relative flex min-w-[360px] max-w-[480px] flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md"
                     >
                       <div className="relative h-56 w-full">
-                        <img
-                          src={article.image}
-                          alt={article.title}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                          decoding="async"
-                          width={480}
-                          height={224}
-                        />
+                         <SmartImage
+                           src={article.image}
+                           alt={article.title}
+                           className="h-full w-full"
+                           imgClassName="object-cover"
+                           width={480}
+                           height={224}
+                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
                         {article.is_exclusive && (
                           <div className="absolute right-2 top-2 rounded-[5px] border border-white/30 px-2 py-1 text-[11px] text-white/90 backdrop-blur bg-red-600/80 font-bold">
@@ -625,12 +650,12 @@ export default function Home() {
                         </p>
                       </div>
                       <div className="w-32 h-24 shrink-0 rounded-lg overflow-hidden">
-                        <img
-                          src={article.image}
-                          alt={article.title}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
+                         <SmartImage
+                           src={article.image}
+                           alt={article.title}
+                           className="w-full h-full"
+                           imgClassName="object-cover"
+                         />
                       </div>
                     </button>
                   ))}
@@ -664,15 +689,14 @@ export default function Home() {
                       className="group cursor-pointer space-y-3"
                     >
                       <div className="relative aspect-video overflow-hidden rounded-lg shadow-sm group-hover:shadow-md transition-all border border-border/50 group-hover:border-primary/50">
-                        <img
-                          src={article.image}
-                          alt={article.title}
-                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                          loading="lazy"
-                          decoding="async"
-                          width={640}
-                          height={360}
-                        />
+                         <SmartImage
+                           src={article.image}
+                           alt={article.title}
+                           className="h-full w-full"
+                           imgClassName="object-cover transition-transform duration-500 group-hover:scale-105"
+                           width={640}
+                           height={360}
+                         />
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">

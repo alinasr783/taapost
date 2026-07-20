@@ -132,7 +132,7 @@ export default function DashboardHome() {
       const articleCounts = new Map<string, number>()
       const articleTitles = new Map<string, string>()
       
-      for (const view of views as ViewRow[]) {
+      for (const view of views as unknown as ViewRow[]) {
         if (!view.article) continue
         const id = String(view.article_id)
         articleCounts.set(id, (articleCounts.get(id) || 0) + 1)
@@ -150,7 +150,7 @@ export default function DashboardHome() {
 
       // 2. Top 5 Locations
       const locationCounts = new Map<string, number>()
-      for (const view of views as ViewRow[]) {
+      for (const view of views as unknown as ViewRow[]) {
         const loc = view.country || 'Unknown'
         locationCounts.set(loc, (locationCounts.get(loc) || 0) + 1)
       }
@@ -162,7 +162,7 @@ export default function DashboardHome() {
 
       // 3. Top 5 Times (hours)
       const timeCounts = new Map<string, number>()
-      for (const view of views as ViewRow[]) {
+      for (const view of views as unknown as ViewRow[]) {
         const hour = new Date(view.viewed_at).getHours()
         const timeLabel = `${hour}:00`
         timeCounts.set(timeLabel, (timeCounts.get(timeLabel) || 0) + 1)
@@ -174,7 +174,7 @@ export default function DashboardHome() {
 
       // 4. Top 5 Categories
       const categoryCounts = new Map<string, number>()
-      for (const view of views as ViewRow[]) {
+      for (const view of views as unknown as ViewRow[]) {
         const catName = view.article?.categories?.name
         if (!catName) continue
         categoryCounts.set(catName, (categoryCounts.get(catName) || 0) + 1)

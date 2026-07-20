@@ -133,7 +133,7 @@ export default function DashboardArticles() {
       if (count !== null) setTotalCount(count)
 
       if (data && data.length > 0) {
-        const normalized = (data as unknown[]).map((a: Record<string, unknown>) => {
+        const normalized = (data as Record<string, unknown>[]).map((a) => {
           const joinedCats = a.categories
           const cat = Array.isArray(joinedCats) ? (joinedCats[0] as Record<string, unknown> ?? null) : (joinedCats ?? null)
           const joinedAuthors = a.authors

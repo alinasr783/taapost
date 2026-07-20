@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Article } from '../lib/supabase'
+import SmartImage from './SmartImage'
 
 type Props = {
   articles: Article[]
@@ -91,13 +92,12 @@ export default function HomeCarousel({ articles, title }: Props) {
             className="relative w-full flex-shrink-0 snap-center h-64 sm:h-80 md:h-[380px] lg:h-[430px] cursor-pointer"
             onClick={() => navigate(articleUrl(slide))}
           >
-            <img
+            <SmartImage
               src={slide.image}
               alt={slide.title}
-              className="h-full w-full object-cover"
-              loading={index === 0 ? 'eager' : 'lazy'}
-              decoding="async"
-              fetchPriority={index === 0 ? 'high' : 'auto'}
+              className="h-full w-full"
+              imgClassName="object-cover"
+              eager={index === 0}
               width={1200}
               height={430}
             />

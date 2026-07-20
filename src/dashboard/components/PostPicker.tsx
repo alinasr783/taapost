@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase, type Article, type Category } from '../../lib/supabase'
-import { Search, Plus, X } from 'lucide-react'
+import { Search, X } from 'lucide-react'
 
 type Props = {
   categoryId: number

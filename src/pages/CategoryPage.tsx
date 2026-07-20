@@ -3,7 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase, type Category, type Article } from '../lib/supabase'
+import { withTimeout } from '../lib/withTimeout'
 import Seo from '../components/Seo'
+import SmartImage from '../components/SmartImage'
+import QueryError from '../components/QueryError'
 import { useSiteSettings } from '../components/useSiteSettings'
 
 export default function CategoryPage() {
@@ -19,11 +22,19 @@ export default function CategoryPage() {
 
       let catData: Category | null = null
       if (categoryId) {
-        const { data, error } = await supabase.from('categories').select('id, name, slug, description, image, image_caption').eq('id', categoryId).maybeSingle()
+        const { data, error } = await withTimeout(
+          supabase.from('categories').select('id, name, slug, description, image, image_caption').eq('id', categoryId).maybeSingle(),
+          15_000,
+          'categories',
+        )
         if (error) throw error
         catData = (data as Category | null) ?? null
       } else if (categorySlug) {
-        const { data, error } = await supabase.from('categories').select('id, name, slug, description, image, image_caption').eq('slug', categorySlug).maybeSingle()
+        const { data, error } = await withTimeout(
+          supabase.from('categories').select('id, name, slug, description, image, image_caption').eq('slug', categorySlug).maybeSingle(),
+          15_000,
+          'categories',
+        )
         if (error) throw error
         catData = (data as Category | null) ?? null
         if (catData) {
@@ -36,17 +47,21 @@ export default function CategoryPage() {
       }
 
       type CategoryArticle = Pick<Article, 'id' | 'slug' | 'title' | 'excerpt' | 'image' | 'date' | 'is_exclusive' | 'type'> & { authors?: { name: string; image?: string } | null }
-      const { data: artData, error: artError } = await supabase
-        .from('articles')
-        .select('id,slug,title,excerpt,image,date,is_exclusive,type,authors(name,image)')
-        .eq('category_id', catData.id)
-        .neq('type', 'article')
-        .order('date', { ascending: false })
-        .limit(60)
+      const { data: artData, error: artError } = await withTimeout(
+        supabase
+          .from('articles')
+          .select('id,slug,title,excerpt,image,date,is_exclusive,type,authors(name,image)')
+          .eq('category_id', catData.id)
+          .neq('type', 'article')
+          .order('date', { ascending: false })
+          .limit(60),
+        15_000,
+        'category_articles',
+      )
 
       if (artError) throw artError
 
-      const normalized = ((artData ?? []) as unknown[]).map((a: Record<string, unknown>) => {
+      const normalized = ((artData ?? []) as Record<string, unknown>[]).map((a) => {
         const joinedAuthors = a.authors
         const authorRow = Array.isArray(joinedAuthors) ? (joinedAuthors[0] as Record<string, unknown>) : joinedAuthors
         return { ...a, authors: authorRow || null } as unknown as CategoryArticle
@@ -100,6 +115,18 @@ export default function CategoryPage() {
             ))}
           </div>
         </div>
+      </div>
+    )
+  }
+
+  if (categoryQuery.isError) {
+    return (
+      <div className="container py-16">
+        <QueryError
+          message="تعذّر تحميل القسم. تحقق من اتصالك بالإنترنت."
+          onRetry={() => categoryQuery.refetch()}
+          isRetrying={categoryQuery.isFetching}
+        />
       </div>
     )
   }
@@ -166,11 +193,11 @@ export default function CategoryPage() {
                 className="relative flex flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md hover:border-white/20 transition-colors w-full"
               >
                 <div className="relative h-56 w-full">
-                  <img
+                  <SmartImage
                     src={i.image}
                     alt={i.title}
-                    className="h-full w-full object-cover"
-                    loading="lazy"
+                    className="h-full w-full"
+                    imgClassName="object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
                   {i.is_exclusive && (
@@ -192,7 +219,7 @@ export default function CategoryPage() {
                         <div className="flex items-center gap-1.5 mt-1">
                           <div className="w-4 h-4 rounded-full overflow-hidden bg-white/20 shrink-0">
                             {i.authors.image ? (
-                              <img src={i.authors.image} alt={i.authors.name} className="w-full h-full object-cover" />
+                              <SmartImage src={i.authors.image} alt={i.authors.name} className="w-full h-full" imgClassName="object-cover" />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-[6px] font-bold text-white">
                                 {i.authors.name.charAt(0)}
