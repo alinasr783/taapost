@@ -153,7 +153,7 @@ export default function BreakingNewsForm({ existing, categories, onSave, onCance
                 >
                   <div className="w-10 h-8 rounded overflow-hidden bg-muted shrink-0">
                     {article.image ? (
-                      <img src={article.image} alt="" className="w-full h-full object-cover" />
+                      <img src={article.image} alt="" className="w-full h-full object-contain bg-muted/40" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-[8px] text-muted-foreground">صورة</div>
                     )}
@@ -188,7 +188,7 @@ export default function BreakingNewsForm({ existing, categories, onSave, onCance
           <div className="flex items-center gap-3">
             {selectedArticle.image && (
               <div className="w-16 h-12 rounded overflow-hidden shrink-0">
-                <img src={selectedArticle.image} alt="" className="w-full h-full object-cover" />
+                <img src={selectedArticle.image} alt="" className="w-full h-full object-contain bg-muted/40" />
               </div>
             )}
             <p className="text-sm font-medium text-foreground">{selectedArticle.title}</p>

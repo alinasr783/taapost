@@ -407,12 +407,13 @@ export default function Home() {
                                  onMouseEnter={() => prefetchArticle(article.id)}
                                  className="group cursor-pointer space-y-3"
                             >
-                                 <div className="relative aspect-video overflow-hidden rounded-lg shadow-sm group-hover:shadow-md transition-all border border-border/50 group-hover:border-primary/50">
-                                      <SmartImage
+                                 <div className="relative aspect-video overflow-hidden rounded-lg shadow-sm group-hover:shadow-md transition-all border border-border/50 group-hover:border-primary/50 bg-muted/20">
+                                       <SmartImage
                                          src={article.image}
                                          alt={article.title}
                                          className="h-full w-full"
-                                         imgClassName="object-cover transition-transform duration-500 group-hover:scale-105"
+                                         objectFit="contain"
+                                         imgClassName="object-contain transition-transform duration-500 group-hover:scale-[1.02]"
                                          width={640}
                                          height={360}
                                       />
@@ -553,12 +554,13 @@ export default function Home() {
                       onMouseEnter={() => prefetchArticle(article.id)}
                       className="relative flex min-w-[360px] max-w-[480px] flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md"
                     >
-                      <div className="relative h-56 w-full">
+                      <div className="relative h-56 w-full bg-black">
                          <SmartImage
                            src={article.image}
                            alt={article.title}
                            className="h-full w-full"
-                           imgClassName="object-cover"
+                           objectFit="contain"
+                           imgClassName="object-contain"
                            width={480}
                            height={224}
                          />
@@ -649,12 +651,13 @@ export default function Home() {
                           {article.excerpt}
                         </p>
                       </div>
-                      <div className="w-32 h-24 shrink-0 rounded-lg overflow-hidden">
+                      <div className="w-32 h-24 shrink-0 rounded-lg overflow-hidden bg-muted/20">
                          <SmartImage
                            src={article.image}
                            alt={article.title}
                            className="w-full h-full"
-                           imgClassName="object-cover"
+                           objectFit="contain"
+                           imgClassName="object-contain"
                          />
                       </div>
                     </button>
@@ -688,12 +691,13 @@ export default function Home() {
                       onMouseEnter={() => prefetchArticle(article.id)}
                       className="group cursor-pointer space-y-3"
                     >
-                      <div className="relative aspect-video overflow-hidden rounded-lg shadow-sm group-hover:shadow-md transition-all border border-border/50 group-hover:border-primary/50">
+                      <div className="relative aspect-video overflow-hidden rounded-lg shadow-sm group-hover:shadow-md transition-all border border-border/50 group-hover:border-primary/50 bg-muted/20">
                          <SmartImage
                            src={article.image}
                            alt={article.title}
                            className="h-full w-full"
-                           imgClassName="object-cover transition-transform duration-500 group-hover:scale-105"
+                           objectFit="contain"
+                           imgClassName="object-contain transition-transform duration-500 group-hover:scale-[1.02]"
                            width={640}
                            height={360}
                          />

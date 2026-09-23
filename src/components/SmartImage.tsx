@@ -17,6 +17,12 @@ type Props = {
   fallbackSrc?: string
   /** When true, no placeholder is rendered for a missing/broken image. */
   hideOnError?: boolean
+  /**
+   * When objectFit is 'contain', render a blurred filled backdrop behind the
+   * full image so cards keep uniform height while the image appears complete
+   * (no cropping). Defaults to true for contain.
+   */
+  withBlurBackground?: boolean
 }
 
 export default function SmartImage({
@@ -31,6 +37,7 @@ export default function SmartImage({
   objectFit = 'cover',
   fallbackSrc,
   hideOnError = false,
+  withBlurBackground = true,
 }: Props) {
   const [loaded, setLoaded] = useState(false)
   const [errored, setErrored] = useState(false)
@@ -57,12 +64,27 @@ export default function SmartImage({
     )
   }
 
+  const isContain = objectFit === 'contain'
+  const showBlur = isContain && withBlurBackground && !!finalSrc
+
   return (
     <div
       className={`relative overflow-hidden bg-muted/30 ${className}`}
       style={wrapperStyle}
     >
       {!loaded && <div className="absolute inset-0 animate-pulse bg-muted/40" />}
+      {showBlur && (
+        <img
+          src={finalSrc ?? ''}
+          alt=""
+          aria-hidden
+          loading={eager ? 'eager' : 'lazy'}
+          decoding="async"
+          onLoad={() => setLoaded(true)}
+          onError={() => setErrored(true)}
+          className="absolute inset-0 h-full w-full scale-110 object-cover blur-xl opacity-50"
+        />
+      )}
       <img
         src={finalSrc ?? ''}
         alt={alt}
@@ -73,7 +95,7 @@ export default function SmartImage({
         fetchPriority={eager ? 'high' : 'auto'}
         onLoad={() => setLoaded(true)}
         onError={() => setErrored(true)}
-        className={`h-full w-full transition-opacity duration-300 ${
+        className={`relative z-10 h-full w-full transition-opacity duration-300 ${
           loaded ? 'opacity-100' : 'opacity-0'
         } ${imgClassName}`}
         style={{ objectFit }}

@@ -94,12 +94,13 @@ export default function ContentListPage() {
             to={`/post/${item.id}`}
             className="group flex flex-col rounded-xl border border-border/40 bg-card overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all"
           >
-            <div className="relative aspect-[16/9] overflow-hidden">
+            <div className="relative aspect-[16/9] overflow-hidden bg-muted/20">
               <SmartImage
                 src={item.image}
                 alt={item.title}
                 className="h-full w-full"
-                imgClassName="object-cover transition-transform duration-500 group-hover:scale-105"
+                objectFit="contain"
+                imgClassName="object-contain transition-transform duration-500 group-hover:scale-[1.02]"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
               {item.is_exclusive && (

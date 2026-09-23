@@ -508,14 +508,15 @@ export default function ArticlePage() {
         )}
       </div>
 
-      {/* Featured Image (Full Width) */}
-      <div className="relative overflow-hidden rounded-[5px] shadow-lg mb-4 md:mb-8 max-h-[300px] sm:max-h-[400px] md:max-h-[600px]">
+      {/* Featured Image (Full Width - complete without cropping) */}
+      <div className="relative overflow-hidden rounded-[5px] shadow-lg mb-4 md:mb-8 bg-muted/20">
         <SmartImage
           src={article.image}
           alt={article.title}
           eager
           className="w-full"
-          imgClassName="object-cover max-h-[300px] sm:max-h-[400px] md:max-h-[600px]"
+          objectFit="contain"
+          imgClassName="object-contain w-full h-auto max-h-[600px]"
           width={1200}
           height={600}
         />
@@ -614,12 +615,13 @@ export default function ArticlePage() {
                       to={buildContentUrl(authArticle)}
                       className="group rounded-[5px] border border-border/40 bg-background/50 overflow-hidden hover:border-primary/30 hover:shadow-md transition-all"
                     >
-                      <div className="relative h-40 w-full overflow-hidden">
+                      <div className="relative h-40 w-full overflow-hidden bg-black">
                         <SmartImage
                           src={authArticle.image}
                           alt={authArticle.title}
                           className="h-full w-full"
-                          imgClassName="object-cover transition-transform duration-500 group-hover:scale-105"
+                          objectFit="contain"
+                          imgClassName="object-contain transition-transform duration-500 group-hover:scale-[1.02]"
                           width={400}
                           height={160}
                         />
@@ -687,12 +689,13 @@ export default function ArticlePage() {
                   to={buildContentUrl(related)}
                   className="relative flex min-w-[360px] max-w-[480px] flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md group"
                 >
-                  <div className="relative h-56 w-full">
+                  <div className="relative h-56 w-full bg-black">
                     <SmartImage
                       src={resolveImageSrc(related.image ?? '')}
                       alt={related.title}
                       className="h-full w-full"
-                      imgClassName="object-cover transition-transform duration-500 group-hover:scale-105"
+                      objectFit="contain"
+                      imgClassName="object-contain transition-transform duration-500 group-hover:scale-[1.02]"
                       width={480}
                       height={224}
                     />

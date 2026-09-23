@@ -31,7 +31,7 @@ function SortablePostItem({ article, onRemove, index }: { article: Article; onRe
       <span className="text-xs text-muted-foreground w-5 text-center shrink-0">{index + 1}</span>
       <div className="w-10 h-8 rounded overflow-hidden bg-muted shrink-0">
         {article.image ? (
-          <img src={article.image} alt="" className="w-full h-full object-cover" />
+          <img src={article.image} alt="" className="w-full h-full object-contain bg-muted/40" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-[8px] text-muted-foreground">صورة</div>
         )}

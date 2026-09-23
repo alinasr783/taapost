@@ -450,7 +450,7 @@ export default function DashboardHomeCustomization() {
                 <div key={item.id} className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg border border-border">
                   <div className="w-16 h-12 rounded overflow-hidden bg-muted shrink-0">
                     {item.articles?.image ? (
-                      <img src={item.articles.image} alt="" className="w-full h-full object-cover" />
+                      <img src={item.articles.image} alt="" className="w-full h-full object-contain bg-muted/40" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-[8px] text-muted-foreground">صورة</div>
                     )}

@@ -192,12 +192,13 @@ export default function CategoryPage() {
                 onClick={() => navigate(i.type === 'article' ? `/article/${i.id}` : `/post/${i.id}`)}
                 className="relative flex flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md hover:border-white/20 transition-colors w-full"
               >
-                <div className="relative h-56 w-full">
+                <div className="relative h-56 w-full bg-black">
                   <SmartImage
                     src={i.image}
                     alt={i.title}
                     className="h-full w-full"
-                    imgClassName="object-cover"
+                    objectFit="contain"
+                    imgClassName="object-contain"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
                   {i.is_exclusive && (
