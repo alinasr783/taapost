@@ -45,7 +45,7 @@ export default function ImageWithCaptionModal({ open, onClose, onInsert }: Props
       onClick={handleClose}
     >
       <div
-        className="bg-card rounded-lg shadow-xl w-full max-w-md p-6 border border-border mx-4"
+        className="bg-card rounded-lg shadow-xl w-full max-w-2xl p-6 border border-border mx-4 max-h-[92vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">

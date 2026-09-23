@@ -6,6 +6,7 @@ import { supabase, type Article } from '../lib/supabase'
 import Seo from '../components/Seo'
 import ShareButton from '../components/ShareButton'
 import SmartImage from '../components/SmartImage'
+import ArticleHeroImage from '../components/ArticleHeroImage'
 
 const ARTICLE_STYLE = `
   .article-body {
@@ -42,7 +43,8 @@ const ARTICLE_STYLE = `
   }
   .article-body a { color: hsl(var(--primary)); text-decoration: none; }
   .article-body a:hover { text-decoration: underline; }
-  .article-body img { max-width: 100%; height: auto; border-radius: 8px; display: block; margin: 1.5em 0; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .article-body img { width: 100%; height: auto; max-height: 75vh; object-fit: contain; border-radius: 8px; display: block; margin: 0 auto; background: hsl(var(--muted) / 0.3); }
+  .article-body figure.article-image { position: relative; overflow: hidden; border-radius: 8px; background: hsl(var(--muted) / 0.3); box-shadow: 0 10px 25px rgba(0,0,0,0.08); }
   .article-body blockquote {
     border-right: 4px solid hsl(var(--primary));
     background: hsl(var(--primary) / 0.05);
@@ -150,9 +152,9 @@ export default function ArticleViewPage() {
             }
           }
           const captionHtml = caption
-            ? `<figcaption style="font-size:0.875rem;opacity:0.7;margin-top:0.5em;text-align:center;color:hsl(var(--foreground));">${caption}</figcaption>`
+            ? `<figcaption style="font-size:0.875rem;opacity:0.7;margin-top:0.5em;text-align:center;color:hsl(var(--foreground));position:relative;z-index:10;">${caption}</figcaption>`
             : ''
-          return `<figure class="article-image" style="margin:1.5em 0;text-align:center;"><img src="${url}" alt="${caption}" style="max-width:100%;height:auto;border-radius:0.5rem;" />${captionHtml}</figure>`
+          return `<figure class="article-image" style="position:relative;margin:1.5em 0;text-align:center;overflow:hidden;border-radius:0.5rem;background:hsl(var(--muted) / 0.3);"><img src="${url}" alt="" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:blur(24px);opacity:0.4;transform:scale(1.1);pointer-events:none;" /><img src="${url}" alt="${caption}" style="position:relative;z-index:10;width:100%;height:auto;max-height:75vh;object-fit:contain;margin:0 auto;border-radius:0.5rem;" />${captionHtml}</figure>`
         })
       } catch {
         contentHtml = (articleData as Record<string, unknown>).content as string || ''
@@ -372,23 +374,15 @@ export default function ArticleViewPage() {
         </div>
       </div>
 
-      {/* Featured Image */}
+      {/* Featured Image — full, never cropped */}
       {article.image && (
-        <div className="relative overflow-hidden rounded-2xl shadow-lg mb-10 max-h-[500px]">
-          <SmartImage
+        <div className="mb-10">
+          <ArticleHeroImage
             src={article.image}
             alt={article.title}
-            eager
-            className="w-full"
-            imgClassName="object-cover max-h-[500px]"
-            width={1200}
-            height={600}
+            caption={article.image_caption}
+            roundedClass="rounded-2xl"
           />
-          {article.image_caption && (
-            <p className="text-sm text-center text-muted-foreground py-2 px-4 bg-muted/30">
-              {article.image_caption}
-            </p>
-          )}
         </div>
       )}
 
