@@ -95,9 +95,8 @@ export default function HomeCarousel({ articles, title }: Props) {
             <SmartImage
               src={slide.image}
               alt={slide.title}
-              className="h-full w-full bg-black"
-              objectFit="contain"
-              imgClassName="object-contain"
+              className="h-full w-full"
+              imgClassName="object-cover"
               eager={index === 0}
               width={1200}
               height={430}

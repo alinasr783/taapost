@@ -87,8 +87,7 @@ export default function Categories() {
               src={c.image}
               alt={c.name}
               className="h-40 w-full"
-              objectFit="contain"
-              imgClassName="object-contain"
+              imgClassName="object-cover"
             />
             <div className="space-y-2 px-4 py-3 text-right">
               <div className="text-sm font-semibold">{c.name}</div>

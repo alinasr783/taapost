@@ -132,14 +132,13 @@ export default function ArticlesPage() {
           to={featured.type === 'article' ? `/article/${featured.id}` : `/post/${featured.id}`}
           className="group block relative overflow-hidden rounded-2xl shadow-lg"
         >
-          <div className="relative h-[300px] md:h-[450px] w-full bg-black">
+          <div className="relative h-[300px] md:h-[450px] w-full">
             <SmartImage
               src={featured.image}
               alt={featured.title}
               eager
               className="h-full w-full"
-              objectFit="contain"
-              imgClassName="object-contain transition-transform duration-700 group-hover:scale-[1.02]"
+              imgClassName="object-cover transition-transform duration-700 group-hover:scale-105"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
             {featured.is_exclusive && (
@@ -190,13 +189,12 @@ export default function ArticlesPage() {
               to={`/article/${article.id}`}
               className="group flex flex-col rounded-xl border border-border/40 bg-card overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all"
             >
-              <div className="relative aspect-[16/10] overflow-hidden bg-muted/20">
+              <div className="relative aspect-[16/10] overflow-hidden">
                 <SmartImage
                   src={article.image}
                   alt={article.title}
                   className="h-full w-full"
-                  objectFit="contain"
-                  imgClassName="object-contain transition-transform duration-500 group-hover:scale-[1.02]"
+                  imgClassName="object-cover transition-transform duration-500 group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                 {article.is_exclusive && (

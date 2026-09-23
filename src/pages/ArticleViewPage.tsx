@@ -372,16 +372,15 @@ export default function ArticleViewPage() {
         </div>
       </div>
 
-      {/* Featured Image - complete without cropping */}
+      {/* Featured Image */}
       {article.image && (
-        <div className="relative overflow-hidden rounded-2xl shadow-lg mb-10 bg-muted/20">
+        <div className="relative overflow-hidden rounded-2xl shadow-lg mb-10 max-h-[500px]">
           <SmartImage
             src={article.image}
             alt={article.title}
             eager
             className="w-full"
-            objectFit="contain"
-            imgClassName="object-contain w-full h-auto max-h-[500px]"
+            imgClassName="object-cover max-h-[500px]"
             width={1200}
             height={600}
           />
@@ -478,14 +477,13 @@ export default function ArticleViewPage() {
                   to={`/article/${item.id}`}
                   className="group rounded-xl border border-border/30 bg-card overflow-hidden hover:shadow-md hover:border-primary/25 transition-all"
                 >
-                  <div className="relative aspect-[16/9] overflow-hidden bg-muted/20">
+                  <div className="relative aspect-[16/9] overflow-hidden bg-muted/30">
                     {item.image ? (
                       <SmartImage
                         src={item.image}
                         alt={item.title}
                         className="h-full w-full"
-                        objectFit="contain"
-                        imgClassName="object-contain transition-transform duration-500 group-hover:scale-[1.02]"
+                        imgClassName="object-cover transition-transform duration-500 group-hover:scale-105"
                       />
                     ) : (
                       <div className="h-full w-full flex items-center justify-center text-muted-foreground/30">
@@ -527,13 +525,12 @@ export default function ArticleViewPage() {
                 to={`/article/${related.id}`}
                 className="group rounded-xl border border-border/40 bg-card overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all"
               >
-                <div className="relative aspect-[16/10] overflow-hidden bg-muted/20">
+                <div className="relative aspect-[16/10] overflow-hidden">
                   <SmartImage
                     src={related.image}
                     alt={related.title}
                     className="h-full w-full"
-                    objectFit="contain"
-                    imgClassName="object-contain transition-transform duration-500 group-hover:scale-[1.02]"
+                    imgClassName="object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                   {related.is_exclusive && (
                     <div className="absolute right-2 top-2 rounded-md bg-red-600/80 px-2 py-0.5 text-[10px] text-white font-bold">
