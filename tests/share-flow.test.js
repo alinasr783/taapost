@@ -74,7 +74,7 @@ describe('Share URL → Crawler Response flow', () => {
       expect(res.status).toBe(200)
       const html = await res.text()
       expect(html).toContain('og:image" content="')
-      expect(html).toContain('storage/v1/render/image/')
+      expect(html).toContain('storage/v1/object/public/')
       expect(html).toContain('og:title" content="عنوان المقال | تاء بوست"')
       expect(html).toContain(`og:url" content="https://www.taapost.com/article/25"`)
     })

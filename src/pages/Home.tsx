@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, type Article, type Author, type HomepageSection, type HomepageSlider, type BreakingNewsHero } from '../lib/supabase'
 import { withTimeout } from '../lib/withTimeout'
-import { getArticlePreview, openArticle, navigateInstant } from '../utils/instantNav'
-import { preloadImage } from '../utils/supabaseImage'
+import { navigateInstant, openArticle, setArticlePreview } from '../utils/instantNav'
 import SmartImage from '../components/SmartImage'
 import QueryError from '../components/QueryError'
 import HomeCarousel from '../components/HomeCarousel'
@@ -198,53 +197,12 @@ export default function Home() {
   }
 
   const prefetchArticle = (id: number) => {
-    const queryType = { type: 'id' as const, value: id }
-    if (queryClient.getQueryData(['article_page', queryType])) return
-
-    // Seed preview data from the card so the detail page paints instantly,
-    // then prefetch the full article in the background.
+    // Warm-only: seed the sync preview Map + preload the hero image.
+    // IMPORTANT: never prefetch into the detail query key (['article_page', ...])
+    // with content-less data — a fresh cache entry blocks the real fetch and
+    // leaves the detail page stuck on the content skeleton forever.
     const cardArticle = sortedArticles.find((a) => a.id === id)
-    if (cardArticle) {
-      getArticlePreview(id) // touch cache
-      preloadImage(cardArticle.image, 'hero')
-    }
-    // Minimal prefetch: only get basic article data without processing
-    // ArticlePage will re-fetch with full processing when navigated to
-    queryClient.prefetchQuery({
-      queryKey: ['article_page', queryType],
-      queryFn: async () => {
-        const baseQuery = supabase
-          .from('articles')
-          .select('id, slug, title, excerpt, image, category_id, date, is_exclusive, content_source, categories(name), authors(id, name, image, bio, role)')
-
-        const { data, error } = await baseQuery.eq('id', id).single()
-
-        if (error) throw error
-        if (!data) return { article: null as Article | null, toc: [], related: [], redirectToId: null as number | null }
-
-        const authorData = Array.isArray(data.authors)
-          ? (data.authors.length > 0 ? data.authors[0] : null)
-          : data.authors
-
-        const article: Article = {
-          ...(data as unknown as Article),
-          category: (Array.isArray((data as Record<string, unknown>).categories)
-            ? ((data as Record<string, unknown>).categories as Array<Record<string, unknown>>)[0]?.name
-            : ((data as Record<string, unknown>).categories as Record<string, unknown>)?.name) || '',
-          authors: authorData,
-          contentHtml: ((data as Record<string, unknown>).content as string) || '',
-        } as Article
-
-        return {
-          article,
-          toc: [],
-          related: [],
-          redirectToId: null as number | null,
-        }
-      },
-      staleTime: 30_000, // Short stale time so ArticlePage will re-fetch with full processing
-      gcTime: 5 * 60_000,
-    })
+    if (cardArticle) setArticlePreview(cardArticle)
   }
 
   const openInstant = (article: Article) => openArticle(navigate, queryClient, article)

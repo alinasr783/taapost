@@ -101,9 +101,9 @@ describe('middleware (integration)', () => {
       expect(res.status).toBe(200)
       const html = await res.text()
       expect(html).toContain('og:image" content="')
-      expect(html).toContain('storage/v1/render/image/')
-      expect(html).toContain('width=1200')
-      expect(html).toContain('height=630')
+      expect(html).toContain('storage/v1/object/public/')
+      expect(html).toContain('og:image:width" content="1200"')
+      expect(html).toContain('og:image:height" content="630"')
       expect(html).toContain('og:title" content="عنوان المقال | تاء بوست"')
       expect(html).toContain('og:type" content="article"')
       expect(html).toContain('article:published_time')
@@ -165,12 +165,16 @@ describe('middleware (integration)', () => {
       expect(res).toBeUndefined()
     })
 
-    it('returns undefined when article not found (bot)', async () => {
+    it('returns default OG HTML when article not found (bot)', async () => {
       mockFetch([])
       const req = createRequest('/article/999', 'facebookexternalhit/1.1')
       const res = await middleware(req)
 
-      expect(res).toBeUndefined()
+      // Crawlers must still get valid OG tags (with the default image),
+      // never an empty/redirect response.
+      expect(res).toBeInstanceOf(Response)
+      const html = await res.text()
+      expect(html).toContain('og:image" content="https://www.taapost.com/og-default.png"')
     })
   })
 
@@ -191,7 +195,7 @@ describe('middleware (integration)', () => {
 
       const html = await res.text()
       expect(html).toContain('og:image" content=')
-      expect(html).toContain('storage/v1/render/image/')
+      expect(html).toContain('storage/v1/object/public/')
     })
   })
 

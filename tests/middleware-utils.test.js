@@ -91,15 +91,19 @@ describe('resolveImage', () => {
     expect(resolveImage(url, origin)).toBe(url)
   })
 
-  it('returns data: URIs as-is', () => {
+  it('falls back to default for data: URIs (crawlers need absolute http(s))', () => {
     const url = 'data:image/png;base64,abc'
-    expect(resolveImage(url, origin)).toBe(url)
+    expect(resolveImage(url, origin)).toBe(`${origin}/og-default.png`)
   })
 
-  it('routes Supabase Storage URLs through our own 1200x630 WebP resizer', () => {
+  it('falls back to default for blob: URIs', () => {
+    expect(resolveImage('blob:https://x/abc', origin)).toBe(`${origin}/og-default.png`)
+  })
+
+  it('returns Supabase Storage URLs directly (og-image proxy 500s without sharp)', () => {
     const supabaseUrl = 'https://test.supabase.co/storage/v1/object/public/media/test.png'
     const result = resolveImage(supabaseUrl, origin)
-    expect(result).toBe(`${origin}/api/og-image?url=${encodeURIComponent(supabaseUrl)}`)
+    expect(result).toBe(supabaseUrl)
   })
 
   it('prepends origin for relative paths starting with /', () => {
@@ -270,5 +274,11 @@ describe('getArticleParam', () => {
   it('handles article path with extra segments', () => {
     const result = getArticleParam('/article/25/extra')
     expect(result).toEqual({ param: '25', type: 'article' })
+  })
+
+  it('strips trailing slashes, queries and hashes', () => {
+    expect(getArticleParam('/post/42/')).toEqual({ param: '42', type: 'post' })
+    expect(getArticleParam('/post/42?utm_source=x')).toEqual({ param: '42', type: 'post' })
+    expect(getArticleParam('/article/25#comments')).toEqual({ param: '25', type: 'article' })
   })
 })

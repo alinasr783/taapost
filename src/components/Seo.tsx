@@ -17,21 +17,19 @@ type Props = {
 function resolveAbsoluteUrl(origin: string, input: string) {
   const v = input.trim()
   if (!v) return ''
-  if (v.startsWith('data:') || v.startsWith('blob:')) return v
-  let url = ''
+  // data:/blob: URLs are unusable as og:image (must be absolute http(s)).
+  // Return empty so callers fall back to the default og image.
+  if (v.startsWith('data:') || v.startsWith('blob:')) return ''
   if (v.startsWith('http://') || v.startsWith('https://')) {
-    url = v
+    return v
   } else if (v.startsWith('/')) {
-    url = `${origin}${v}`
+    return `${origin}${v}`
   } else {
-    url = `${origin}/${v.replace(/^\/+/, '')}`
+    return `${origin}/${v.replace(/^\/+/, '')}`
   }
-  if (url.includes('.supabase.co/storage/v1/object/public/')) {
-    return url
-      .replace('/storage/v1/object/', '/storage/v1/render/image/')
-      .replace(/\?[^]*$/, '') + '?width=1200&height=630&resize=cover'
-  }
-  return url
+  // NOTE: do NOT rewrite Supabase URLs to /render/image/ — Image
+  // Transformations are OFF in this project and that endpoint 404s.
+  // Direct public object URLs are crawler-readable as-is.
 }
 
 function upsertMetaByName(name: string, content: string) {
@@ -110,7 +108,10 @@ export default function Seo(props: Props) {
   const image = useMemo(() => {
     const fallback = site.og_image?.trim() || (site.logo_url?.trim() ? site.logo_url.trim() : '/og-default.png')
     const src = props.image?.trim() ? props.image.trim() : fallback
-    return origin ? resolveAbsoluteUrl(origin, src) : src
+    if (!origin) return src
+    const resolved = resolveAbsoluteUrl(origin, src)
+    // resolveAbsoluteUrl returns '' for data:/blob: URLs -> use the fallback.
+    return resolved || resolveAbsoluteUrl(origin, fallback) || `${origin}/og-default.png`
   }, [origin, props.image, site.og_image, site.logo_url])
 
   const robots = useMemo(() => {

@@ -70,11 +70,48 @@ export default function ImageUpload({ value, onChange, label = 'صورة', class
     }
   }, [sourceUrl])
 
+  // Downscale huge uploads (e.g. 3000-4000px phone photos) to a max of 1200px
+  // and re-encode as JPEG so article heroes stay fast for readers AND for
+  // social crawlers (WhatsApp/Facebook ignore slow multi-MB og:images).
+  const downscaleForShare = async (blob: Blob): Promise<Blob> => {
+    try {
+      const bitmap = await createImageBitmap(blob).catch(() => null)
+      if (!bitmap) return blob
+      const MAX = 1200
+      const { width, height } = bitmap
+      if (width <= MAX && height <= MAX) {
+        bitmap.close?.()
+        return blob
+      }
+      const scale = Math.min(MAX / width, MAX / height)
+      const w = Math.max(1, Math.round(width * scale))
+      const h = Math.max(1, Math.round(height * scale))
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return blob
+      ctx.drawImage(bitmap, 0, 0, w, h)
+      bitmap.close?.()
+      const out = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.82),
+      )
+      return out || blob
+    } catch {
+      return blob
+    }
+  }
+
   const uploadBlob = async (blob: Blob, originalName: string) => {
-    const ext = originalName.split('.').pop()?.toLowerCase() || 'jpg'
-    const safeExt = ['jpg', 'jpeg', 'png', 'webp'].includes(ext) ? ext : 'jpg'
+    const prepared = await downscaleForShare(blob)
+    const contentType = prepared.type || 'image/jpeg'
+    const extFromType = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg'
+    const ext = originalName.split('.').pop()?.toLowerCase() || extFromType
+    const safeExt = ['jpg', 'jpeg', 'png', 'webp'].includes(ext) ? ext : extFromType
     const fileName = `${uuidv4()}.${safeExt}`
-    const { error: uploadError } = await supabase.storage.from('media').upload(fileName, blob)
+    const { error: uploadError } = await supabase.storage
+      .from('media')
+      .upload(fileName, prepared, { contentType, upsert: false })
     if (uploadError) throw uploadError
     const { data } = supabase.storage.from('media').getPublicUrl(fileName)
     onChange(data.publicUrl)

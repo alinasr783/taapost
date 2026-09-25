@@ -25,7 +25,11 @@ export function resolveImage(input, origin) {
   if (!input) return origin ? `${origin}${DEFAULT_OG_IMAGE}` : DEFAULT_OG_IMAGE
   const v = input.trim()
   if (!v) return origin ? `${origin}${DEFAULT_OG_IMAGE}` : DEFAULT_OG_IMAGE
-  if (v.startsWith('data:') || v.startsWith('blob:')) return v
+  // data:/blob: URLs can never work as og:image (crawlers need an absolute
+  // http(s) URL) -> fall back to the default image instead of emitting garbage.
+  if (v.startsWith('data:') || v.startsWith('blob:')) {
+    return origin ? `${origin}${DEFAULT_OG_IMAGE}` : DEFAULT_OG_IMAGE
+  }
   let abs
   if (v.startsWith('http://') || v.startsWith('https://')) {
     abs = v
@@ -34,11 +38,12 @@ export function resolveImage(input, origin) {
   } else {
     abs = `${origin}/${v.replace(/^\/+/, '')}`
   }
-  // Heavy Supabase originals (often >1MB PNGs) make crawlers time out.
-  // Route them through our own resizer so they become a fast 1200x630 WebP.
-  if (abs.toLowerCase().includes('.supabase.co/storage/')) {
-    return `${origin}/api/og-image?url=${encodeURIComponent(abs)}`
-  }
+  // NOTE: previously Supabase originals were routed through /api/og-image for
+  // resizing, but that endpoint 500s on Vercel (FUNCTION_INVOCATION_FAILED -
+  // `sharp` is not installed), which broke og:image for EVERY new article.
+  // Supabase public object URLs are directly crawler-readable, so return them
+  // as-is. Heavy uploads are now downscaled at upload time in the dashboard.
+  // The /api/og-image endpoint is kept as a dumb passthrough fallback only.
   return abs
 }
 
@@ -64,8 +69,11 @@ ${process.env.VITE_FB_APP_ID ? `<meta property="fb:app_id" content="${esc(proces
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:url" content="${esc(url)}">
 <meta property="og:image" content="${esc(image)}">
+<meta property="og:image:secure_url" content="${esc(image)}">
+<meta property="og:image:type" content="${esc(image.toLowerCase().includes('.png') ? 'image/png' : image.toLowerCase().includes('.webp') ? 'image/webp' : 'image/jpeg')}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="${esc(title || siteName)}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${esc(pageTitle)}">
 <meta name="twitter:description" content="${esc(description)}">
@@ -78,10 +86,25 @@ ${extraTags}
 }
 
 export function getArticleParam(pathname) {
-  const postMatch = pathname.match(/^\/post\/([^/]+)/)
-  if (postMatch) return { param: decodeURIComponent(postMatch[1]), type: 'post' }
-  const articleMatch = pathname.match(/^\/article\/([^/]+)/)
-  if (articleMatch) return { param: decodeURIComponent(articleMatch[1]), type: 'article' }
+  // Strip trailing slashes, query strings and hashes so that
+  // /post/42/, /post/42?utm_source=x and /post/42#x all resolve.
+  const clean = String(pathname || '').split('?')[0].split('#')[0].replace(/\/+$/, '') || '/'
+  const postMatch = clean.match(/^\/post\/([^/]+)/)
+  if (postMatch) {
+    try {
+      return { param: decodeURIComponent(postMatch[1]).trim(), type: 'post' }
+    } catch {
+      return { param: postMatch[1].trim(), type: 'post' }
+    }
+  }
+  const articleMatch = clean.match(/^\/article\/([^/]+)/)
+  if (articleMatch) {
+    try {
+      return { param: decodeURIComponent(articleMatch[1]).trim(), type: 'article' }
+    } catch {
+      return { param: articleMatch[1].trim(), type: 'article' }
+    }
+  }
   return null
 }
 

@@ -33,33 +33,12 @@ export function getArticlePreview(id: number | null | undefined): Article | unde
   return previewMap.get(id);
 }
 
-export function primeArticleQueries(queryClient: QueryClient, article: Article | null | undefined) {
-  if (!article || typeof article.id !== 'number') return;
+export function primeArticleQueries(_queryClient: QueryClient | null, article: Article | null | undefined) {
+  // IMPORTANT: only seed the synchronous preview Map — never setQueryData here.
+  // Writing a content-less card object into the detail query key marks it
+  // "fresh" and blocks the real fetch, leaving the content skeleton forever.
+  // Detail pages read the Map via placeholderData (doesn't block fetching).
   setArticlePreview(article);
-  try {
-    // Seed both detail query shapes so placeholderData/initialData hits instantly.
-    // ArticleViewPage uses ['article_view', String(id)] and ArticlePage uses
-    // ['article_page', { type: 'id', value }]. We only seed if empty to avoid
-    // clobbering a full fetch that already contains contentHtml.
-    const viewKey = ['article_view', String(article.id)];
-    if (!queryClient.getQueryData(viewKey)) {
-      queryClient.setQueryData(
-        viewKey,
-        { article, related: [], authorArticles: [], error: null },
-        { updatedAt: Date.now() },
-      );
-    }
-    const pageKey = ['article_page', { type: 'id', value: article.id }];
-    if (!queryClient.getQueryData(pageKey)) {
-      queryClient.setQueryData(
-        pageKey,
-        { article, toc: [], related: [], redirectToId: null, redirectToArticle: null },
-        { updatedAt: Date.now() },
-      );
-    }
-  } catch {
-    /* ignore */
-  }
 }
 
 // ---------------------------------------------------------------------------

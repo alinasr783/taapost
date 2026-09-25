@@ -343,6 +343,7 @@ export default function ArticlePage() {
   const article = fullArticle ?? preview ?? null
   const loadingContent = articleQuery.isPending && !fullArticle && !preview
   const refreshingContent = articleQuery.isFetching && !fullArticle?.contentHtml
+  const contentError = Boolean(articleQuery.error) && !fullArticle?.contentHtml
 
   // Deferred: related posts (don't block first paint).
   const relatedQuery = useQuery({
@@ -435,7 +436,10 @@ export default function ArticlePage() {
     )
   }
 
-  if (articleQuery.error) {
+  // Show the full error screen only when there is nothing to paint.
+  // With a card preview available, the page opens instantly and the content
+  // area shows a skeleton with a retry button instead.
+  if (articleQuery.error && !article) {
     const errorMessage = articleQuery.error instanceof Error ? articleQuery.error.message : 'حدث خطأ غير معروف'
     return (
       <div className="container flex flex-col items-center justify-center py-20 text-center">
@@ -607,8 +611,19 @@ export default function ArticlePage() {
                 <div className="h-4 w-10/12 rounded skeleton-shimmer" />
                 <div className="h-4 w-full rounded skeleton-shimmer" />
                 <div className="h-4 w-9/12 rounded skeleton-shimmer" />
-                {refreshingContent && (
+                {refreshingContent && !contentError && (
                   <p className="text-xs text-muted-foreground pt-2">جاري تحميل باقي المحتوى…</p>
+                )}
+                {contentError && (
+                  <div className="pt-2">
+                    <p className="text-xs text-destructive mb-2">تعذّر تحميل المحتوى. تحقق من اتصالك بالإنترنت.</p>
+                    <button
+                      onClick={() => articleQuery.refetch()}
+                      className="rounded-[5px] bg-primary px-5 py-2 text-xs text-primary-foreground hover:bg-primary/90"
+                    >
+                      إعادة المحاولة
+                    </button>
+                  </div>
                 )}
               </div>
             )}

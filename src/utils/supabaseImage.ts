@@ -11,6 +11,12 @@
 const TRANSFORM_MARKER = '/storage/v1/object/public/';
 const TRANSFORM_REPLACEMENT = '/storage/v1/render/image/public/';
 
+// Image Transformations must be enabled in the Supabase project (Storage
+// settings / CDN). They are currently OFF (middleware falls back to the
+// /api/og-image proxy), so transforming render URLs would 404 every image
+// across the UI. Keep disabled until transforms are verified in Supabase.
+const TRANSFORM_ENABLED = false;
+
 export type ImagePreset = 'card' | 'hero' | 'thumb' | 'original';
 
 const PRESET_PARAMS: Record<Exclude<ImagePreset, 'original'>, string> = {
@@ -28,6 +34,7 @@ export function getOptimizedImage(src: string | null | undefined, preset: ImageP
   const s = src.trim();
   if (!s) return '';
   if (preset === 'original') return s;
+  if (!TRANSFORM_ENABLED) return s;
   // Only transform Supabase public object URLs; leave external/data/blob as-is.
   if (s.startsWith('data:') || s.startsWith('blob:')) return s;
   if (!s.includes(TRANSFORM_MARKER)) return s;

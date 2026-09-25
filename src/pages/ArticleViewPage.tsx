@@ -94,8 +94,9 @@ export default function ArticleViewPage() {
           .eq('type', 'article')
           .single()
         if (res.error) {
-          // Fall back to preview so the page still opens instantly.
-          if (preview) return { article: preview, related: [], authorArticles: [], error: null }
+          // Surface the error but keep the preview so the page still opens
+          // instantly with a retry option instead of a dead skeleton.
+          if (preview) return { article: preview, related: [], authorArticles: [], error: res.error.message }
           return { article: null, related: [], error: res.error.message }
         }
         articleData = res.data as Record<string, unknown>
@@ -197,6 +198,7 @@ export default function ArticleViewPage() {
   const article = fullArticle ?? preview ?? null
   const loadingContent = articleQuery.isPending && !fullArticle && !preview
   const refreshingContent = articleQuery.isFetching && (!fullArticle?.contentHtml || !preview?.contentHtml)
+  const contentError = Boolean(articleQuery.data?.error) && !fullArticle?.contentHtml
 
   // Deferred: related + author articles (don't block first paint).
   const relatedQuery = useQuery({
@@ -298,7 +300,7 @@ export default function ArticleViewPage() {
     )
   }
 
-  if (articleQuery.error || (!article && articleQuery.data?.error)) {
+  if ((articleQuery.error && !article) || (!article && articleQuery.data?.error)) {
     return (
       <div className="container flex flex-col items-center justify-center py-20 text-center">
         <Seo title="خطأ في تحميل المقال" description="حدث خطأ أثناء تحميل المقال" robots="noindex,follow" />
@@ -475,8 +477,19 @@ export default function ArticleViewPage() {
               <div className="h-4 w-10/12 rounded skeleton-shimmer" />
               <div className="h-4 w-full rounded skeleton-shimmer" />
               <div className="h-4 w-9/12 rounded skeleton-shimmer" />
-              {refreshingContent && (
+              {refreshingContent && !contentError && (
                 <p className="text-xs text-muted-foreground pt-2">جاري تحميل باقي المحتوى…</p>
+              )}
+              {contentError && (
+                <div className="pt-2">
+                  <p className="text-xs text-destructive mb-2">تعذّر تحميل المحتوى. تحقق من اتصالك بالإنترنت.</p>
+                  <button
+                    onClick={() => articleQuery.refetch()}
+                    className="rounded-xl bg-primary px-5 py-2 text-xs text-primary-foreground hover:bg-primary/90"
+                  >
+                    إعادة المحاولة
+                  </button>
+                </div>
               )}
             </div>
           )}
