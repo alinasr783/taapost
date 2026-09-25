@@ -15,6 +15,7 @@ import Footer from './Footer'
 import OfflineBanner from './OfflineBanner'
 import { SiteSettingsProvider } from './SiteSettingsProvider'
 import { defaultSiteSettings } from './siteSettingsModel'
+import { navigateInstant } from '../utils/instantNav'
 import DynamicIcon from './DynamicIcon'
 
 const categoryIconMap: Record<string, LucideIcon> = {
@@ -265,7 +266,7 @@ export default function SiteLayout({ children }: Props) {
                   e.preventDefault()
                   const qp = new URLSearchParams()
                   if (q) qp.set('q', q)
-                  navigate(`/articles?${qp.toString()}`)
+                  navigateInstant(navigate, `/articles?${qp.toString()}`)
                 }}
                 className="flex flex-1 items-center justify-end gap-2 max-w-[380px]"
               >

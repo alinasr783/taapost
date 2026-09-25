@@ -1,9 +1,11 @@
 import { useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight, User as UserIcon } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, type Author, type Article } from '../lib/supabase'
 import { withTimeout } from '../lib/withTimeout'
+import { navigateInstant, openArticle, setArticlePreview } from '../utils/instantNav'
+import { preloadImage } from '../utils/supabaseImage'
 import Seo from '../components/Seo'
 import SmartImage from '../components/SmartImage'
 import QueryError from '../components/QueryError'
@@ -12,6 +14,10 @@ import { useSiteSettings } from '../components/useSiteSettings'
 export default function AuthorPage() {
   const { id, slug } = useParams()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const open = (a: Article) => openArticle(navigate, queryClient, a)
+  const warm = (a: Article) => { setArticlePreview(a); preloadImage(a.image, 'hero') }
+  const go = (to: string) => navigateInstant(navigate, to)
   const site = useSiteSettings()
   const authorId = id && /^\d+$/.test(id) ? Number(id) : null
   const authorSlug = slug ? decodeURIComponent(slug) : ''
@@ -205,7 +211,7 @@ export default function AuthorPage() {
                   {catSlug && (
                     <button
                       type="button"
-                      onClick={() => navigate(`/category/${catId}`)}
+                      onClick={() => go(`/category/${catId}`)}
                       className="text-xs font-medium bg-primary/10 text-primary px-4 py-1.5 rounded-full hover:bg-primary hover:text-primary-foreground transition-all"
                     >
                       المزيد
@@ -218,11 +224,15 @@ export default function AuthorPage() {
                       <button
                         key={article.id}
                         type="button"
-                        onClick={() => navigate(article.type === 'article' ? `/article/${article.id}` : `/post/${article.id}`)}
+                        onClick={() => open(article as unknown as Article)}
+                        onMouseEnter={() => warm(article as unknown as Article)}
+                        onTouchStart={() => warm(article as unknown as Article)}
                         className="relative flex min-w-[360px] max-w-[480px] flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md"
                       >
                         <div className="relative h-56 w-full">
                           <SmartImage
+                            transitionName={`article-hero-${article.id}`}
+                            preset="card"
                             src={article.image}
                             alt={article.title}
                             className="h-full w-full"

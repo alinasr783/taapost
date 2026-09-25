@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from 'react'
 import { ImageOff } from 'lucide-react'
+import { getOptimizedImage, type ImagePreset } from '../utils/supabaseImage'
 
 type Props = {
   src?: string | null
@@ -17,6 +18,10 @@ type Props = {
   fallbackSrc?: string
   /** When true, no placeholder is rendered for a missing/broken image. */
   hideOnError?: boolean
+  /** Shared-element name for View Transitions (card image -> hero). */
+  transitionName?: string
+  /** Supabase transform preset. Defaults to 'card'. */
+  preset?: ImagePreset
 }
 
 export default function SmartImage({
@@ -31,12 +36,15 @@ export default function SmartImage({
   objectFit = 'cover',
   fallbackSrc,
   hideOnError = false,
+  transitionName,
+  preset = 'card',
 }: Props) {
   const [loaded, setLoaded] = useState(false)
   const [errored, setErrored] = useState(false)
 
   const showPlaceholder = !src || (errored && !fallbackSrc)
-  const finalSrc = errored && fallbackSrc ? fallbackSrc : src
+  const rawSrc = errored && fallbackSrc ? fallbackSrc : src
+  const finalSrc = getOptimizedImage(rawSrc, preset)
 
   const wrapperStyle: CSSProperties = {
     aspectRatio: ratio,
@@ -76,7 +84,7 @@ export default function SmartImage({
         className={`h-full w-full transition-opacity duration-300 ${
           loaded ? 'opacity-100' : 'opacity-0'
         } ${imgClassName}`}
-        style={{ objectFit }}
+        style={{ objectFit, ...(transitionName ? { viewTransitionName: transitionName } : null) } as CSSProperties}
       />
     </div>
   )

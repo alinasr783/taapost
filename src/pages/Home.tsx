@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, type Article, type Author, type HomepageSection, type HomepageSlider, type BreakingNewsHero } from '../lib/supabase'
 import { withTimeout } from '../lib/withTimeout'
+import { getArticlePreview, openArticle, navigateInstant } from '../utils/instantNav'
+import { preloadImage } from '../utils/supabaseImage'
 import SmartImage from '../components/SmartImage'
 import QueryError from '../components/QueryError'
 import HomeCarousel from '../components/HomeCarousel'
@@ -199,6 +201,13 @@ export default function Home() {
     const queryType = { type: 'id' as const, value: id }
     if (queryClient.getQueryData(['article_page', queryType])) return
 
+    // Seed preview data from the card so the detail page paints instantly,
+    // then prefetch the full article in the background.
+    const cardArticle = sortedArticles.find((a) => a.id === id)
+    if (cardArticle) {
+      getArticlePreview(id) // touch cache
+      preloadImage(cardArticle.image, 'hero')
+    }
     // Minimal prefetch: only get basic article data without processing
     // ArticlePage will re-fetch with full processing when navigated to
     queryClient.prefetchQuery({
@@ -237,6 +246,9 @@ export default function Home() {
       gcTime: 5 * 60_000,
     })
   }
+
+  const openInstant = (article: Article) => openArticle(navigate, queryClient, article)
+  const go = (to: string) => navigateInstant(navigate, to)
 
   if (!homeQuery.data && !hadData.current) {
     if (homeQuery.isPending) {
@@ -392,7 +404,7 @@ export default function Home() {
                         <h2 className="text-2xl font-bold border-r-4 border-primary pr-3">{section.title || 'أحدث المقالات'}</h2>
                          <button
                            type="button"
-                           onClick={() => navigate('/articles')} 
+                           onClick={() => go('/articles')} 
                           className="text-xs font-medium bg-primary/10 text-primary px-4 py-1.5 rounded-full hover:bg-primary hover:text-primary-foreground transition-all"
                         >
                           المزيد
@@ -402,14 +414,16 @@ export default function Home() {
                         {list.map((article) => (
                            <div key={article.id} 
                                  onClick={() =>
-                                   navigate(article.type === 'article' ? `/article/${article.id}` : `/post/${article.id}`)
+                                   openInstant(article)
                                  }
                                  onMouseEnter={() => prefetchArticle(article.id)}
+                                  onFocus={() => prefetchArticle(article.id)}
+                                  onTouchStart={() => prefetchArticle(article.id)}
                                  className="group cursor-pointer space-y-3"
                             >
                                  <div className="relative aspect-video overflow-hidden rounded-lg shadow-sm group-hover:shadow-md transition-all border border-border/50 group-hover:border-primary/50">
                                       <SmartImage
-                                         src={article.image}
+                                         transitionName={`article-hero-${article.id}`} preset="card" src={article.image}
                                          alt={article.title}
                                          className="h-full w-full"
                                          imgClassName="object-cover transition-transform duration-500 group-hover:scale-105"
@@ -471,9 +485,11 @@ export default function Home() {
                        key={article.id}
                        type="button"
                        onClick={() =>
-                         navigate(article.type === 'article' ? `/article/${article.id}` : `/post/${article.id}`)
+                         openInstant(article)
                        }
                        onMouseEnter={() => prefetchArticle(article.id)}
+                                  onFocus={() => prefetchArticle(article.id)}
+                                  onTouchStart={() => prefetchArticle(article.id)}
                        className="group relative flex items-center gap-4 p-3 rounded-2xl border border-border/30 bg-gradient-to-l from-primary/[0.02] to-transparent hover:shadow-md hover:border-primary/25 transition-all duration-300 w-full text-right overflow-hidden"
                      >
                        <div className="absolute right-0 top-3 bottom-3 w-0.5 bg-primary/0 group-hover:bg-primary/30 rounded-full transition-all duration-300" />
@@ -525,7 +541,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (catId) navigate(`/category/${catId}`)
+                    if (catId) go(`/category/${catId}`)
                   }}
                   className="text-2xl font-bold border-r-4 border-primary pr-3 hover:text-primary transition-colors"
                 >
@@ -534,7 +550,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (catId) navigate(`/category/${catId}`)
+                    if (catId) go(`/category/${catId}`)
                   }}
                   className="text-xs font-medium bg-primary/10 text-primary px-4 py-1.5 rounded-full hover:bg-primary hover:text-primary-foreground transition-all"
                 >
@@ -548,14 +564,16 @@ export default function Home() {
                       key={article.id}
                       type="button"
                       onClick={() =>
-                        navigate(article.type === 'article' ? `/article/${article.id}` : `/post/${article.id}`)
+                        openInstant(article)
                       }
                       onMouseEnter={() => prefetchArticle(article.id)}
+                                  onFocus={() => prefetchArticle(article.id)}
+                                  onTouchStart={() => prefetchArticle(article.id)}
                       className="relative flex min-w-[360px] max-w-[480px] flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md"
                     >
                       <div className="relative h-56 w-full">
                          <SmartImage
-                           src={article.image}
+                           transitionName={`article-hero-${article.id}`} preset="card" src={article.image}
                            alt={article.title}
                            className="h-full w-full"
                            imgClassName="object-cover"
@@ -611,14 +629,14 @@ export default function Home() {
                 <div className="flex items-center justify-between border-b border-primary/10 pb-4">
                   <button
                     type="button"
-                    onClick={() => { if (catId) navigate(`/category/${catId}`) }}
+                    onClick={() => { if (catId) go(`/category/${catId}`) }}
                     className="text-2xl font-bold border-r-4 border-primary pr-3 hover:text-primary transition-colors"
                   >
                     {catName}
                   </button>
                   <button
                     type="button"
-                    onClick={() => { if (catId) navigate(`/category/${catId}`) }}
+                    onClick={() => { if (catId) go(`/category/${catId}`) }}
                     className="text-xs font-medium bg-primary/10 text-primary px-4 py-1.5 rounded-full hover:bg-primary hover:text-primary-foreground transition-all"
                   >
                     المزيد
@@ -630,9 +648,11 @@ export default function Home() {
                       key={article.id}
                       type="button"
                       onClick={() =>
-                        navigate(article.type === 'article' ? `/article/${article.id}` : `/post/${article.id}`)
+                        openInstant(article)
                       }
                       onMouseEnter={() => prefetchArticle(article.id)}
+                                  onFocus={() => prefetchArticle(article.id)}
+                                  onTouchStart={() => prefetchArticle(article.id)}
                       className="group flex gap-5 py-5 w-full text-right hover:bg-muted/30 px-3 -mx-3 rounded-lg transition-colors"
                     >
                       <div className="flex-1 min-w-0 space-y-2">
@@ -651,7 +671,7 @@ export default function Home() {
                       </div>
                       <div className="w-32 h-24 shrink-0 rounded-lg overflow-hidden">
                          <SmartImage
-                           src={article.image}
+                           transitionName={`article-hero-${article.id}`} preset="card" src={article.image}
                            alt={article.title}
                            className="w-full h-full"
                            imgClassName="object-cover"
@@ -683,14 +703,16 @@ export default function Home() {
                     <div
                       key={article.id}
                       onClick={() =>
-                        navigate(article.type === 'article' ? `/article/${article.id}` : `/post/${article.id}`)
+                        openInstant(article)
                       }
                       onMouseEnter={() => prefetchArticle(article.id)}
+                                  onFocus={() => prefetchArticle(article.id)}
+                                  onTouchStart={() => prefetchArticle(article.id)}
                       className="group cursor-pointer space-y-3"
                     >
                       <div className="relative aspect-video overflow-hidden rounded-lg shadow-sm group-hover:shadow-md transition-all border border-border/50 group-hover:border-primary/50">
                          <SmartImage
-                           src={article.image}
+                           transitionName={`article-hero-${article.id}`} preset="card" src={article.image}
                            alt={article.title}
                            className="h-full w-full"
                            imgClassName="object-cover transition-transform duration-500 group-hover:scale-105"

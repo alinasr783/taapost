@@ -1,6 +1,9 @@
 import { useRef, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import type { Article } from '../lib/supabase'
+import { openArticle } from '../utils/instantNav'
+import { preloadImage } from '../utils/supabaseImage'
 import SmartImage from './SmartImage'
 
 type Props = {
@@ -8,12 +11,11 @@ type Props = {
   title?: string
 }
 
-function articleUrl(article: Article) {
-  return article.type === 'article' ? `/article/${article.id}` : `/post/${article.id}`
-}
-
 export default function HomeCarousel({ articles, title }: Props) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const open = (a: Article) => openArticle(navigate, queryClient, a)
+  const warm = (a: Article) => preloadImage(a.image, 'hero')
   const scrollRef = useRef<HTMLDivElement>(null)
   const [carouselIndex, setCarouselIndex] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
@@ -90,9 +92,13 @@ export default function HomeCarousel({ articles, title }: Props) {
           <div 
             key={slide.id} 
             className="relative w-full flex-shrink-0 snap-center h-64 sm:h-80 md:h-[380px] lg:h-[430px] cursor-pointer"
-            onClick={() => navigate(articleUrl(slide))}
+            onClick={() => open(slide)}
+            onMouseEnter={() => warm(slide)}
+            onTouchStart={() => warm(slide)}
           >
             <SmartImage
+              transitionName={`article-hero-${slide.id}`}
+              preset="hero"
               src={slide.image}
               alt={slide.title}
               className="h-full w-full"
@@ -172,7 +178,7 @@ export default function HomeCarousel({ articles, title }: Props) {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation()
-                        navigate(articleUrl(slide))
+                        open(slide)
                       }}
                       className="rounded-[5px] border border-white/40 bg-black/40 px-8 py-2.5 text-xs font-semibold text-white shadow-sm backdrop-blur md:text-sm"
                     >
@@ -224,7 +230,7 @@ export default function HomeCarousel({ articles, title }: Props) {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation()
-                        navigate(articleUrl(slide))
+                        open(slide)
                       }}
                       className="rounded-[5px] border border-white/40 bg-black/40 px-6 py-2 text-xs font-semibold text-white shadow-sm backdrop-blur"
                     >

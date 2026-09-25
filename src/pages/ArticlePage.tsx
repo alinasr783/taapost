@@ -8,8 +8,10 @@ import {
   ZoomOut,
   RotateCcw,
 } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, type Article } from '../lib/supabase'
+import { getArticlePreview, primeArticleQueries, setArticlePreview } from '../utils/instantNav'
+import { preloadImage } from '../utils/supabaseImage'
 import { useTrackView } from '../hooks/useTrackView'
 import Seo from '../components/Seo'
 import ShareButton from '../components/ShareButton'
@@ -156,7 +158,10 @@ const ARTICLE_STYLE = `
 export default function ArticlePage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const routeArticleId = id && /^\d+$/.test(id) ? Number(id) : null
+  // Card data cached synchronously before navigation -> instant first paint.
+  const preview = routeArticleId != null ? (getArticlePreview(routeArticleId) ?? null) : null
 
   const articleQueryKey = useMemo(() => {
     if (routeArticleId) return { type: 'id' as const, value: routeArticleId }
@@ -165,12 +170,13 @@ export default function ArticlePage() {
 
   const articleQuery = useQuery({
     queryKey: ['article_page', articleQueryKey],
+    placeholderData: (prev) => prev ?? (preview ? { article: preview, toc: [], related: [], redirectToId: null, redirectToArticle: null } : prev),
     queryFn: async () => {
       if (!articleQueryKey) return { article: null as Article | null, toc: [], related: [], redirectToId: null as number | null }
 
       const baseQuery = supabase
         .from('articles')
-        .select('*, categories(name), authors(id, name, image, bio, role)')
+        .select('id,slug,title,excerpt,content,image,image_caption,category_id,author_id,date,is_exclusive,content_source,type,created_at,categories(name),authors(id,name,image,bio,role)')
 
       const { data, error } = await baseQuery.eq('id', articleQueryKey.value).single()
 
@@ -282,31 +288,17 @@ export default function ArticlePage() {
       }
 
       const article: Article = {
-        ...(data as Article),
-        category: (Array.isArray(data.categories) ? data.categories[0]?.name : data.categories?.name) || '',
+        ...(data as unknown as Article),
+        category: (Array.isArray(data.categories) ? (data.categories as Array<{ name: string }>)[0]?.name : (data.categories as { name: string } | null)?.name) || '',
         authors: authorData,
         contentHtml: contentHtml,
       } as Article
 
-      let related: Article[] = []
-      try {
-        const { data: relatedData } = await supabase
-          .from('articles')
-          .select('id, slug, title, image, date, category_id, excerpt, is_exclusive')
-          .eq('category_id', data.category_id)
-          .eq('type', data.type)
-          .neq('id', data.id)
-          .limit(5)
-          .order('date', { ascending: false })
-        related = (relatedData ?? []) as Article[]
-      } catch (err) {
-        console.error('[ArticlePage] Error fetching related articles:', err)
-      }
-
+      // Related loads separately below so the hero/title paint instantly.
       return {
         article,
         toc,
-        related,
+        related: [] as Article[],
         redirectToId: null as number | null,
         redirectToArticle: null as string | null,
       }
@@ -317,6 +309,12 @@ export default function ArticlePage() {
     retry: 1,
   })
 
+  const fullArticle = articleQuery.data?.article ?? null
+  // Refresh the preview cache once the full article arrives (upgrades hero).
+  useEffect(() => {
+    if (fullArticle) primeArticleQueries(queryClient, fullArticle)
+  }, [fullArticle, queryClient])
+
   const buildArticleUrl = (article: Article | null) => {
     if (!article) return ''
     return `/post/${article.id}`
@@ -325,6 +323,7 @@ export default function ArticlePage() {
   const buildContentUrl = (a: Article) => {
     return `/post/${a.id}`
   }
+  const warm = (a: Article) => { setArticlePreview(a); preloadImage(a.image, 'hero') }
 
   useEffect(() => {
     const redirectToArticle = articleQuery.data?.redirectToArticle
@@ -341,8 +340,33 @@ export default function ArticlePage() {
     navigate(target, { replace: true })
   }, [articleQuery.data?.redirectToArticle, articleQuery.data?.redirectToId, articleQuery.data?.article, navigate])
 
-  const article = articleQuery.data?.article ?? null
-  const relatedArticles = articleQuery.data?.related ?? []
+  const article = fullArticle ?? preview ?? null
+  const loadingContent = articleQuery.isPending && !fullArticle && !preview
+  const refreshingContent = articleQuery.isFetching && !fullArticle?.contentHtml
+
+  // Deferred: related posts (don't block first paint).
+  const relatedQuery = useQuery({
+    queryKey: ['article_page_related', fullArticle?.id ?? routeArticleId, fullArticle?.category_id],
+    queryFn: async () => {
+      const aid = fullArticle?.id ?? routeArticleId
+      const cid = fullArticle?.category_id
+      if (!aid || cid == null) return [] as Article[]
+      const { data } = await supabase
+        .from('articles')
+        .select('id, slug, title, image, date, category_id, excerpt, is_exclusive')
+        .eq('category_id', cid)
+        .eq('type', fullArticle?.type ?? 'other')
+        .neq('id', aid)
+        .limit(5)
+        .order('date', { ascending: false })
+      return (data ?? []) as Article[]
+    },
+    enabled: Boolean(fullArticle?.id ?? preview?.id),
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+    retry: 1,
+  })
+  const relatedArticles = relatedQuery.data ?? articleQuery.data?.related ?? []
   useTrackView(article?.id || 0)
 
   const [fontSize, setFontSize] = useState(() => {
@@ -395,7 +419,7 @@ export default function ArticlePage() {
     return `${minutes} دقيقة قراءة`
   }
 
-  if (articleQuery.isLoading) {
+  if (loadingContent) {
     return (
     <div className="container max-w-7xl py-4 md:py-8 lg:py-12">
         <div className="space-y-6">
@@ -457,7 +481,7 @@ export default function ArticlePage() {
   }
 
   return (
-    <div className="container max-w-7xl py-4 md:py-8 lg:py-12">
+    <div className="container max-w-7xl py-4 md:py-8 lg:py-12 page-enter">
       <Seo
         title={article.title}
         description={article.excerpt || article.title}
@@ -519,13 +543,14 @@ export default function ArticlePage() {
         )}
       </div>
 
-      {/* Featured Image (Full Width, never cropped) */}
+      {/* Featured Image — paints instantly from card cache (shared-element) */}
       <div className="mb-4 md:mb-8">
         <ArticleHeroImage
           src={article.image}
           alt={article.title}
           caption={article.image_caption}
           roundedClass="rounded-[5px]"
+          transitionName={`article-hero-${article.id}`}
         />
       </div>
 
@@ -568,12 +593,25 @@ export default function ArticlePage() {
                 </button>
               </div>
             </div>
-            <div
-              className="article-body w-full p-4 sm:p-6 md:p-10"
-              lang="ar"
-              style={{ '--article-font-size': `${fontSize}rem` } as React.CSSProperties}
-              dangerouslySetInnerHTML={{ __html: article.contentHtml || '' }}
-            />
+            {article.contentHtml ? (
+              <div
+                className="article-body w-full p-4 sm:p-6 md:p-10"
+                lang="ar"
+                style={{ '--article-font-size': `${fontSize}rem` } as React.CSSProperties}
+                dangerouslySetInnerHTML={{ __html: article.contentHtml || '' }}
+              />
+            ) : (
+              <div className="w-full p-4 sm:p-6 md:p-10 space-y-3" aria-label="جاري تحميل المحتوى">
+                <div className="h-4 w-full rounded skeleton-shimmer" />
+                <div className="h-4 w-11/12 rounded skeleton-shimmer" />
+                <div className="h-4 w-10/12 rounded skeleton-shimmer" />
+                <div className="h-4 w-full rounded skeleton-shimmer" />
+                <div className="h-4 w-9/12 rounded skeleton-shimmer" />
+                {refreshingContent && (
+                  <p className="text-xs text-muted-foreground pt-2">جاري تحميل باقي المحتوى…</p>
+                )}
+              </div>
+            )}
           </section>
 
           {article.authors && article.authors.name && (
@@ -615,10 +653,14 @@ export default function ArticlePage() {
                     <Link
                       key={authArticle.id}
                       to={buildContentUrl(authArticle)}
+                      onMouseEnter={() => warm(authArticle)}
+                      onTouchStart={() => warm(authArticle)}
                       className="group rounded-[5px] border border-border/40 bg-background/50 overflow-hidden hover:border-primary/30 hover:shadow-md transition-all"
                     >
                       <div className="relative h-40 w-full overflow-hidden">
                         <SmartImage
+                          transitionName={`article-hero-${authArticle.id}`}
+                          preset="card"
                           src={authArticle.image}
                           alt={authArticle.title}
                           className="h-full w-full"
@@ -688,10 +730,14 @@ export default function ArticlePage() {
                 <Link 
                   key={related.id} 
                   to={buildContentUrl(related)}
+                  onMouseEnter={() => warm(related)}
+                  onTouchStart={() => warm(related)}
                   className="relative flex min-w-[360px] max-w-[480px] flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md group"
                 >
                   <div className="relative h-56 w-full">
                     <SmartImage
+                      transitionName={`article-hero-${related.id}`}
+                      preset="card"
                       src={resolveImageSrc(related.image ?? '')}
                       alt={related.title}
                       className="h-full w-full"

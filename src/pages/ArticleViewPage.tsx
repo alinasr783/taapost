@@ -3,6 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowRight, Calendar, User, ZoomIn, ZoomOut, RotateCcw, Clock, BookOpen } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase, type Article } from '../lib/supabase'
+import { getArticlePreview, setArticlePreview } from '../utils/instantNav'
+import { preloadImage } from '../utils/supabaseImage'
 import Seo from '../components/Seo'
 import ShareButton from '../components/ShareButton'
 import SmartImage from '../components/SmartImage'
@@ -72,9 +74,13 @@ export default function ArticleViewPage() {
   const navigate = useNavigate()
   const param = id ? decodeURIComponent(id) : ''
   const isNumericId = /^\d+$/.test(param)
+  const numericId = isNumericId ? Number(param) : null
+  // Card data cached synchronously before navigation -> instant first paint.
+  const preview = numericId != null ? (getArticlePreview(numericId) ?? null) : null
 
   const articleQuery = useQuery({
     queryKey: ['article_view', param],
+    placeholderData: (prev) => prev ?? (preview ? { article: preview, related: [], authorArticles: [], error: null } : prev),
     queryFn: async () => {
       if (!param) return { article: null as Article | null, related: [] as Article[], error: null as string | null }
 
@@ -83,11 +89,15 @@ export default function ArticleViewPage() {
       if (isNumericId) {
         const res = await supabase
           .from('articles')
-          .select('*, categories(name), authors(id, name, image, bio, role)')
+          .select('id,slug,title,excerpt,content,image,image_caption,category_id,author_id,date,is_exclusive,content_source,type,created_at,categories(name),authors(id,name,image,bio,role)')
           .eq('id', Number(param))
           .eq('type', 'article')
           .single()
-        if (res.error) return { article: null, related: [], error: res.error.message }
+        if (res.error) {
+          // Fall back to preview so the page still opens instantly.
+          if (preview) return { article: preview, related: [], authorArticles: [], error: null }
+          return { article: null, related: [], error: res.error.message }
+        }
         articleData = res.data as Record<string, unknown>
       } else {
         const res = await supabase
@@ -173,30 +183,9 @@ export default function ArticleViewPage() {
         contentHtml,
       } as Article
 
-      const { data: relatedData } = await supabase
-        .from('articles')
-        .select('id, slug, title, image, date, category_id, excerpt, is_exclusive')
-        .eq('category_id', article.category_id)
-        .eq('type', 'article')
-        .neq('id', article.id)
-        .limit(5)
-        .order('date', { ascending: false })
-
-      const authorId = article.author_id
-      let authorArticles: Article[] = []
-      if (authorId) {
-        const { data: authorArtData } = await supabase
-          .from('articles')
-          .select('id, slug, title, image, date, excerpt, is_exclusive')
-          .eq('author_id', authorId)
-          .eq('type', 'article')
-          .neq('id', article.id)
-          .limit(4)
-          .order('date', { ascending: false })
-        authorArticles = (authorArtData ?? []) as Article[]
-      }
-
-      return { article, related: (relatedData ?? []) as Article[], authorArticles, error: null }
+      // Main fetch resolves here — related lists load separately below so
+      // the hero/title paint is never blocked behind 2 extra queries.
+      return { article, related: [] as Article[], authorArticles: [] as Article[], error: null }
     },
     enabled: Boolean(param),
     staleTime: 5 * 60_000,
@@ -204,10 +193,59 @@ export default function ArticleViewPage() {
     retry: 1,
   })
 
-  const article = articleQuery.data?.article ?? null
-  const relatedArticles = articleQuery.data?.related ?? []
-  const authorArticles = articleQuery.data?.authorArticles ?? []
-  const redirectTo = articleQuery.data?.redirectTo
+  const fullArticle = articleQuery.data?.article ?? null
+  const article = fullArticle ?? preview ?? null
+  const loadingContent = articleQuery.isPending && !fullArticle && !preview
+  const refreshingContent = articleQuery.isFetching && (!fullArticle?.contentHtml || !preview?.contentHtml)
+
+  // Deferred: related + author articles (don't block first paint).
+  const relatedQuery = useQuery({
+    queryKey: ['article_view_related', fullArticle?.id ?? numericId, fullArticle?.category_id],
+    queryFn: async () => {
+      const aid = fullArticle?.id ?? numericId
+      const cid = fullArticle?.category_id
+      if (!aid || cid == null) return [] as Article[]
+      const { data } = await supabase
+        .from('articles')
+        .select('id, slug, title, image, date, category_id, excerpt, is_exclusive')
+        .eq('category_id', cid)
+        .eq('type', 'article')
+        .neq('id', aid)
+        .limit(5)
+        .order('date', { ascending: false })
+      return (data ?? []) as Article[]
+    },
+    enabled: Boolean(fullArticle?.id ?? preview?.id),
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+    retry: 1,
+  })
+
+  const authorArticlesQuery = useQuery({
+    queryKey: ['article_view_author', fullArticle?.author_id ?? preview?.author_id, fullArticle?.id ?? numericId],
+    queryFn: async () => {
+      const authorId = fullArticle?.author_id ?? preview?.author_id
+      const aid = fullArticle?.id ?? numericId
+      if (!authorId || !aid) return [] as Article[]
+      const { data } = await supabase
+        .from('articles')
+        .select('id, slug, title, image, date, excerpt, is_exclusive')
+        .eq('author_id', authorId)
+        .eq('type', 'article')
+        .neq('id', aid)
+        .limit(4)
+        .order('date', { ascending: false })
+      return (data ?? []) as Article[]
+    },
+    enabled: Boolean(fullArticle?.author_id ?? preview?.author_id),
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+    retry: 1,
+  })
+
+  const relatedArticles = relatedQuery.data ?? articleQuery.data?.related ?? []
+  const authorArticles = authorArticlesQuery.data ?? articleQuery.data?.authorArticles ?? []
+  const redirectTo = (articleQuery.data as { redirectTo?: string } | undefined)?.redirectTo
 
   useEffect(() => {
     if (redirectTo) {
@@ -242,8 +280,9 @@ export default function ArticleViewPage() {
   const buildArticleUrl = (a: Article) => {
     return `/article/${a.id}`
   }
+  const warm = (a: Article) => { setArticlePreview(a); preloadImage(a.image, 'hero') }
 
-  if (articleQuery.isLoading) {
+  if (loadingContent) {
     return (
       <div className="container max-w-4xl py-8">
         <div className="space-y-6">
@@ -293,7 +332,7 @@ export default function ArticleViewPage() {
   }
 
   return (
-    <div className="container max-w-4xl py-8">
+    <div className="container max-w-4xl py-8 page-enter">
       <Seo
         title={article.title}
         description={article.excerpt || article.title}
@@ -374,7 +413,7 @@ export default function ArticleViewPage() {
         </div>
       </div>
 
-      {/* Featured Image — full, never cropped */}
+      {/* Featured Image — paints instantly from card cache (shared-element) */}
       {article.image && (
         <div className="mb-10">
           <ArticleHeroImage
@@ -382,6 +421,7 @@ export default function ArticleViewPage() {
             alt={article.title}
             caption={article.image_caption}
             roundedClass="rounded-2xl"
+            transitionName={`article-hero-${article.id}`}
           />
         </div>
       )}
@@ -421,12 +461,25 @@ export default function ArticleViewPage() {
           </div>
 
           <style dangerouslySetInnerHTML={{ __html: ARTICLE_STYLE }} />
-          <div
-            className="article-body w-full p-6 md:p-12"
-            lang="ar"
-            style={{ '--article-font-size': `${fontSize}rem` } as React.CSSProperties}
-            dangerouslySetInnerHTML={{ __html: article.contentHtml || '' }}
-          />
+          {article.contentHtml ? (
+            <div
+              className="article-body w-full p-6 md:p-12"
+              lang="ar"
+              style={{ '--article-font-size': `${fontSize}rem` } as React.CSSProperties}
+              dangerouslySetInnerHTML={{ __html: article.contentHtml || '' }}
+            />
+          ) : (
+            <div className="w-full p-6 md:p-12 space-y-3" aria-label="جاري تحميل المحتوى">
+              <div className="h-4 w-full rounded skeleton-shimmer" />
+              <div className="h-4 w-11/12 rounded skeleton-shimmer" />
+              <div className="h-4 w-10/12 rounded skeleton-shimmer" />
+              <div className="h-4 w-full rounded skeleton-shimmer" />
+              <div className="h-4 w-9/12 rounded skeleton-shimmer" />
+              {refreshingContent && (
+                <p className="text-xs text-muted-foreground pt-2">جاري تحميل باقي المحتوى…</p>
+              )}
+            </div>
+          )}
 
           {article.authors && (
             <div className="border-t border-border/40 px-6 md:px-12 py-6">
@@ -469,11 +522,15 @@ export default function ArticleViewPage() {
                 <Link
                   key={item.id}
                   to={`/article/${item.id}`}
+                  onMouseEnter={() => warm(item)}
+                  onTouchStart={() => warm(item)}
                   className="group rounded-xl border border-border/30 bg-card overflow-hidden hover:shadow-md hover:border-primary/25 transition-all"
                 >
                   <div className="relative aspect-[16/9] overflow-hidden bg-muted/30">
                     {item.image ? (
                       <SmartImage
+                        transitionName={`article-hero-${item.id}`}
+                        preset="card"
                         src={item.image}
                         alt={item.title}
                         className="h-full w-full"
@@ -517,10 +574,14 @@ export default function ArticleViewPage() {
               <Link
                 key={related.id}
                 to={`/article/${related.id}`}
+                onMouseEnter={() => warm(related)}
+                onTouchStart={() => warm(related)}
                 className="group rounded-xl border border-border/40 bg-card overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all"
               >
                 <div className="relative aspect-[16/10] overflow-hidden">
                   <SmartImage
+                    transitionName={`article-hero-${related.id}`}
+                    preset="card"
                     src={related.image}
                     alt={related.title}
                     className="h-full w-full"

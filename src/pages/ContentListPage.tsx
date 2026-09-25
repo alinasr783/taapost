@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase, type Article } from '../lib/supabase'
 import { withTimeout } from '../lib/withTimeout'
+import { setArticlePreview } from '../utils/instantNav'
+import { preloadImage } from '../utils/supabaseImage'
 import Seo from '../components/Seo'
 import SmartImage from '../components/SmartImage'
 import { useSiteSettings } from '../components/useSiteSettings'
@@ -17,7 +19,8 @@ export default function ContentListPage() {
           .from('articles')
           .select('id,slug,title,excerpt,image,date,is_exclusive,category_id,categories(name)')
           .eq('type', 'other')
-          .order('date', { ascending: false }),
+          .order('date', { ascending: false })
+          .limit(60),
         15_000,
         'content_list',
       )
@@ -35,6 +38,7 @@ export default function ContentListPage() {
   })
 
   const list = articlesQuery.data ?? []
+  const warm = (a: Article) => { setArticlePreview(a); preloadImage(a.image, 'hero') }
 
   if (articlesQuery.isLoading) {
     return (
@@ -92,10 +96,14 @@ export default function ContentListPage() {
           <Link
             key={item.id}
             to={`/post/${item.id}`}
+            onMouseEnter={() => warm(item)}
+            onTouchStart={() => warm(item)}
             className="group flex flex-col rounded-xl border border-border/40 bg-card overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all"
           >
             <div className="relative aspect-[16/9] overflow-hidden">
               <SmartImage
+                transitionName={`article-hero-${item.id}`}
+                preset="card"
                 src={item.image}
                 alt={item.title}
                 className="h-full w-full"

@@ -1,14 +1,17 @@
 import { Suspense } from 'react'
 import { BrowserRouter, Route, Routes, Outlet } from 'react-router-dom'
 import { lazyWithRetry } from './utils/lazyWithRetry'
-const Home = lazyWithRetry(() => import('./pages/Home'))
+// Public pages are imported eagerly: they are the hot navigation paths and
+// lazy-chunk loading was adding ~1-2s of blank "جاري التحميل..." on every
+// menu/card tap. Dashboard stays lazy (admin only, heavy editors).
+import Home from './pages/Home'
+import CategoryPage from './pages/CategoryPage'
+import ArticlesPage from './pages/ArticlesPage'
+import ArticleViewPage from './pages/ArticleViewPage'
+import ArticlePage from './pages/ArticlePage'
+import ContentListPage from './pages/ContentListPage'
+import AuthorPage from './pages/AuthorPage'
 const Categories = lazyWithRetry(() => import('./pages/Categories'))
-const CategoryPage = lazyWithRetry(() => import('./pages/CategoryPage'))
-const ArticlesPage = lazyWithRetry(() => import('./pages/ArticlesPage'))
-const ArticleViewPage = lazyWithRetry(() => import('./pages/ArticleViewPage'))
-const ContentListPage = lazyWithRetry(() => import('./pages/ContentListPage'))
-const ArticlePage = lazyWithRetry(() => import('./pages/ArticlePage'))
-const AuthorPage = lazyWithRetry(() => import('./pages/AuthorPage'))
 const NotFound = lazyWithRetry(() => import('./pages/NotFound'))
 const LegacyRedirect = lazyWithRetry(() => import('./pages/LegacyRedirect'))
 import SiteLayout from './components/SiteLayout'

@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase, type Article } from '../lib/supabase'
+import { setArticlePreview } from '../utils/instantNav'
+import { preloadImage } from '../utils/supabaseImage'
 import Seo from '../components/Seo'
 import SmartImage from '../components/SmartImage'
 import { useSiteSettings } from '../components/useSiteSettings'
@@ -24,6 +26,7 @@ export default function ArticlesPage() {
         .select('id,slug,title,excerpt,image,date,is_exclusive,type,category_id,authors(name,id,image),categories(name)')
         .eq('type', 'article')
         .order('date', { ascending: false })
+        .limit(60)
 
       if (normalizedQ) {
         const pattern = `%${normalizedQ}%`
@@ -43,6 +46,7 @@ export default function ArticlesPage() {
     gcTime: 30 * 60_000,
   })
 
+  const warm = (a: Article) => { setArticlePreview(a); preloadImage(a.image, 'hero') }
   const allArticles = articlesQuery.data ?? []
   const featured = allArticles[0]
   const rest = useMemo(() => allArticles.slice(1), [allArticles])
@@ -130,10 +134,14 @@ export default function ArticlesPage() {
       {featured && !normalizedQ && (
         <Link
           to={featured.type === 'article' ? `/article/${featured.id}` : `/post/${featured.id}`}
+          onMouseEnter={() => warm(featured)}
+          onTouchStart={() => warm(featured)}
           className="group block relative overflow-hidden rounded-2xl shadow-lg"
         >
           <div className="relative h-[300px] md:h-[450px] w-full">
             <SmartImage
+              transitionName={`article-hero-${featured.id}`}
+              preset="hero"
               src={featured.image}
               alt={featured.title}
               eager
@@ -187,10 +195,14 @@ export default function ArticlesPage() {
             <Link
               key={article.id}
               to={`/article/${article.id}`}
+              onMouseEnter={() => warm(article)}
+              onTouchStart={() => warm(article)}
               className="group flex flex-col rounded-xl border border-border/40 bg-card overflow-hidden hover:shadow-lg hover:border-primary/30 transition-all"
             >
               <div className="relative aspect-[16/10] overflow-hidden">
                 <SmartImage
+                  transitionName={`article-hero-${article.id}`}
+                  preset="card"
                   src={article.image}
                   alt={article.title}
                   className="h-full w-full"

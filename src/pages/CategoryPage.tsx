@@ -1,9 +1,11 @@
 import { useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, type Category, type Article } from '../lib/supabase'
 import { withTimeout } from '../lib/withTimeout'
+import { openArticle, setArticlePreview } from '../utils/instantNav'
+import { preloadImage } from '../utils/supabaseImage'
 import Seo from '../components/Seo'
 import SmartImage from '../components/SmartImage'
 import QueryError from '../components/QueryError'
@@ -12,6 +14,9 @@ import { useSiteSettings } from '../components/useSiteSettings'
 export default function CategoryPage() {
   const { id, slug } = useParams()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const open = (a: Article) => openArticle(navigate, queryClient, a)
+  const warm = (a: Article) => { setArticlePreview(a); preloadImage(a.image, 'hero') }
   const site = useSiteSettings()
   const categoryId = id && /^\d+$/.test(id) ? Number(id) : null
   const categorySlug = slug ? decodeURIComponent(slug) : ''
@@ -189,11 +194,16 @@ export default function CategoryPage() {
             {articles.map((i) => (
               <button
                 key={i.id}
-                onClick={() => navigate(i.type === 'article' ? `/article/${i.id}` : `/post/${i.id}`)}
+                onClick={() => open(i as unknown as Article)}
+                onMouseEnter={() => warm(i as unknown as Article)}
+                onFocus={() => warm(i as unknown as Article)}
+                onTouchStart={() => warm(i as unknown as Article)}
                 className="relative flex flex-col overflow-hidden rounded-[5px] border border-white/10 bg-black/30 text-right shadow-sm backdrop-blur-md hover:border-white/20 transition-colors w-full"
               >
                 <div className="relative h-56 w-full">
                   <SmartImage
+                    transitionName={`article-hero-${i.id}`}
+                    preset="card"
                     src={i.image}
                     alt={i.title}
                     className="h-full w-full"

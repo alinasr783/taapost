@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ImageOff } from 'lucide-react'
+import { getOptimizedImage } from '../utils/supabaseImage'
 
 type Props = {
   src?: string | null
@@ -8,6 +9,7 @@ type Props = {
   roundedClass?: string
   maxHeightClass?: string
   eager?: boolean
+  transitionName?: string
 }
 
 /**
@@ -24,6 +26,7 @@ export default function ArticleHeroImage({
   roundedClass = 'rounded-[5px]',
   maxHeightClass = 'max-h-[75vh]',
   eager = true,
+  transitionName,
 }: Props) {
   const [loaded, setLoaded] = useState(false)
   const [errored, setErrored] = useState(false)
@@ -39,26 +42,32 @@ export default function ArticleHeroImage({
     )
   }
 
+  const heroSrc = getOptimizedImage(src, 'hero')
+  const blurSrc = getOptimizedImage(src, 'thumb')
+
   return (
     <figure className={`overflow-hidden shadow-lg ${roundedClass} bg-muted/30`}>
       <div className="relative w-full overflow-hidden">
-        {/* طبقة الخلفية الضبابية — تملأ أي فراغ حول الصورة */}
+        {/* طبقة الخلفية الضبابية — نسخة مصغّرة لتوفير البيانات */}
         <img
-          src={src}
+          src={blurSrc || heroSrc}
           alt=""
           aria-hidden
+          loading="eager"
+          decoding="async"
           className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover blur-2xl opacity-40 select-none"
         />
         {/* الصورة الأصلية كاملة بدون قص */}
         {!loaded && <div className="absolute inset-0 animate-pulse bg-muted/40" />}
         <img
-          src={src}
+          src={heroSrc}
           alt={alt}
           loading={eager ? 'eager' : 'lazy'}
           decoding="async"
           fetchPriority={eager ? 'high' : 'auto'}
           onLoad={() => setLoaded(true)}
           onError={() => setErrored(true)}
+          style={transitionName ? ({ viewTransitionName: transitionName } as React.CSSProperties) : undefined}
           className={`relative z-10 mx-auto w-full h-auto ${maxHeightClass} object-contain transition-opacity duration-300 ${
             loaded ? 'opacity-100' : 'opacity-0'
           }`}

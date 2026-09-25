@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle } from 'lucide-react'
-import type { BreakingNewsHero as BreakingNewsHeroType } from '../lib/supabase'
+import type { Article, BreakingNewsHero as BreakingNewsHeroType } from '../lib/supabase'
+import { navigateInstant, setArticlePreview } from '../utils/instantNav'
 
 type Props = {
   items: BreakingNewsHeroType[]
@@ -9,6 +10,10 @@ type Props = {
 function postUrl(article: NonNullable<BreakingNewsHeroType['articles']>) {
   const base = article.type === 'article' ? '/article/' : '/post/'
   return `${base}${article.id}`
+}
+
+function warm(a: NonNullable<BreakingNewsHeroType['articles']>) {
+  setArticlePreview(a as unknown as Article)
 }
 
 export default function BreakingNewsTicker({ items }: Props) {
@@ -30,7 +35,9 @@ export default function BreakingNewsTicker({ items }: Props) {
               <button
                 key={`${item.id}-${idx}`}
                 type="button"
-                onClick={() => navigate(postUrl(item.articles!))}
+                onClick={() => { warm(item.articles!); navigateInstant(navigate, postUrl(item.articles!)) }}
+                onMouseEnter={() => warm(item.articles!)}
+                onTouchStart={() => warm(item.articles!)}
                 className="text-[11px] sm:text-sm font-medium hover:underline underline-offset-2 whitespace-nowrap"
               >
                 {item.articles!.title}
